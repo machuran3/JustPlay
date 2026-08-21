@@ -1,0 +1,640 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.drawerlayout.widget.DrawerLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawerLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F111A">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="#1A1C29"
+            android:padding="12dp">
+            <TextView
+                android:id="@+id/btnMenuHamburguesa"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="☰"
+                android:textColor="#DEFF9A"
+                android:textSize="26sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="12dp"
+                android:clickable="true"
+                android:focusable="true"/>
+            <TextView
+                android:id="@+id/tvTituloToolbar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Just Play"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:layout_marginStart="8dp"/>
+
+            <TextView
+                android:id="@+id/tvBadgeOffline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📶 Sin Conexión (Solo Lectura)"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:background="#E65100"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
+                android:visibility="gone"/>
+        </LinearLayout>
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <FrameLayout
+                android:id="@+id/mainContent"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/layoutTablero"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="16dp"
+                    android:visibility="visible">
+
+                    <LinearLayout
+                        android:id="@+id/llResumen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        app:layout_constraintTop_toTopOf="parent">
+
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="0dp"
+                            android:layout_height="90dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
+                            app:cardBackgroundColor="#1A1C29"
+                            app:cardCornerRadius="12dp">
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:orientation="vertical"
+                                android:padding="12dp">
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Cines" android:textColor="#A0A0A0" android:textSize="12sp" />
+                                <TextView android:id="@+id/tvMinicineOcupadas" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 / 9" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold" android:layout_marginTop="4dp"/>
+                            </LinearLayout>
+                        </androidx.cardview.widget.CardView>
+
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="0dp"
+                            android:layout_height="90dp"
+                            android:layout_weight="1"
+                            android:layout_marginHorizontal="3dp"
+                            app:cardBackgroundColor="#1A1C29"
+                            app:cardCornerRadius="12dp">
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:orientation="vertical"
+                                android:padding="12dp">
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Autitos" android:textColor="#A0A0A0" android:textSize="12sp" />
+                                <TextView android:id="@+id/tvAutitosOcupados" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 / 8" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold" android:layout_marginTop="4dp"/>
+                            </LinearLayout>
+                        </androidx.cardview.widget.CardView>
+
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="0dp"
+                            android:layout_height="90dp"
+                            android:layout_weight="1"
+                            android:layout_marginHorizontal="3dp"
+                            app:cardBackgroundColor="#1A1C29"
+                            app:cardCornerRadius="12dp">
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:orientation="vertical"
+                                android:padding="12dp">
+                                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Just Dance" android:textColor="#A0A0A0" android:textSize="12sp" />
+                                <TextView android:id="@+id/tvJustDanceOcupados" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 / 1" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold" android:layout_marginTop="4dp"/>
+                            </LinearLayout>
+                        </androidx.cardview.widget.CardView>
+                    </LinearLayout>
+
+                    <androidx.core.widget.NestedScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_marginTop="16dp"
+                        app:layout_constraintTop_toBottomOf="@id/llResumen"
+                        app:layout_constraintBottom_toBottomOf="parent">
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Salas Minicine" android:textColor="#DEFF9A" android:textSize="18sp" android:textStyle="bold" android:layout_marginTop="8dp" android:layout_marginBottom="8dp"/>
+                            <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvSalasMinicine" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Autitos (Simuladores)" android:textColor="#DEFF9A" android:textSize="18sp" android:textStyle="bold" android:layout_marginTop="24dp" android:layout_marginBottom="8dp"/>
+                            <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvSalasAutitos" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Just Dance" android:textColor="#DEFF9A" android:textSize="18sp" android:textStyle="bold" android:layout_marginTop="24dp" android:layout_marginBottom="8dp"/>
+                            <androidx.recyclerview.widget.RecyclerView android:id="@+id/rvSalasJustDance" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+                            <androidx.cardview.widget.CardView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="32dp"
+                                android:layout_marginBottom="16dp"
+                                app:cardBackgroundColor="#1A1C29"
+                                app:cardCornerRadius="12dp">
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="match_parent"
+                                    android:orientation="vertical"
+                                    android:padding="16dp">
+                                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Próximas Reservas (Hoy)" android:textColor="#A0A0A0" android:textSize="14sp" android:textStyle="bold" />
+                                    <LinearLayout
+                                        android:id="@+id/llContenedorReservasDash"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:orientation="vertical"
+                                        android:layout_marginTop="8dp"/>
+                                </LinearLayout>
+                            </androidx.cardview.widget.CardView>
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Desarrollado por Maru"
+                                android:textColor="#1AFFFFFF"
+                                android:textSize="12sp"
+                                android:textStyle="italic"
+                                android:gravity="center"
+                                android:layout_marginTop="8dp"
+                                android:layout_marginBottom="80dp"/>
+
+                        </LinearLayout>
+                    </androidx.core.widget.NestedScrollView>
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+                <LinearLayout
+                    android:id="@+id/layoutRegistro"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:visibility="gone">
+
+                    <!-- CABECERA Y EXPORTAR -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Registro de Sesiones"
+                            android:textColor="#FFFFFF"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+                        <Button
+                            android:id="@+id/btnExportar"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⬇️ Exportar"
+                            android:backgroundTint="#DEFF9A"
+                            android:textColor="#000000"
+                            android:textStyle="bold"/>
+                    </LinearLayout>
+
+                    <!-- TARJETA TOTAL DEL DIA / FILTRADO -->
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="10dp"
+                        app:cardBackgroundColor="#1A1C29"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="3dp">
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="12dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical">
+                                <TextView
+                                    android:id="@+id/tvTituloTotal"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="💰 TOTAL DEL DÍA (HOY):"
+                                    android:textColor="#A0A0A0"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold"/>
+                                <TextView
+                                    android:id="@+id/tvTotalRecaudado"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0.0 Bs"
+                                    android:textColor="#00E676"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold"/>
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/tvDesgloseTotal"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="💵 Efectivo: 0.0 Bs | 📱 QR: 0.0 Bs (0 registros)"
+                                android:textColor="#DEFF9A"
+                                android:textSize="12sp"
+                                android:layout_marginTop="4dp"/>
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+
+                    <!-- BOTONES DE FECHA Y RANGO DE HORAS -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginBottom="8dp">
+
+                        <!-- FILA 1: FECHA Y RESET -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:layout_marginBottom="4dp">
+
+                            <Button
+                                android:id="@+id/btnFiltroFecha"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="📅 Hoy"
+                                android:backgroundTint="#24283B"
+                                android:textColor="#DEFF9A"
+                                android:textSize="12sp"
+                                android:textStyle="bold"/>
+
+                            <Button
+                                android:id="@+id/btnLimpiarFecha"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🔄 Reset Hoy"
+                                android:backgroundTint="#1A1C29"
+                                android:textColor="#A0A0A0"
+                                android:textSize="11sp"
+                                android:layout_marginStart="6dp"/>
+                        </LinearLayout>
+
+                        <!-- FILA 2: RANGO DE HORAS (DESDE - HASTA) -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <Button
+                                android:id="@+id/btnFiltroHoraInicio"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="⏰ Desde: Inicio"
+                                android:backgroundTint="#24283B"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                android:layout_marginEnd="3dp"/>
+
+                            <Button
+                                android:id="@+id/btnFiltroHoraFin"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="⏰ Hasta: Fin"
+                                android:backgroundTint="#24283B"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                android:layout_marginStart="3dp"/>
+
+                            <Button
+                                android:id="@+id/btnLimpiarHoras"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="✖️ Horas"
+                                android:backgroundTint="#1A1C29"
+                                android:textColor="#A0A0A0"
+                                android:textSize="11sp"
+                                android:layout_marginStart="6dp"/>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- CHECKBOXES / SELECCION MULTIPLE TICKEABLE -->
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:scrollbars="none"
+                        android:layout_marginBottom="6dp">
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <CheckBox
+                                android:id="@+id/cbFiltroCine"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🎬 Cines"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"/>
+
+                            <CheckBox
+                                android:id="@+id/cbFiltroAutitos"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🏎️ Autitos"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"
+                                android:layout_marginStart="8dp"/>
+
+                            <CheckBox
+                                android:id="@+id/cbFiltroDance"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="💃 Just Dance"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"
+                                android:layout_marginStart="8dp"/>
+
+                            <CheckBox
+                                android:id="@+id/cbFiltroMostrador"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🛒 Mostrador"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"
+                                android:layout_marginStart="8dp"/>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="20dp"
+                                android:background="#444"
+                                android:layout_marginHorizontal="10dp"/>
+
+                            <CheckBox
+                                android:id="@+id/cbFiltroEfectivo"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="💵 Efectivo"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"/>
+
+                            <CheckBox
+                                android:id="@+id/cbFiltroQR"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="📱 QR"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"
+                                android:layout_marginStart="8dp"/>
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvRegistro"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"/>
+                </LinearLayout>
+
+                <RelativeLayout
+                    android:id="@+id/layoutReservasGenerales"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="16dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvTituloReservasGenerales"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Reservas Programadas"
+                        android:textColor="#FFFFFF"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"/>
+
+                    <androidx.core.widget.NestedScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_below="@id/tvTituloReservasGenerales">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Salas Minicine"
+                                android:textColor="#DEFF9A"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:layout_marginBottom="4dp"/>
+                            <androidx.recyclerview.widget.RecyclerView
+                                android:id="@+id/rvReservasMinicine"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Autitos (Simuladores)"
+                                android:textColor="#DEFF9A"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:layout_marginTop="16dp"
+                                android:layout_marginBottom="4dp"/>
+                            <androidx.recyclerview.widget.RecyclerView
+                                android:id="@+id/rvReservasAutitos"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Just Dance"
+                                android:textColor="#DEFF9A"
+                                android:textSize="16sp"
+                                android:textStyle="bold"
+                                android:layout_marginTop="16dp"
+                                android:layout_marginBottom="4dp"/>
+                            <androidx.recyclerview.widget.RecyclerView
+                                android:id="@+id/rvReservasJustDance"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content" />
+
+                            <Space android:layout_width="match_parent" android:layout_height="80dp"/>
+                        </LinearLayout>
+                    </androidx.core.widget.NestedScrollView>
+
+                    <com.google.android.material.floatingactionbutton.FloatingActionButton
+                        android:id="@+id/fabAgregarReservaPantalla"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentBottom="true"
+                        android:layout_alignParentEnd="true"
+                        android:layout_margin="16dp"
+                        android:src="@android:drawable/ic_input_add"
+                        app:backgroundTint="#DEFF9A"
+                        app:tint="#000000" />
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/layoutVetados"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:padding="16dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvTituloVetados"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Clientes Vetados (Lista Negra)"
+                        android:textColor="#FF5252"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"/>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvVetados"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_below="@id/tvTituloVetados" />
+
+                    <com.google.android.material.floatingactionbutton.FloatingActionButton
+                        android:id="@+id/fabAgregarVetado"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentBottom="true"
+                        android:layout_alignParentEnd="true"
+                        android:layout_margin="16dp"
+                        android:src="@android:drawable/ic_input_add"
+                        app:backgroundTint="#FF5252"
+                        app:tint="#FFFFFF" />
+                </RelativeLayout>
+            </FrameLayout>
+
+            <View
+                android:id="@+id/fabOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#CC000000"
+                android:visibility="gone"
+                android:elevation="6dp"/>
+
+            <LinearLayout
+                android:id="@+id/llFabVenta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_above="@id/llFabReservas"
+                android:layout_alignParentEnd="true"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_vertical"
+                android:visibility="gone"
+                android:elevation="10dp">
+                <androidx.cardview.widget.CardView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    app:cardBackgroundColor="#2A2C39"
+                    app:cardCornerRadius="8dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Venta Mostrador" android:textColor="#FFF" android:textStyle="bold" android:paddingHorizontal="12dp" android:paddingVertical="8dp"/>
+                </androidx.cardview.widget.CardView>
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fabVenta"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:fabSize="mini"
+                    android:src="@android:drawable/ic_menu_agenda"                    app:backgroundTint="#DEFF9A"
+                    app:tint="#000" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/llFabReservas"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_above="@id/fabMain"
+                android:layout_alignParentEnd="true"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_vertical"
+                android:visibility="gone"
+                android:elevation="10dp">
+                <androidx.cardview.widget.CardView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    app:cardBackgroundColor="#2A2C39"
+                    app:cardCornerRadius="8dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ver Reservas" android:textColor="#FFF" android:textStyle="bold" android:paddingHorizontal="12dp" android:paddingVertical="8dp"/>
+                </androidx.cardview.widget.CardView>
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/fabReservas"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:fabSize="mini"
+                    android:src="@android:drawable/ic_menu_today"
+                    app:backgroundTint="#DEFF9A"
+                    app:tint="#000" />
+            </LinearLayout>
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fabMain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentEnd="true"
+                android:layout_margin="16dp"
+                android:src="@android:drawable/ic_input_add"
+                android:elevation="10dp"
+                app:backgroundTint="#DEFF9A"
+                app:tint="#000000" />
+
+        </RelativeLayout>
+    </LinearLayout>
+
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/navigationView"
+        android:layout_width="260dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:backgroundTint="#1A1C29"
+        app:itemTextColor="#FFFFFF"
+        app:itemIconTint="#DEFF9A"/>
+
+</androidx.drawerlayout.widget.DrawerLayout>

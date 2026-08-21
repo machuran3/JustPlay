@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    app:cardBackgroundColor="#1A1C29"
+    app:cardCornerRadius="16dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:id="@+id/tvTituloDialog"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Nueva Función"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp"/>
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etCliente"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Nombre del Cliente"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#A0A0A0"
+                android:backgroundTint="#DEFF9A"
+                android:inputType="textPersonName"/>
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etCelular"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Celular (Para verificar Vetos)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#A0A0A0"
+                android:backgroundTint="#DEFF9A"
+                android:inputType="phone"
+                android:layout_marginTop="8dp"/>
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etPelicula"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Película / Juego"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#A0A0A0"
+                android:backgroundTint="#DEFF9A"
+                android:layout_marginTop="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etTiempo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Tiempo (Ej: 1:20)"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#A0A0A0"
+                    android:backgroundTint="#DEFF9A"
+                    android:inputType="time"
+                    android:layout_marginEnd="4dp"/>
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etPrecioSala"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Precio Sala (Bs)"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#A0A0A0"
+                    android:backgroundTint="#FFC107"
+                    android:inputType="numberDecimal"
+                    android:textStyle="bold"
+                    android:layout_marginStart="4dp"/>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#333" android:layout_marginVertical="16dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Añadir Consumo (Snacks/Bebidas)"
+                android:textColor="#A0A0A0"
+                android:textSize="14sp"
+                android:layout_marginBottom="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <EditText
+                    android:id="@+id/etPedCantidad"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="Cant"
+                    android:inputType="number"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#666"
+                    android:textSize="14sp"
+                    android:backgroundTint="#DEFF9A"/>
+
+                <EditText
+                    android:id="@+id/etPedNombre"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="3"
+                    android:hint="Producto"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#666"
+                    android:textSize="14sp"
+                    android:backgroundTint="#DEFF9A"
+                    android:layout_marginHorizontal="4dp"/>
+
+                <EditText
+                    android:id="@+id/etPedPrecio"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.5"
+                    android:hint="Precio Unit"
+                    android:inputType="numberDecimal"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#666"
+                    android:textSize="14sp"
+                    android:backgroundTint="#DEFF9A"/>
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnAgregarPedido"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="+ Añadir Producto"
+                android:backgroundTint="#2A2C39"
+                android:textColor="#DEFF9A"
+                android:layout_marginTop="8dp"/>
+
+            <LinearLayout
+                android:id="@+id/llListaPedidos"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp"/>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#333" android:layout_marginVertical="14dp"/>
+
+            <!-- METODO DE PAGO -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💳 Método de Pago"
+                android:textColor="#DEFF9A"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp"/>
+
+            <RadioGroup
+                android:id="@+id/rgMetodoPago"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <RadioButton
+                    android:id="@+id/rbPagoEfectivo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="💵 Efectivo"
+                    android:textColor="#FFFFFF"
+                    android:checked="true"/>
+                <RadioButton
+                    android:id="@+id/rbPagoQR"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="📱 QR"
+                    android:textColor="#FFFFFF"/>
+                <RadioButton
+                    android:id="@+id/rbPagoMixto"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="💵📱 Mixto"
+                    android:textColor="#FFFFFF"/>
+            </RadioGroup>
+
+            <!-- SECCION PAGO MIXTO -->
+            <LinearLayout
+                android:id="@+id/llSeccionMixto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#1E2337"
+                android:padding="10dp"
+                android:layout_marginTop="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💵 Monto en Efectivo:"
+                    android:textColor="#DEFF9A"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/etMontoEfectivoMixto"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal"
+                    android:hint="Ej. 30 (Bs en efectivo)"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#A0A0A0"
+                    android:backgroundTint="#DEFF9A" />
+
+                <TextView
+                    android:id="@+id/tvMontoQRMixto"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="📱 Saldo en QR: 0.0 Bs"
+                    android:textColor="#FFC107"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- SECCION COMPROBANTE QR -->
+            <LinearLayout
+                android:id="@+id/llSeccionQR"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#222536"
+                android:padding="12dp"
+                android:layout_marginTop="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Foto del Comprobante QR:"
+                    android:textColor="#A0A0A0"
+                    android:textSize="13sp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <Button
+                        android:id="@+id/btnTomarFotoQR"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="📷 Cámara"
+                        android:textSize="12sp"
+                        android:backgroundTint="#2A2C39"
+                        android:textColor="#DEFF9A"
+                        android:layout_marginEnd="4dp"/>
+
+                    <Button
+                        android:id="@+id/btnGaleriaQR"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="🖼️ Galería"
+                        android:textSize="12sp"
+                        android:backgroundTint="#2A2C39"
+                        android:textColor="#DEFF9A"
+                        android:layout_marginStart="4dp"/>
+                </LinearLayout>
+
+                <!-- PREVIEW DE LA FOTO -->
+                <RelativeLayout
+                    android:id="@+id/rlPreviewQR"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/ivPreviewQR"
+                        android:layout_width="90dp"
+                        android:layout_height="90dp"
+                        android:background="#1A1C29"
+                        android:scaleType="centerCrop"
+                        android:contentDescription="Miniatura Comprobante"/>
+
+                    <TextView
+                        android:id="@+id/tvEstadoFotoQR"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_toEndOf="@id/ivPreviewQR"
+                        android:layout_marginStart="12dp"
+                        android:text="✅ Comprobante adjuntado"
+                        android:textColor="#00E676"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvVerFotoQR"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_toEndOf="@id/ivPreviewQR"
+                        android:layout_below="@id/tvEstadoFotoQR"
+                        android:layout_marginStart="12dp"
+                        android:layout_marginTop="4dp"
+                        android:text="🔍 Toca para ampliar"
+                        android:textColor="#DEFF9A"
+                        android:textSize="12sp"
+                        android:clickable="true"
+                        android:focusable="true"/>
+
+                    <TextView
+                        android:id="@+id/btnEliminarFotoQR"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:text="🗑️ Quitar"
+                        android:textColor="#FF5252"
+                        android:textSize="13sp"
+                        android:padding="6dp"
+                        android:clickable="true"
+                        android:focusable="true"/>
+                </RelativeLayout>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#333" android:layout_marginVertical="14dp"/>
+
+            <!-- GRAN TOTAL -->
+            <TextView
+                android:id="@+id/tvTotalCuenta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="TOTAL: 0.0 Bs"
+                android:textColor="#00E676"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textAlignment="center"
+                android:layout_marginBottom="16dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end">
+                <Button
+                    android:id="@+id/btnCancelar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Cancelar"
+                    android:backgroundTint="@android:color/transparent"
+                    android:textColor="#A0A0A0"/>
+                <Button
+                    android:id="@+id/btnConfirmar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Guardar"
+                    android:backgroundTint="#DEFF9A"
+                    android:textColor="#000000"
+                    android:textStyle="bold"
+                    android:layout_marginStart="8dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</androidx.cardview.widget.CardView>

@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    app:cardBackgroundColor="#1A1C29"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- HEADER -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvTituloDetalleSoloLectura"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🎬 Minicine - Sala 1"
+                android:textColor="#DEFF9A"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/btnCerrarDetalleSoloLecturaX"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✕"
+                android:textColor="#A0A0A0"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:padding="6dp"
+                android:clickable="true"
+                android:focusable="true"/>
+        </LinearLayout>
+
+        <!-- BADGE ESTADO -->
+        <TextView
+            android:id="@+id/tvBadgeEstadoSoloLectura"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔴 OCUPADA"
+            android:textColor="#FF5252"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="#2A2C39"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:layout_marginTop="8dp"/>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#2E334D"
+            android:layout_marginVertical="12dp"/>
+
+        <!-- CONTENEDOR INFORMACION DE OCUPACION -->
+        <LinearLayout
+            android:id="@+id/llInfoOcupadaSoloLectura"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- CLIENTE -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👤 Cliente:"
+                    android:textColor="#A0A0A0"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="8dp"/>
+                <TextView
+                    android:id="@+id/tvClienteDetalleSoloLectura"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Juan Pérez (70012345)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+
+            <!-- TIEMPO / CUENTA REGRESIVA -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⏱️ Tiempo Restante:"
+                    android:textColor="#A0A0A0"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="8dp"/>
+                <TextView
+                    android:id="@+id/tvTiempoRestanteDetalleSoloLectura"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:35:12"
+                    android:textColor="#DEFF9A"
+                    android:textSize="15sp"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+
+            <!-- HORA FIN -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🏁 Finaliza a las:"
+                    android:textColor="#A0A0A0"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="8dp"/>
+                <TextView
+                    android:id="@+id/tvHoraFinDetalleSoloLectura"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="18:30"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+
+            <!-- PELICULA / CONTENIDO -->
+            <LinearLayout
+                android:id="@+id/llFilaPeliculaSoloLectura"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎬 Película/Contenido:"
+                    android:textColor="#A0A0A0"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="8dp"/>
+                <TextView
+                    android:id="@+id/tvPeliculaDetalleSoloLectura"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Avatar 2"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+
+            <!-- PEDIDOS / CONSUMOS -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🍿 Consumos agregados:"
+                android:textColor="#A0A0A0"
+                android:textSize="14sp"
+                android:layout_marginTop="4dp"/>
+
+            <TextView
+                android:id="@+id/tvPedidosDetalleSoloLectura"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ninguno"
+                android:textColor="#DEFF9A"
+                android:textSize="13sp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="8dp"/>
+
+            <!-- TOTAL Y METODO DE PAGO -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="4dp">
+
+                <TextView
+                    android:id="@+id/tvTotalDetalleSoloLectura"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Total: 35.0 Bs"
+                    android:textColor="#00E676"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/tvMetodoPagoDetalleSoloLectura"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💵 Efectivo"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:background="#2A2C39"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp"/>
+            </LinearLayout>
+
+            <!-- BOTON VER COMPROBANTE QR SI TIENE -->
+            <Button
+                android:id="@+id/btnVerComprobanteDetalleSoloLectura"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="📷 Ver Comprobante QR"
+                android:backgroundTint="#24283B"
+                android:textColor="#DEFF9A"
+                android:layout_marginTop="10dp"
+                android:visibility="gone"/>
+        </LinearLayout>
+
+        <!-- CONTENEDOR CUANDO ESTA DISPONIBLE -->
+        <LinearLayout
+            android:id="@+id/llInfoDisponibleSoloLectura"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🟢 Sala Libre / Disponible"
+                android:textColor="#00E676"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="No hay clientes ocupando esta sala en este momento."
+                android:textColor="#A0A0A0"
+                android:textSize="13sp"
+                android:textAlignment="center"
+                android:layout_marginTop="6dp"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnCerrarDetalleSoloLectura"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cerrar"
+            android:backgroundTint="#2A2C39"
+            android:textColor="#FFFFFF"
+            android:layout_marginTop="16dp"/>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

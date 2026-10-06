@@ -1,0 +1,170 @@
+2026-09-28T13:21:28.139-0400 [DEBUG] [org.gradle.launcher.daemon.bootstrap.DaemonMain] Assuming the daemon was started with following jvm opts: [-Xmx2048m, -Dfile.encoding=UTF-8, -Duser.country=MX, -Duser.language=es, -Duser.variant]
+2026-09-28T13:21:28.367-0400 [DEBUG] [org.gradle.internal.remote.internal.inet.InetAddresses] Adding IP addresses for network interface lo
+2026-09-28T13:21:28.367-0400 [DEBUG] [org.gradle.internal.remote.internal.inet.InetAddresses] Is this a loopback interface? true
+2026-09-28T13:21:28.368-0400 [DEBUG] [org.gradle.internal.remote.internal.inet.InetAddresses] Adding loopback address /0:0:0:0:0:0:0:1%lo
+2026-09-28T13:21:28.368-0400 [DEBUG] [org.gradle.internal.remote.internal.inet.InetAddresses] Adding loopback address /127.0.0.1
+2026-09-28T13:21:28.469-0400 [INFO] [org.gradle.launcher.daemon.server.Daemon] start() called on daemon - DefaultDaemonContext[uid=c0b4bc8d-9724-4b54-8029-5199c4036c4a,javaHome=/usr/lib/jvm/java-21-openjdk-amd64,javaVersion=21,javaVendor=Debian,daemonRegistryDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon,pid=78,idleTimeout=120000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-Xmx2048m,-Dfile.encoding=UTF-8,-Duser.country=MX,-Duser.language=es,-Duser.variant]
+2026-09-28T13:21:28.484-0400 [DEBUG] [org.gradle.internal.remote.internal.inet.TcpIncomingConnector] Listening on [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]].
+2026-09-28T13:21:28.512-0400 [DEBUG] [org.gradle.launcher.daemon.server.Daemon] Daemon starting at: Mon Sep 28 13:21:28 BOT 2026, with address: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+2026-09-28T13:21:28.513-0400 [INFO] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Advertising the daemon address to the clients: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+2026-09-28T13:21:28.514-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Advertised daemon context: DefaultDaemonContext[uid=c0b4bc8d-9724-4b54-8029-5199c4036c4a,javaHome=/usr/lib/jvm/java-21-openjdk-amd64,javaVersion=21,javaVendor=Debian,daemonRegistryDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon,pid=78,idleTimeout=120000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-Xmx2048m,-Dfile.encoding=UTF-8,-Duser.country=MX,-Duser.language=es,-Duser.variant]
+2026-09-28T13:21:28.517-0400 [DEBUG] [org.gradle.launcher.daemon.registry.PersistentDaemonRegistry] Storing daemon address: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]], context: DefaultDaemonContext[uid=c0b4bc8d-9724-4b54-8029-5199c4036c4a,javaHome=/usr/lib/jvm/java-21-openjdk-amd64,javaVersion=21,javaVendor=Debian,daemonRegistryDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon,pid=78,idleTimeout=120000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-Xmx2048m,-Dfile.encoding=UTF-8,-Duser.country=MX,-Duser.language=es,-Duser.variant]
+2026-09-28T13:21:28.534-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Waiting to acquire exclusive lock on daemon addresses registry.
+2026-09-28T13:21:28.545-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Lock acquired on daemon addresses registry.
+2026-09-28T13:21:28.547-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on daemon addresses registry.
+2026-09-28T13:21:28.551-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Waiting to acquire exclusive lock on daemon addresses registry.
+2026-09-28T13:21:28.553-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Lock acquired on daemon addresses registry.
+2026-09-28T13:21:28.562-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on daemon addresses registry.
+2026-09-28T13:21:28.563-0400 [LIFECYCLE] [org.gradle.launcher.daemon.server.Daemon] Daemon server started.
+2026-09-28T13:21:28.565-0400 [DEBUG] [org.gradle.launcher.daemon.bootstrap.DaemonStartupCommunication] Completed writing the daemon greeting. Closing streams...
+2026-09-28T13:21:28.582-0400 [DEBUG] [org.gradle.launcher.daemon.server.Daemon] stopOnExpiration() called on daemon
+2026-09-28T13:21:28.585-0400 [DEBUG] [org.gradle.launcher.daemon.server.Daemon] awaitExpiration() called on daemon
+2026-09-28T13:21:28.587-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] daemon is running. Sleeping until state changes.
+2026-09-28T13:21:28.607-0400 [DEBUG] [org.gradle.internal.remote.internal.inet.TcpIncomingConnector] Accepted connection from /127.0.0.1:55738 to /127.0.0.1:46741.
+2026-09-28T13:21:28.662-0400 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 39: received class org.gradle.launcher.daemon.protocol.Build
+2026-09-28T13:21:28.663-0400 [DEBUG] [org.gradle.launcher.daemon.server.DefaultDaemonConnection] thread 39: Received non-IO message from client: Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop}
+2026-09-28T13:21:28.665-0400 [INFO] [org.gradle.launcher.daemon.server.DefaultIncomingConnectionHandler] Received command: Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop}.
+2026-09-28T13:21:28.666-0400 [DEBUG] [org.gradle.launcher.daemon.server.DefaultIncomingConnectionHandler] Starting executing command: Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop} with connection: socket connection from /127.0.0.1:46741 to /127.0.0.1:55738.
+2026-09-28T13:21:28.671-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] Command execution: started DaemonCommandExecution[command = Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop}, connection = DefaultDaemonConnection: socket connection from /127.0.0.1:46741 to /127.0.0.1:55738] after 0.003266666666666667 minutes of idle
+2026-09-28T13:21:28.673-0400 [INFO] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Marking the daemon as busy, address: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+2026-09-28T13:21:28.673-0400 [DEBUG] [org.gradle.launcher.daemon.registry.PersistentDaemonRegistry] Marking busy by address: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+2026-09-28T13:21:28.675-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Waiting to acquire exclusive lock on daemon addresses registry.
+2026-09-28T13:21:28.677-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Lock acquired on daemon addresses registry.
+2026-09-28T13:21:28.681-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on daemon addresses registry.
+2026-09-28T13:21:28.683-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] resetting idle timer
+2026-09-28T13:21:28.684-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] daemon is running. Sleeping until state changes.
+2026-09-28T13:21:28.686-0400 [INFO] [org.gradle.launcher.daemon.server.exec.StartBuildOrRespondWithBusy] Daemon is about to start building Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop}. Dispatching build started information...
+2026-09-28T13:21:28.688-0400 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 41: dispatching org.gradle.launcher.daemon.protocol.BuildStarted@7cc03771
+2026-09-28T13:21:28.693-0400 [DEBUG] [org.gradle.launcher.daemon.server.exec.EstablishBuildEnvironment] Configuring env variables: [PATH, XAUTHORITY, INVOCATION_ID, XMODIFIERS, ANTIGRAVITY_LS_ADDRESS, XDG_DATA_DIRS, GDMSESSION, ANTIGRAVITY_CONVERSATION_ID, ANTIGRAVITY_CSRF_TOKEN, GIT_PAGER, ANTIGRAVITY_PROJECT_ID, DBUS_SESSION_BUS_ADDRESS, XDG_CURRENT_DESKTOP, JOURNAL_STREAM, USERNAME, SESSION_MANAGER, LOGNAME, ANTIGRAVITY_LS_VERSION, AGY_BROWSER_ACTIVE_PORT_FILE, MANAGERPID, PWD, LANGUAGE, GJS_DEBUG_TOPICS, SHELL, CHROME_DESKTOP, PAGER, GIO_LAUNCHED_DESKTOP_FILE, GNOME_DESKTOP_SESSION_ID, CHROME_DEVTOOLS_MCP_JS, GTK_MODULES, ZSH_TMUX_AUTOSTARTED, SYSTEMD_EXEC_PID, LS_COLORS, XDG_SESSION_DESKTOP, SHLVL, MEMORY_PRESSURE_WRITE, ANTIGRAVITY_SOURCE_METADATA, QT_IM_MODULE, MEMORY_PRESSURE_WATCH, ANTIGRAVITY_TRAJECTORY_ID, TERM, LANG, XDG_SESSION_TYPE, AGY_BROWSER_WS_URL, DISPLAY, FC_FONTATIONS, XDG_SESSION_CLASS, _, GDM_LANG, DISABLE_AUTO_UPDATE, ANTIGRAVITY_AGENTAPI_EXE, GDK_BACKEND, GPG_AGENT_INFO, DESKTOP_SESSION, USER, XDG_MENU_PREFIX, GIO_LAUNCHED_DESKTOP_FILE_PID, WINDOWPATH, ZSH_TMUX_AUTOSTART, QT_ACCESSIBILITY, GJS_DEBUG_OUTPUT, SSH_AUTH_SOCK, NO_AT_BRIDGE, ANTIGRAVITY_AGENT, XDG_RUNTIME_DIR, HOME]
+2026-09-28T13:21:28.702-0400 [DEBUG] [org.gradle.launcher.daemon.server.exec.LogToClient] About to start relaying all logs to the client via the connection.
+2026-09-28T13:21:28.703-0400 [INFO] [org.gradle.launcher.daemon.server.exec.LogToClient] The client will now receive all logging from the daemon (pid: 78). The daemon log file: /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon/9.5.0/daemon-78.out.log
+2026-09-28T13:21:28.708-0400 [DEBUG] [org.gradle.launcher.daemon.server.exec.RequestStopIfSingleUsedDaemon] Requesting daemon stop after processing Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop}
+2026-09-28T13:21:28.708-0400 [LIFECYCLE] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] Daemon will be stopped at the end of the build 
+2026-09-28T13:21:28.709-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] Stop as soon as idle requested. The daemon is busy
+2026-09-28T13:21:28.710-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] daemon stop has been requested. Sleeping until state changes.
+2026-09-28T13:21:28.717-0400 [DEBUG] [org.gradle.launcher.daemon.server.exec.ExecuteBuild] The daemon has started executing the build.
+2026-09-28T13:21:28.718-0400 [DEBUG] [org.gradle.launcher.daemon.server.exec.ExecuteBuild] Executing build with daemon context: DefaultDaemonContext[uid=c0b4bc8d-9724-4b54-8029-5199c4036c4a,javaHome=/usr/lib/jvm/java-21-openjdk-amd64,javaVersion=21,javaVendor=Debian,daemonRegistryDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon,pid=78,idleTimeout=120000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-Xmx2048m,-Dfile.encoding=UTF-8,-Duser.country=MX,-Duser.language=es,-Duser.variant]
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Build file '/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/build.gradle.kts' line: 4
+
+* What went wrong:
+Plugin [id: 'org.jetbrains.kotlin.jvm', version: '2.0.0'] was not found in any of the following sources:
+
+- Gradle Core Plugins (plugin is not in 'org.gradle' namespace)
+- Included Builds (No included builds contain this plugin)
+- Plugin Repositories (could not resolve plugin artifact 'org.jetbrains.kotlin.jvm:org.jetbrains.kotlin.jvm.gradle.plugin:2.0.0')
+  Searched in the following repositories:
+    Google
+    MavenRepo
+    maven(https://maven.pkg.jetbrains.space/public/p/compose/dev)
+    Gradle Central Plugin Repository
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 19s
+2026-09-28T13:21:45.569-0400 [DEBUG] [org.gradle.launcher.daemon.server.exec.ExecuteBuild] The daemon has finished executing the build.
+2026-09-28T13:21:45.580-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] daemon stop has been requested. Sleeping until state changes.
+2026-09-28T13:21:45.580-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] Command execution: finished waiting for DaemonCommandExecution[command = Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop}, connection = DefaultDaemonConnection: socket connection from /127.0.0.1:46741 to /127.0.0.1:55738]. Result org.gradle.launcher.daemon.server.DaemonStateCoordinator@68353826 with state StopRequested
+2026-09-28T13:21:45.581-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] Command execution: completed DaemonCommandExecution[command = Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop}, connection = DefaultDaemonConnection: socket connection from /127.0.0.1:46741 to /127.0.0.1:55738]
+2026-09-28T13:21:45.581-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] resetting idle timer
+2026-09-28T13:21:45.581-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] Marking daemon stopped due to command completed and stop requested. The daemon is not running a build
+2026-09-28T13:21:45.582-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] daemon has stopped.
+2026-09-28T13:21:45.582-0400 [DEBUG] [org.gradle.launcher.daemon.server.exec.ReturnResult] Daemon is dispatching the build result: Success[value=org.gradle.launcher.exec.BuildActionResult@b723263]
+2026-09-28T13:21:45.582-0400 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 38: dispatching Success[value=org.gradle.launcher.exec.BuildActionResult@b723263]
+2026-09-28T13:21:45.582-0400 [DEBUG] [org.gradle.launcher.daemon.server.Daemon] stop() called on daemon
+2026-09-28T13:21:45.582-0400 [INFO] [org.gradle.launcher.daemon.server.Daemon] Stop requested. Daemon is removing its presence from the registry...
+2026-09-28T13:21:45.583-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Removing our presence to clients, eg. removing this address from the registry: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+2026-09-28T13:21:45.583-0400 [DEBUG] [org.gradle.launcher.daemon.registry.PersistentDaemonRegistry] Removing daemon address: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+2026-09-28T13:21:45.584-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Waiting to acquire exclusive lock on daemon addresses registry.
+2026-09-28T13:21:45.584-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Lock acquired on daemon addresses registry.
+2026-09-28T13:21:45.585-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on daemon addresses registry.
+2026-09-28T13:21:45.586-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Address removed from registry.
+2026-09-28T13:21:45.589-0400 [DEBUG] [org.gradle.launcher.daemon.server.exec.CleanUpVirtualFileSystemAfterBuild] Cleaning virtual file system after build finished
+2026-09-28T13:21:45.589-0400 [DEBUG] [org.gradle.launcher.daemon.server.DefaultIncomingConnectionHandler] Finishing executing command: Build{id=25a9c1a8-b1f6-4a7c-81b0-11edd2385493, currentDir=/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop}
+2026-09-28T13:21:45.622-0400 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 39: received class org.gradle.launcher.daemon.protocol.CloseInput
+2026-09-28T13:21:45.623-0400 [DEBUG] [org.gradle.launcher.daemon.server.DefaultDaemonConnection] thread 39: Received IO message from client: org.gradle.launcher.daemon.protocol.CloseInput@3bad6fc4
+2026-09-28T13:21:45.623-0400 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 39: received class org.gradle.launcher.daemon.protocol.Finished
+2026-09-28T13:21:45.623-0400 [DEBUG] [org.gradle.launcher.daemon.server.DefaultDaemonConnection] thread 39: Received non-IO message from client: org.gradle.launcher.daemon.protocol.Finished@11f749ba
+2026-09-28T13:21:45.623-0400 [DEBUG] [org.gradle.launcher.daemon.server.DefaultIncomingConnectionHandler] Received finished message: org.gradle.launcher.daemon.protocol.Finished@11f749ba
+2026-09-28T13:21:45.623-0400 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 38: stopping connection
+2026-09-28T13:21:45.625-0400 [DEBUG] [org.gradle.internal.remote.internal.inet.SocketConnection] Discarding EOFException: java.io.EOFException
+2026-09-28T13:21:45.625-0400 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 39: received null
+2026-09-28T13:21:45.625-0400 [DEBUG] [org.gradle.launcher.daemon.server.DefaultDaemonConnection] thread 39: Received end-of-input from client.
+2026-09-28T13:21:45.626-0400 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 38: stopping connection
+2026-09-28T13:21:45.628-0400 [DEBUG] [org.gradle.cache.internal.DefaultCacheCoordinator] Cache jars (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/jars-9) was closed 0 times.
+2026-09-28T13:21:45.628-0400 [DEBUG] [org.gradle.cache.internal.LockOnDemandCrossProcessCacheAccess] Releasing file lock for file content cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/fileContent)
+2026-09-28T13:21:45.629-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on file content cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/fileContent).
+2026-09-28T13:21:45.629-0400 [DEBUG] [org.gradle.internal.watch.vfs.impl.WatchingVirtualFileSystem] Closing VFS, dropping state
+2026-09-28T13:21:45.630-0400 [DEBUG] [org.gradle.cache.internal.LockOnDemandCrossProcessCacheAccess] Releasing file lock for Generated Gradle JARs cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/generated-gradle-jars)
+2026-09-28T13:21:45.630-0400 [DEBUG] [org.gradle.internal.watch.registry.impl.DefaultFileWatcherRegistry] Finished listening to file system change events
+2026-09-28T13:21:45.630-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on Generated Gradle JARs cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/generated-gradle-jars).
+2026-09-28T13:21:45.631-0400 [DEBUG] [org.gradle.cache.internal.LockOnDemandCrossProcessCacheAccess] Releasing file lock for artifact cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/modules-2)
+2026-09-28T13:21:45.632-0400 [DEBUG] [org.gradle.cache.internal.btree.BTreePersistentIndexedCache] Closing cache module-metadata.bin (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/modules-2/metadata-2.107/module-metadata.bin)
+2026-09-28T13:21:45.632-0400 [DEBUG] [org.gradle.cache.internal.btree.BTreePersistentIndexedCache] Closing cache resource-at-url.bin (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/modules-2/metadata-2.107/resource-at-url.bin)
+2026-09-28T13:21:45.632-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on artifact cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/modules-2).
+2026-09-28T13:21:45.634-0400 [DEBUG] [org.gradle.cache.internal.LockOnDemandCrossProcessCacheAccess] Releasing file lock for journal cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/journal-1)
+2026-09-28T13:21:45.634-0400 [DEBUG] [org.gradle.cache.internal.btree.BTreePersistentIndexedCache] Closing cache file-access.bin (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/journal-1/file-access.bin)
+2026-09-28T13:21:45.635-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on journal cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/journal-1).
+2026-09-28T13:21:45.635-0400 [DEBUG] [org.gradle.cache.internal.LockOnDemandCrossProcessCacheAccess] Releasing file lock for file hash cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/fileHashes)
+2026-09-28T13:21:45.636-0400 [DEBUG] [org.gradle.cache.internal.btree.BTreePersistentIndexedCache] Closing cache kotlinDslCompileAvoidanceClasspathHashCache.bin (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/fileHashes/kotlinDslCompileAvoidanceClasspathHashCache.bin)
+2026-09-28T13:21:45.636-0400 [DEBUG] [org.gradle.cache.internal.btree.BTreePersistentIndexedCache] Closing cache fileHashes.bin (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/fileHashes/fileHashes.bin)
+2026-09-28T13:21:45.636-0400 [DEBUG] [org.gradle.cache.internal.btree.BTreePersistentIndexedCache] Closing cache KotlinMetadataCompatibilityCache.bin (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/fileHashes/KotlinMetadataCompatibilityCache.bin)
+2026-09-28T13:21:45.637-0400 [DEBUG] [org.gradle.cache.internal.btree.BTreePersistentIndexedCache] Closing cache resourceHashesCache.bin (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/fileHashes/resourceHashesCache.bin)
+2026-09-28T13:21:45.637-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on file hash cache (/home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches/9.5.0/fileHashes).
+2026-09-28T13:21:45.638-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Build operation 'Deleting unused version-specific caches in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches' started
+2026-09-28T13:21:45.654-0400 [DEBUG] [org.gradle.cache.internal.VersionSpecificCacheCleanupAction] Processed version-specific caches at /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches for cleanup in 0.015 secs
+2026-09-28T13:21:45.655-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Completing Build operation 'Deleting unused version-specific caches in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches'
+2026-09-28T13:21:45.655-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Build operation 'Deleting unused version-specific caches in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/caches' completed
+2026-09-28T13:21:45.660-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Build operation 'Deleting unused Gradle distributions in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/wrapper/dists' started
+2026-09-28T13:21:45.661-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Completing Build operation 'Deleting unused Gradle distributions in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/wrapper/dists'
+2026-09-28T13:21:45.661-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Build operation 'Deleting unused Gradle distributions in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/wrapper/dists' completed
+2026-09-28T13:21:45.663-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Build operation 'Deleting old daemon log files in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon' started
+2026-09-28T13:21:45.664-0400 [DEBUG] [org.gradle.cache.internal.DaemonLogCleanupAction] Processed daemon logs at /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon for cleanup in 0.001 secs
+2026-09-28T13:21:45.664-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Completing Build operation 'Deleting old daemon log files in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon'
+2026-09-28T13:21:45.665-0400 [DEBUG] [org.gradle.internal.operations.DefaultBuildOperationRunner] Build operation 'Deleting old daemon log files in /home/maru/AndroidStudioProjects/JustPlay_POS_Desktop/.gradle-user-home/daemon' completed
+2026-09-28T13:21:45.665-0400 [DEBUG] [org.gradle.launcher.daemon.server.Daemon] stop() called on daemon
+2026-09-28T13:21:45.665-0400 [INFO] [org.gradle.launcher.daemon.server.Daemon] Stop requested. Daemon is removing its presence from the registry...
+2026-09-28T13:21:45.665-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Removing our presence to clients, eg. removing this address from the registry: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+2026-09-28T13:21:45.665-0400 [DEBUG] [org.gradle.launcher.daemon.registry.PersistentDaemonRegistry] Removing daemon address: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+2026-09-28T13:21:45.666-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Waiting to acquire exclusive lock on daemon addresses registry.
+2026-09-28T13:21:45.666-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Lock acquired on daemon addresses registry.
+2026-09-28T13:21:45.668-0400 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on daemon addresses registry.
+2026-09-28T13:21:45.669-0400 [DEBUG] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Address removed from registry.
+2026-09-28T13:21:45.670-0400 [DEBUG] [org.gradle.cache.internal.locklistener.DefaultFileLockContentionHandler] File lock listener thread completed.
+2026-09-28T13:21:45.674-0400 [DEBUG] [java.lang.Runtime] Runtime.exit() called with status: 0
+java.lang.Throwable: Runtime.exit(0)
+	at java.base/java.lang.Shutdown.logRuntimeExit(Shutdown.java:179)
+	at java.base/java.lang.Shutdown.exit(Shutdown.java:160)
+	at java.base/java.lang.Runtime.exit(Runtime.java:188)
+	at java.base/java.lang.System.exit(System.java:1921)
+	at org.gradle.launcher.bootstrap.ProcessCompleter.complete(ProcessCompleter.java:21)
+	at org.gradle.launcher.bootstrap.EntryPoint.run(EntryPoint.java:62)
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at org.gradle.launcher.bootstrap.ProcessBootstrap.runNoExit(ProcessBootstrap.java:72)
+	at org.gradle.launcher.bootstrap.ProcessBootstrap.run(ProcessBootstrap.java:39)
+	at org.gradle.launcher.daemon.bootstrap.GradleDaemon.main(GradleDaemon.java:22)
+2026-09-28T13:21:45.676-0400 [DEBUG] [org.gradle.launcher.daemon.registry.PersistentDaemonRegistry] Removing daemon address: [89e52a26-50e6-44a1-bbf7-06959c2f1158 port:46741, addresses:[localhost/127.0.0.1]]
+Daemon vm is shutting down... The daemon has exited normally or was terminated in response to a user interrupt.
+2026-09-28T13:21:45.677-0400 [DEBUG] [org.gradle.launcher.daemon.server.Daemon] VM shutdown hook was unable to remove the daemon address from the registry. It will be cleaned up later.
+java.lang.IllegalStateException: Cannot start managing file contention because this handler has been closed.
+	at org.gradle.cache.internal.locklistener.DefaultFileLockContentionHandler.assertNotStopped(DefaultFileLockContentionHandler.java:267)
+	at org.gradle.cache.internal.locklistener.DefaultFileLockContentionHandler.reservePort(DefaultFileLockContentionHandler.java:312)
+	at org.gradle.cache.internal.DefaultFileLockManager.lock(DefaultFileLockManager.java:127)
+	at org.gradle.cache.internal.DefaultFileLockManager.lock(DefaultFileLockManager.java:109)
+	at org.gradle.cache.internal.DefaultFileLockManager.lock(DefaultFileLockManager.java:104)
+	at org.gradle.cache.internal.OnDemandFileAccess.updateFile(OnDemandFileAccess.java:51)
+	at org.gradle.cache.internal.FileBackedObjectHolder.update(FileBackedObjectHolder.java:77)
+	at org.gradle.cache.internal.FileIntegrityViolationSuppressingObjectHolderDecorator.lambda$update$0(FileIntegrityViolationSuppressingObjectHolderDecorator.java:48)
+	at org.gradle.cache.internal.FileIntegrityViolationSuppressingObjectHolderDecorator.doUpdate(FileIntegrityViolationSuppressingObjectHolderDecorator.java:58)
+	at org.gradle.cache.internal.FileIntegrityViolationSuppressingObjectHolderDecorator.update(FileIntegrityViolationSuppressingObjectHolderDecorator.java:48)
+	at org.gradle.launcher.daemon.registry.PersistentDaemonRegistry.remove(PersistentDaemonRegistry.java:133)
+	at org.gradle.launcher.daemon.server.Daemon$1.run(Daemon.java:133)
+	at java.base/java.lang.Thread.run(Thread.java:1583)

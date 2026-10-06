@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        app:cardBackgroundColor="#1A1C29"
+        app:cardCornerRadius="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <!-- CABECERA -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="14dp">
+
+                <TextView
+                    android:id="@+id/tvTituloGestion"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="⚙️ Permisos de Dispositivo"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/btnCerrarGestion"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✕"
+                    android:textColor="#A0A0A0"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:padding="4dp"
+                    android:clickable="true"
+                    android:focusable="true"/>
+            </LinearLayout>
+
+            <!-- INFO HARDWARE -->
+            <TextView
+                android:id="@+id/tvInfoDispositivoHardware"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📱 Dispositivo • ID: 12345678"
+                android:textColor="#DEFF9A"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- NOMBRE / ALIAS -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Nombre / Alias del Empleado o Puesto:"
+                android:textColor="#A0A0A0"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+
+            <EditText
+                android:id="@+id/etGestionNombre"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Ej. Caja Mostrador / Juan Empleado"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#666666"
+                android:backgroundTint="#DEFF9A"
+                android:inputType="textPersonName"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- PIN DE ACCESO -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PIN de Acceso y Operaciones (Requerido para entrar a la app):"
+                android:textColor="#A0A0A0"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+
+            <EditText
+                android:id="@+id/etGestionPin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Ej. 1234"
+                android:textColor="#DEFF9A"
+                android:textColorHint="#666666"
+                android:backgroundTint="#DEFF9A"
+                android:inputType="numberPassword"
+                android:maxLength="8"
+                android:layout_marginBottom="14dp"/>
+
+            <!-- ROL: SOLO ADMINISTRADOR Y EMPLEADO -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Rol asignado:"
+                android:textColor="#A0A0A0"
+                android:textSize="12sp"
+                android:textStyle="bold"/>
+
+            <RadioGroup
+                android:id="@+id/rgGestionRol"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="14dp">
+
+                <RadioButton
+                    android:id="@+id/rbGestionRolEmpleado"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Empleado"
+                    android:textColor="#FFFFFF"
+                    android:checked="true"/>
+
+                <RadioButton
+                    android:id="@+id/rbGestionRolAdmin"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Administrador"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginStart="24dp"/>
+            </RadioGroup>
+
+            <!-- TIEMPO DE CONEXION / ACCESO PERMITIDO -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#24283B"
+                app:cardCornerRadius="10dp"
+                android:layout_marginBottom="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⏱️ Tiempo de Conexión Autorizado:"
+                        android:textColor="#DEFF9A"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="6dp"/>
+
+                    <RadioGroup
+                        android:id="@+id/rgGestionTiempo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <RadioButton
+                            android:id="@+id/rbTiempoIndefinido"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Permanente (Hasta que lo desactive)"
+                            android:textColor="#FFFFFF"
+                            android:checked="true"/>
+
+                        <RadioButton
+                            android:id="@+id/rbTiempo1Hora"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Por 1 Hora"
+                            android:textColor="#FFFFFF"/>
+
+                        <RadioButton
+                            android:id="@+id/rbTiempo8Horas"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Por 8 Horas (Turno de trabajo)"
+                            android:textColor="#FFFFFF"/>
+
+                        <RadioButton
+                            android:id="@+id/rbTiempo1Dia"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Por 1 Día (24 Horas)"
+                            android:textColor="#FFFFFF"/>
+                    </RadioGroup>
+
+                    <TextView
+                        android:id="@+id/tvFechaFinCalculada"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Vigencia: Sin límite de tiempo"
+                        android:textColor="#FFC107"
+                        android:textSize="12sp"
+                        android:layout_marginTop="4dp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- BLOQUEO MANUAL -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#24283B"
+                app:cardCornerRadius="10dp"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🚫 Desactivar / Bloquear Dispositivo"
+                            android:textColor="#FF5252"
+                            android:textSize="14sp"
+                            android:textStyle="bold"/>
+
+                        <CheckBox
+                            android:id="@+id/cbBloquearDispositivo"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:buttonTint="#FF5252"/>
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/etMotivoBloqueoAdmin"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Motivo del bloqueo (opcional)"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#666666"
+                        android:backgroundTint="#FF5252"
+                        android:textSize="12sp"
+                        android:visibility="gone"
+                        android:layout_marginTop="6dp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- BOTONES -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnEliminarDispositivoLista"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🗑️ Desvincular"
+                    android:backgroundTint="#24283B"
+                    android:textColor="#FF5252"
+                    android:textSize="12sp"/>
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"/>
+
+                <Button
+                    android:id="@+id/btnGuardarGestionUsuario"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Guardar Permisos"
+                    android:backgroundTint="#DEFF9A"
+                    android:textColor="#000000"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+</ScrollView>

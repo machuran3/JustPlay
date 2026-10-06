@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
+<<<<<<< HEAD
     <mapping directory="" vcs="Git" />
+=======
+    <mapping directory="$PROJECT_DIR$/Employ_JustPlay" vcs="Git" />
+>>>>>>> 6c41a4c (feat: implement employ, admin, and desktop apps with barcode scanner)
   </component>
 </project>

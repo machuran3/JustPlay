@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="16dp"
+    app:cardBackgroundColor="#1A1C29"
+    app:cardCornerRadius="16dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📝 Datos de Reserva"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp"/>
+
+            <EditText
+                android:id="@+id/etResNombre"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Nombre del Cliente"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#A0A0A0"
+                android:backgroundTint="#DEFF9A"/>
+
+            <EditText
+                android:id="@+id/etResCelular"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="phone"
+                android:hint="Celular (Opcional)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#A0A0A0"
+                android:backgroundTint="#DEFF9A"
+                android:layout_marginTop="8dp"/>
+
+            <!-- SECCION FECHA Y HORA DESTACADA -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🗓️ Programación de Fecha y Hora:"
+                android:textColor="#DEFF9A"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginTop="14dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+
+                <Button
+                    android:id="@+id/btnResFecha"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="📅 Seleccionar Fecha"
+                    android:backgroundTint="#2A2C39"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:textSize="13sp"
+                    android:layout_marginEnd="4dp"/>
+
+                <Button
+                    android:id="@+id/btnResHora"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="⏰ Seleccionar Hora"
+                    android:backgroundTint="#2A2C39"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:textSize="13sp"
+                    android:layout_marginStart="4dp"/>
+            </LinearLayout>
+
+            <!-- TIPO DE SALA -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎮 ¿Qué desea reservar?"
+                android:textColor="#A0A0A0"
+                android:textSize="13sp"
+                android:layout_marginTop="14dp"/>
+
+            <RadioGroup
+                android:id="@+id/rgResTipo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="4dp">
+                <RadioButton android:id="@+id/rbResCine" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Minicine" android:textColor="#FFFFFF" android:checked="true"/>
+                <RadioButton android:id="@+id/rbResAuto" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Autitos" android:textColor="#FFFFFF" />
+                <RadioButton android:id="@+id/rbResDance" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Just Dance" android:textColor="#FFFFFF" />
+            </RadioGroup>
+
+            <!-- CANTIDAD DE VOLANTES (SOLO AUTITOS) -->
+            <LinearLayout
+                android:id="@+id/llResVolantesContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🏎️ Cantidad de Volantes a Reservar:"
+                    android:textColor="#DEFF9A"
+                    android:textSize="13sp"
+                    android:textStyle="bold"/>
+
+                <EditText
+                    android:id="@+id/etResVolantes"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:hint="Cantidad de volantes (ej. 1, 2, etc.)"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#A0A0A0"
+                    android:backgroundTint="#DEFF9A"/>
+            </LinearLayout>
+
+            <!-- TIEMPO / DURACION -->
+            <EditText
+                android:id="@+id/etResDuracion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="time"
+                android:hint="⏳ Tiempo a reservar (ej. 1:00 o 60 min)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#A0A0A0"
+                android:backgroundTint="#DEFF9A"
+                android:layout_marginTop="8dp"/>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#333" android:layout_marginVertical="14dp"/>
+
+            <!-- ADELANTO Y METODO DE PAGO -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💰 Adelanto de Reserva"
+                android:textColor="#DEFF9A"
+                android:textSize="14sp"
+                android:textStyle="bold"/>
+
+            <EditText
+                android:id="@+id/etResAdelanto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal"
+                android:hint="Monto Adelanto en Bs (Opcional)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#A0A0A0"
+                android:backgroundTint="#FFC107"
+                android:layout_marginTop="4dp"/>
+
+            <RadioGroup
+                android:id="@+id/rgResMetodoPago"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <RadioButton
+                    android:id="@+id/rbResPagoEfectivo"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="💵 Efectivo"
+                    android:textColor="#FFFFFF"
+                    android:checked="true"/>
+                <RadioButton
+                    android:id="@+id/rbResPagoQR"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="📱 QR"
+                    android:textColor="#FFFFFF"/>
+                <RadioButton
+                    android:id="@+id/rbResPagoMixto"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="💵📱 Mixto"
+                    android:textColor="#FFFFFF"/>
+            </RadioGroup>
+
+            <!-- SECCION PAGO MIXTO RESERVA -->
+            <LinearLayout
+                android:id="@+id/llResSeccionMixto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#1E2337"
+                android:padding="10dp"
+                android:layout_marginTop="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💵 Monto en Efectivo:"
+                    android:textColor="#DEFF9A"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/etResMontoEfectivoMixto"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="numberDecimal"
+                    android:hint="Ej. 20 (Bs en efectivo)"
+                    android:textColor="#FFFFFF"
+                    android:textColorHint="#A0A0A0"
+                    android:backgroundTint="#DEFF9A" />
+
+                <TextView
+                    android:id="@+id/tvResMontoQRMixto"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="📱 Saldo en QR: 0.0 Bs"
+                    android:textColor="#FFC107"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- COMPROBANTE QR PARA ADELANTO -->
+            <LinearLayout
+                android:id="@+id/llResSeccionQR"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#222536"
+                android:padding="12dp"
+                android:layout_marginTop="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Foto del Comprobante QR (Adelanto):"
+                    android:textColor="#A0A0A0"
+                    android:textSize="13sp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <Button
+                        android:id="@+id/btnResTomarFotoQR"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="📷 Cámara"
+                        android:textSize="12sp"
+                        android:backgroundTint="#2A2C39"
+                        android:textColor="#DEFF9A"
+                        android:layout_marginEnd="4dp"/>
+
+                    <Button
+                        android:id="@+id/btnResGaleriaQR"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="🖼️ Galería"
+                        android:textSize="12sp"
+                        android:backgroundTint="#2A2C39"
+                        android:textColor="#DEFF9A"
+                        android:layout_marginStart="4dp"/>
+                </LinearLayout>
+
+                <RelativeLayout
+                    android:id="@+id/rlResPreviewQR"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:id="@+id/ivResPreviewQR"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:background="#1A1C29"
+                        android:scaleType="centerCrop"
+                        android:contentDescription="Miniatura Comprobante Adelanto"/>
+
+                    <TextView
+                        android:id="@+id/tvResEstadoFotoQR"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_toEndOf="@id/ivResPreviewQR"
+                        android:layout_marginStart="12dp"
+                        android:text="✅ Comprobante adjuntado"
+                        android:textColor="#00E676"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvResVerFotoQR"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_toEndOf="@id/ivResPreviewQR"
+                        android:layout_below="@id/tvResEstadoFotoQR"
+                        android:layout_marginStart="12dp"
+                        android:layout_marginTop="4dp"
+                        android:text="🔍 Toca para ampliar"
+                        android:textColor="#DEFF9A"
+                        android:textSize="12sp"
+                        android:clickable="true"
+                        android:focusable="true"/>
+
+                    <TextView
+                        android:id="@+id/btnResEliminarFotoQR"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:text="🗑️ Quitar"
+                        android:textColor="#FF5252"
+                        android:textSize="13sp"
+                        android:padding="6dp"
+                        android:clickable="true"
+                        android:focusable="true"/>
+                </RelativeLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="20dp"
+                android:gravity="end">
+                <Button
+                    android:id="@+id/btnResCancelar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Cancelar"
+                    android:backgroundTint="@android:color/transparent"
+                    android:textColor="#A0A0A0"/>
+                <Button
+                    android:id="@+id/btnResGuardar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Guardar Reserva"
+                    android:backgroundTint="#DEFF9A"
+                    android:textColor="#000000"
+                    android:textStyle="bold"
+                    android:layout_marginStart="8dp"/>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</androidx.cardview.widget.CardView>

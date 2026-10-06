@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#0F111A"
+    android:padding="20dp">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="#1A1C29"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🚀"
+                    android:textSize="32sp"/>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="¡Actualización Disponible!"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tvUpdateVersiones"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="v1.0.0 ➔ v1.1.0"
+                        android:textColor="#DEFF9A"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#24283B"
+                android:layout_marginVertical="14dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📝 Novedades y Mejoras:"
+                android:textColor="#FFC107"
+                android:textSize="13sp"
+                android:textStyle="bold"/>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxHeight="160dp"
+                android:layout_marginTop="6dp"
+                android:background="#0F111A"
+                android:padding="10dp">
+
+                <TextView
+                    android:id="@+id/tvUpdateNovedades"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="• Correcciones y mejoras de rendimiento.\n• Nuevas funciones disponibles."
+                    android:textColor="#D0D2E0"
+                    android:textSize="13sp"
+                    android:lineSpacingExtra="3dp"/>
+            </ScrollView>
+
+            <ProgressBar
+                android:id="@+id/pbUpdateDescarga"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:indeterminate="false"
+                android:max="100"
+                android:progress="0"
+                android:progressTint="#DEFF9A"
+                android:visibility="gone"
+                android:layout_marginTop="12dp"/>
+
+            <TextView
+                android:id="@+id/tvUpdateEstadoDescarga"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Descargando paquete de actualización..."
+                android:textColor="#DEFF9A"
+                android:textSize="12sp"
+                android:gravity="center"
+                android:visibility="gone"
+                android:layout_marginTop="4dp"/>
+
+            <Button
+                android:id="@+id/btnUpdateDescargarInstalar"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:text="⬇️ Descargar e Instalar APK"
+                android:textColor="#000000"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:backgroundTint="#DEFF9A"
+                android:layout_marginTop="16dp"/>
+
+            <Button
+                android:id="@+id/btnUpdateNavegador"
+                android:layout_width="match_parent"
+                android:layout_height="42dp"
+                android:text="🌐 Abrir enlace en Navegador"
+                android:textColor="#DEFF9A"
+                android:textSize="12sp"
+                android:backgroundTint="#24283B"
+                android:layout_marginTop="8dp"/>
+
+            <Button
+                android:id="@+id/btnUpdateMasTarde"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:text="Recordar más tarde"
+                android:textColor="#888888"
+                android:textSize="12sp"
+                android:backgroundTint="@android:color/transparent"
+                android:layout_marginTop="4dp"/>
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+</LinearLayout>

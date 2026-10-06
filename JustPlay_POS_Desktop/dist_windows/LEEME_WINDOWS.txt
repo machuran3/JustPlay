@@ -1,0 +1,27 @@
+=====================================================
+🎮 JUSTPLAY POS & GESTIÓN DE SALAS - GUÍA PARA WINDOWS
+=====================================================
+
+1. CÓMO EJECUTAR EN CUALQUIER PC CON WINDOWS:
+   - Haz doble clic en "Iniciar_JustPlay_POS.bat" o en "JustPlayPOS.jar".
+   - Si no tienes Java instalado en la PC, instala Java 21 desde https://adoptium.net
+
+2. FLUJO RÁPIDO CON PISTOLA LECTORA Y TECLA ENTER:
+   - Escanear productos con la pistola USB/Bluetooth añade los productos directamente al carrito.
+   - Presionar la tecla ENTER con productos en el carrito abre la ventana de cobro.
+   - Dentro de la ventana de cobro, presionar ENTER completa y sincroniza la venta al instante.
+
+3. CONTEXTO DE VENTA Y SINCRONIZACIÓN CRUZADA (FOTOS DESDE EL CELULAR):
+   - Al cobrar, puedes elegir "Venta de Mostrador" o "Cargar a Sala".
+   - Si la asignas a una sala, el consumo se suma automáticamente a la cuenta de la sala.
+   - En ambos casos, el cajero o empleado puede abrir la app móvil (Employ_JustPlay / AdminJustPlay)
+     para ver la transacción generada desde la PC y tomarle foto al comprobante QR.
+
+4. MÓDULO DE GESTIÓN DE SALAS (ROL EMPLEADO EN PC):
+   - En la pestaña "🎮 Gestión de Salas en Vivo", puedes monitorizar los temporizadores de Minicine,
+     Autitos y Just Dance en tiempo real.
+   - Puedes Iniciar Salas, Sumar Tiempo (+15m, +30m, +1h) y Liberar salas cuando finalice la sesión.
+
+5. CONTROL DE ACCESO DESDE ADMINJUSTPLAY:
+   - El Administrador puede autorizar o bloquear la terminal POS en tiempo real desde:
+     Menú lateral (☰) -> "🖥️ Terminales POS y Catálogo".

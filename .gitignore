@@ -1,0 +1,17 @@
+# Gradle y cachés
+.gradle/
+.custom_gradle/
+.gradle_home/
+build/
+.idea/caches/
+.idea/libraries/
+.kotlin/
+
+# Archivos locales de compilación y salida
+*.jar
+*.war
+*.nar
+*.ear
+*.apk
+*.ap_
+*.aab

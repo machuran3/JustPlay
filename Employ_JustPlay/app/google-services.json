@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "804874248536",
+    "project_id": "justplay-a081e",
+    "storage_bucket": "justplay-a081e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:804874248536:android:83acec0f03ebe2a358052d",
+        "android_client_info": {
+          "package_name": "com.example.minicine01"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIODuiwI7azNdXk4UHBIqjZzP_6bcdni0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

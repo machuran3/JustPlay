@@ -62,5 +62,11 @@ data class PosUiState(
     val currentAppVersion: String = "1.0.0",
     val minRequiredVersion: String = "1.0.0",
     val isDeviceRevoked: Boolean = false,
-    val isVersionObsolete: Boolean = false
+    val isVersionObsolete: Boolean = false,
+
+    // Estados Anti-Spam y Exportación General
+    val isProcessingSale: Boolean = false,
+    val isRoomActionInProgress: Boolean = false,
+    val isExportingMaster: Boolean = false,
+    val masterExportNotification: String? = null
 )

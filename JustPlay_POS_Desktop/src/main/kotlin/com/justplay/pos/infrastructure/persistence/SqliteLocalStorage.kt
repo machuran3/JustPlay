@@ -78,6 +78,18 @@ class SqliteLocalStorage(
                         )
                         """.trimIndent()
                     )
+
+                    // Tabla de Cola Offline de Catálogo de Productos
+                    stmt.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS pending_catalog_sync (
+                            barcode TEXT PRIMARY KEY,
+                            action TEXT NOT NULL,
+                            product_json TEXT,
+                            timestamp TEXT NOT NULL
+                        )
+                        """.trimIndent()
+                    )
                 }
             }
         } catch (e: Exception) {
@@ -250,4 +262,54 @@ class SqliteLocalStorage(
             isDeleted = rs.getInt("is_deleted") == 1
         )
     }
+
+    override suspend fun queuePendingCatalogSync(barcode: String, action: String, product: Product?): Unit = withContext(Dispatchers.IO) {
+        createTablesIfNotExist()
+        val json = if (product != null) gson.toJson(product) else ""
+        val now = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        getConnection().use { conn ->
+            val sql = "INSERT OR REPLACE INTO pending_catalog_sync (barcode, action, product_json, timestamp) VALUES (?, ?, ?, ?)"
+            conn.prepareStatement(sql).use { pstmt ->
+                pstmt.setString(1, barcode)
+                pstmt.setString(2, action)
+                pstmt.setString(3, json)
+                pstmt.setString(4, now)
+                pstmt.executeUpdate()
+            }
+        }
+    }
+
+    override suspend fun getPendingCatalogSync(): List<com.justplay.pos.core.interfaces.PendingCatalogItem> = withContext(Dispatchers.IO) {
+        createTablesIfNotExist()
+        val list = mutableListOf<com.justplay.pos.core.interfaces.PendingCatalogItem>()
+        getConnection().use { conn ->
+            val sql = "SELECT * FROM pending_catalog_sync ORDER BY timestamp ASC"
+            conn.createStatement().use { stmt ->
+                val rs = stmt.executeQuery(sql)
+                while (rs.next()) {
+                    list.add(
+                        com.justplay.pos.core.interfaces.PendingCatalogItem(
+                            barcode = rs.getString("barcode"),
+                            action = rs.getString("action"),
+                            productJson = rs.getString("product_json") ?: "",
+                            timestamp = rs.getString("timestamp") ?: ""
+                        )
+                    )
+                }
+            }
+        }
+        list
+    }
+
+    override suspend fun removePendingCatalogSync(barcode: String): Unit = withContext(Dispatchers.IO) {
+        createTablesIfNotExist()
+        getConnection().use { conn ->
+            val sql = "DELETE FROM pending_catalog_sync WHERE barcode = ?"
+            conn.prepareStatement(sql).use { pstmt ->
+                pstmt.setString(1, barcode)
+                pstmt.executeUpdate()
+            }
+        }
+    }
 }
+

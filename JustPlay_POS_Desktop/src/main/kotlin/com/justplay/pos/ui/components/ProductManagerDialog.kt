@@ -30,7 +30,39 @@ fun ProductManagerDialog(
 ) {
     var barcode by remember { mutableStateOf(initialProduct?.barcode ?: prefillBarcode) }
     var name by remember { mutableStateOf(initialProduct?.name ?: "") }
-    var gramaje by remember { mutableStateOf(initialProduct?.gramaje ?: "") }
+    
+    val initialGramajeRaw = initialProduct?.gramaje?.trim() ?: ""
+    val unitRegex = remember { Regex("""(?i)^([\d.,]+)\s*([a-zA-ZáéíóúÁÉÍÓÚ]+)?$""") }
+    val initialMatch = remember { unitRegex.find(initialGramajeRaw) }
+    var gramajeQty by remember { mutableStateOf(initialMatch?.groupValues?.getOrNull(1) ?: initialGramajeRaw) }
+    var selectedUnit by remember {
+        val parsedUnit = initialMatch?.groupValues?.getOrNull(2)?.lowercase() ?: ""
+        mutableStateOf(
+            when {
+                parsedUnit.startsWith("ml") -> "ml"
+                parsedUnit.startsWith("l") -> "L"
+                parsedUnit.startsWith("kg") || parsedUnit.startsWith("kilo") -> "kg"
+                parsedUnit.startsWith("g") || parsedUnit.startsWith("gr") -> "g"
+                parsedUnit.startsWith("u") || parsedUnit.startsWith("pza") -> "u"
+                initialGramajeRaw.isBlank() -> "ml"
+                else -> "Otro"
+            }
+        )
+    }
+    var customUnitText by remember {
+        mutableStateOf(if (selectedUnit == "Otro") (initialMatch?.groupValues?.getOrNull(2) ?: "") else "")
+    }
+
+    val effectiveGramaje = remember(gramajeQty, selectedUnit, customUnitText) {
+        val q = gramajeQty.trim()
+        if (q.isBlank()) ""
+        else {
+            val u = if (selectedUnit == "Otro") customUnitText.trim() else selectedUnit
+            if (u.isBlank()) q else "$q $u"
+        }
+    }
+
+    var isSaving by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf(initialProduct?.category ?: "Snacks") }
     var price by remember { mutableStateOf(initialProduct?.unitPrice?.toString() ?: "10.0") }
     var costPrice by remember { mutableStateOf(initialProduct?.costPrice?.toString() ?: "5.0") }
@@ -129,35 +161,50 @@ fun ProductManagerDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Nombre y Gramaje/Volumen separados
+                // Nombre del producto
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre del Producto", fontSize = 12.sp) },
+                    isError = isDuplicateName,
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = SurfaceDark,
+                        unfocusedContainerColor = SurfaceDark,
+                        focusedBorderColor = if (isDuplicateName) AlertRed else AccentLime,
+                        unfocusedBorderColor = if (isDuplicateName) AlertRed else BorderDark,
+                        errorBorderColor = AlertRed,
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (isDuplicateName) {
+                    Text(
+                        text = "❌ Ya existe otro producto registrado con este nombre.",
+                        color = AlertRed,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Selección Dinámica de Gramaje / Volumen y Unidad de Medida
+                Text("Gramaje / Volumen & Unidad de Medida:", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        label = { Text("Nombre del Producto", fontSize = 12.sp) },
-                        isError = isDuplicateName,
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = SurfaceDark,
-                            unfocusedContainerColor = SurfaceDark,
-                            focusedBorderColor = if (isDuplicateName) AlertRed else AccentLime,
-                            unfocusedBorderColor = if (isDuplicateName) AlertRed else BorderDark,
-                            errorBorderColor = AlertRed,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1.3f)
-                    )
-
-                    OutlinedTextField(
-                        value = gramaje,
-                        onValueChange = { gramaje = it },
-                        label = { Text("Gramaje/Volumen", fontSize = 12.sp) },
-                        placeholder = { Text("500ml, 1L", fontSize = 11.sp, color = TextMuted) },
+                        value = gramajeQty,
+                        onValueChange = { gramajeQty = it },
+                        label = { Text("Cantidad / Gramaje", fontSize = 11.sp) },
+                        placeholder = { Text("500, 1.5, 250", fontSize = 11.sp, color = TextMuted) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = SurfaceDark,
@@ -168,16 +215,61 @@ fun ProductManagerDialog(
                             unfocusedTextColor = TextPrimary
                         ),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1.2f)
                     )
+
+                    if (selectedUnit == "Otro") {
+                        OutlinedTextField(
+                            value = customUnitText,
+                            onValueChange = { customUnitText = it },
+                            label = { Text("Unidad", fontSize = 11.sp) },
+                            placeholder = { Text("pack, barra", fontSize = 11.sp, color = TextMuted) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = SurfaceDark,
+                                unfocusedContainerColor = SurfaceDark,
+                                focusedBorderColor = AccentLime,
+                                unfocusedBorderColor = BorderDark,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(0.9f)
+                        )
+                    }
                 }
-                if (isDuplicateName) {
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Chips para selector de unidades de medida
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("ml", "L", "g", "kg", "u", "Otro").forEach { unitOpt ->
+                        FilterChip(
+                            selected = selectedUnit == unitOpt,
+                            onClick = { selectedUnit = unitOpt },
+                            label = { Text(unitOpt, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = SurfaceDark,
+                                labelColor = TextSecondary,
+                                selectedContainerColor = AccentLime,
+                                selectedLabelColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                if (effectiveGramaje.isNotBlank()) {
                     Text(
-                        text = "❌ Ya existe otro producto registrado con este nombre.",
-                        color = AlertRed,
+                        text = "🏷️ Presentación resultante: $effectiveGramaje",
+                        color = AccentLime,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 2.dp, top = 4.dp)
                     )
                 }
 
@@ -355,24 +447,25 @@ fun ProductManagerDialog(
 
                     Button(
                         onClick = {
-                            if (canSave) {
+                            if (canSave && !isSaving) {
+                                isSaving = true
                                 onSaveProduct(
                                     Product(
                                         barcode = cleanBarcode,
                                         name = cleanName,
-                                        gramaje = gramaje.trim(),
+                                        gramaje = effectiveGramaje.trim(),
                                         category = category,
                                         unitPrice = price.toDoubleOrNull() ?: 10.0,
                                         costPrice = costPrice.toDoubleOrNull() ?: 5.0,
                                         currentStock = calculatedStock,
                                         minStockAlert = minStock.toIntOrNull() ?: 5,
-                                        unitOfMeasure = unitOfMeasure
+                                        unitOfMeasure = if (selectedUnit == "Otro") customUnitText.ifBlank { "Unidad" } else selectedUnit
                                     ),
                                     initialProduct?.barcode
                                 )
                             }
                         },
-                        enabled = canSave,
+                        enabled = canSave && !isSaving,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AccentLime,
                             contentColor = Color.Black,
@@ -381,9 +474,15 @@ fun ProductManagerDialog(
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Guardar Producto", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        if (isSaving) {
+                            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Guardando...", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        } else {
+                            Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Guardar Producto", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

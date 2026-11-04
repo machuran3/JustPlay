@@ -79,7 +79,11 @@ class ProductCatalogService(
         if (oldBarcode != null && oldBarcode.isNotBlank() && oldBarcode != updated.barcode) {
             currentList.removeAll { it.barcode == oldBarcode }
             scope.launch {
-                cloudSyncService.deleteProductFromCloud(oldBarcode)
+                localStorage.queuePendingCatalogSync(oldBarcode, "DELETE", null)
+                val ok = cloudSyncService.deleteProductFromCloud(oldBarcode)
+                if (ok) {
+                    localStorage.removePendingCatalogSync(oldBarcode)
+                }
             }
         }
 
@@ -93,7 +97,35 @@ class ProductCatalogService(
         _productsFlow.value = currentList
         scope.launch {
             localStorage.cacheProducts(listOf(updated))
-            cloudSyncService.pushProductToCloud(updated)
+            localStorage.queuePendingCatalogSync(updated.barcode, "UPSERT", updated)
+            val ok = cloudSyncService.pushProductToCloud(updated)
+            if (ok) {
+                localStorage.removePendingCatalogSync(updated.barcode)
+            }
+        }
+    }
+
+    suspend fun syncPendingCatalogWithCloud() {
+        try {
+            val pending = localStorage.getPendingCatalogSync()
+            val gson = com.google.gson.Gson()
+            for (item in pending) {
+                if (item.action == "DELETE") {
+                    val ok = cloudSyncService.deleteProductFromCloud(item.barcode)
+                    if (ok) localStorage.removePendingCatalogSync(item.barcode)
+                } else if (item.action == "UPSERT" && item.productJson.isNotBlank()) {
+                    try {
+                        val prod = gson.fromJson(item.productJson, Product::class.java)
+                        val ok = cloudSyncService.pushProductToCloud(prod)
+                        if (ok) localStorage.removePendingCatalogSync(item.barcode)
+                    } catch (_: Exception) {
+                        localStorage.removePendingCatalogSync(item.barcode)
+                    }
+                }
+            }
+            syncWithCloud()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

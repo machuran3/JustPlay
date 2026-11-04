@@ -26,7 +26,9 @@ fun TopStatusBar(
     state: PosUiState,
     onSyncClick: () -> Unit,
     onHistoryClick: () -> Unit,
-    onNewProductClick: () -> Unit
+    onNewProductClick: () -> Unit,
+    onExportMasterClick: () -> Unit = {},
+    onDismissExportNotification: () -> Unit = {}
 ) {
     Surface(
         color = CardDark,
@@ -150,6 +152,25 @@ fun TopStatusBar(
                     Text("Ventas (${state.recentSales.size})", fontSize = 12.sp)
                 }
 
+                // Botón Exportación General (Master Export)
+                OutlinedButton(
+                    onClick = onExportMasterClick,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentGreen),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AccentGreen),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    enabled = !state.isExportingMaster
+                ) {
+                    if (state.isExportingMaster) {
+                        CircularProgressIndicator(color = AccentGreen, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                    } else {
+                        Text("📊", fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text("Exportación General", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
                 // Botón Agregar Producto al Catálogo
                 Button(
                     onClick = onNewProductClick,
@@ -167,6 +188,38 @@ fun TopStatusBar(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Nuevo Producto", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Banner informativo tras exportación general
+        if (state.masterExportNotification != null) {
+            Surface(
+                color = if (state.masterExportNotification!!.startsWith("❌")) AlertRed.copy(alpha = 0.2f) else AccentGreen.copy(alpha = 0.2f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (state.masterExportNotification!!.startsWith("❌")) AlertRed else AccentGreen),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = state.masterExportNotification!!,
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(
+                        onClick = onDismissExportNotification,
+                        colors = ButtonDefaults.buttonColors(containerColor = CardDark, contentColor = Color.White),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text("Entendido", fontSize = 10.sp)
+                    }
                 }
             }
         }

@@ -95,10 +95,12 @@ fun main() = application {
                             state = state,
                             onSyncClick = { viewModel.triggerCloudSync() },
                             onHistoryClick = { viewModel.openHistoryDialog() },
-                            onNewProductClick = { viewModel.openProductManager(null) }
+                            onNewProductClick = { viewModel.openProductManager(null) },
+                            onExportMasterClick = { viewModel.exportMasterReport() },
+                            onDismissExportNotification = { viewModel.dismissMasterExportNotification() }
                         )
 
-                        // Selector de Pestañas Principales (Salas, Volantes, Just Dance, Venta Mostrador)
+                        // Selector de Pestañas Principales (Minicine, Volantes, Just Dance, Tablero Reservas)
                         Surface(
                             color = CardDark,
                             modifier = Modifier.fillMaxWidth()
@@ -159,20 +161,7 @@ fun main() = application {
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.height(38.dp)
                                 ) {
-                                    Text("📅 Tablero Horarios (${state.reservations.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                }
-
-                                val isPos = state.currentTab == "POS"
-                                Button(
-                                    onClick = { viewModel.switchTab("POS") },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isPos) AccentGreen else BgDark,
-                                        contentColor = if (isPos) Color.Black else Color.White
-                                    ),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.height(38.dp)
-                                ) {
-                                    Text("🛒 Venta Mostrador (POS)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("📅 Tablero Reservas (${state.reservations.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }
                         }
@@ -322,6 +311,10 @@ fun main() = application {
                         onConfirmStart = { client, phone, gameOrMovie, duration, price, method, pedidos, receipt ->
                             viewModel.confirmStartRoom(client, phone, gameOrMovie, duration, price, method, pedidos, receipt)
                         },
+                        onUpdateActiveRoomSession = { client, phone, movie, price, extraMins, method ->
+                            viewModel.updateActiveRoomSession(state.selectedRoomForDetail!!.id, client, phone, movie, price, extraMins, method)
+                        },
+                        isActionInProgress = state.isRoomActionInProgress,
                         onDismiss = { viewModel.closeRoomDetail() }
                     )
                 }

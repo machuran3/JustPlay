@@ -49,6 +49,8 @@ fun RoomDetailDialog(
     onAddTime: (extraMinutes: Int) -> Unit,
     onClearRoom: () -> Unit,
     onConfirmStart: (client: String, phone: String, gameOrMovie: String, durationMin: Int, price: Double, paymentMethod: String, pedidos: List<RoomOrder>, receiptImageUrl: String?) -> Unit,
+    onUpdateActiveRoomSession: ((client: String, phone: String, gameOrMovie: String, price: Double, extraMinutes: Int?, paymentMethod: String) -> Unit)? = null,
+    isActionInProgress: Boolean = false,
     onDismiss: () -> Unit
 ) {
     val isOccupied = room.estado == RoomState.OCUPADA
@@ -61,6 +63,16 @@ fun RoomDetailDialog(
     // Precio base sugerido: Minicine = 35 Bs, Volantes/Just Dance = 15 Bs
     var priceText by remember { mutableStateOf(if (isOccupied) room.precioCobrado.toString() else room.precioBaseSugerido.toString()) }
     var selectedPaymentMethod by remember { mutableStateOf(room.metodoPago.ifBlank { "Efectivo" }) }
+
+    // Estado para modo edición de sala ocupada
+    var isEditModeActive by remember { mutableStateOf(false) }
+    var editClientName by remember { mutableStateOf(room.cliente ?: "") }
+    var editClientPhone by remember { mutableStateOf(room.celular ?: "") }
+    var editGameOrMovie by remember { mutableStateOf(room.pelicula ?: "") }
+    var editPriceText by remember { mutableStateOf(room.precioCobrado.toString()) }
+    var editPaymentMethod by remember { mutableStateOf(room.metodoPago.ifBlank { "Efectivo" }) }
+    var editExtraMinutesText by remember { mutableStateOf("") }
+    var editSaveSuccessMessage by remember { mutableStateOf<String?>(null) }
     var cashAmountMixto by remember { 
         mutableStateOf(
             if (isOccupied && room.metodoPago.startsWith("Mixto", ignoreCase = true)) {
@@ -586,27 +598,221 @@ fun RoomDetailDialog(
                                 Text("🎮 Sesión Activa", color = AccentLime, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                Surface(
+                                 Surface(
                                     shape = RoundedCornerShape(8.dp),
                                     color = CardDark,
                                     border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(
-                                            text = "👤 Cliente: ${room.cliente ?: "N/A"} ${if (!room.celular.isNullOrEmpty()) "(${room.celular})" else ""}",
-                                            color = Color.White,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "👤 Cliente: ${room.cliente ?: "N/A"} ${if (!room.celular.isNullOrEmpty()) "(${room.celular})" else ""}",
+                                                color = Color.White,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            if (onUpdateActiveRoomSession != null) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = if (isEditModeActive) AccentLime else Color(0xFF263238),
+                                                    modifier = Modifier.clickable {
+                                                        isEditModeActive = !isEditModeActive
+                                                        if (isEditModeActive) {
+                                                            editClientName = room.cliente ?: ""
+                                                            editClientPhone = room.celular ?: ""
+                                                            editGameOrMovie = room.pelicula ?: ""
+                                                            editPriceText = room.precioCobrado.toString()
+                                                            editPaymentMethod = room.metodoPago.ifBlank { "Efectivo" }
+                                                            editExtraMinutesText = ""
+                                                            editSaveSuccessMessage = null
+                                                        }
+                                                    }
+                                                ) {
+                                                    Text(
+                                                        text = if (isEditModeActive) "✕ Cancelar" else "✏️ Editar Parámetros",
+                                                        color = if (isEditModeActive) Color.Black else AccentLime,
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
                                         if (!room.pelicula.isNullOrEmpty()) {
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text("🎬 Contenido: ${room.pelicula}", color = TextSecondary, fontSize = 13.sp, maxLines = 1)
                                         }
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text("💳 Alquiler Cobrado: ${room.precioCobrado} Bs (${room.metodoPago})", color = TextSecondary, fontSize = 13.sp)
+                                    }
+                                }
+
+                                if (isEditModeActive && onUpdateActiveRoomSession != null) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Color(0xFF1E2638),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentLime),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Text("✏️ Modificar Parámetros de la Sesión", color = AccentLime, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            OutlinedTextField(
+                                                value = editClientName,
+                                                onValueChange = { editClientName = it },
+                                                label = { Text("Nombre Cliente *", fontSize = 11.sp) },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth(),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedContainerColor = CardDark,
+                                                    unfocusedContainerColor = CardDark,
+                                                    focusedBorderColor = AccentLime,
+                                                    unfocusedBorderColor = BorderDark,
+                                                    focusedTextColor = TextPrimary,
+                                                    unfocusedTextColor = TextPrimary
+                                                )
+                                            )
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                OutlinedTextField(
+                                                    value = editClientPhone,
+                                                    onValueChange = { editClientPhone = it },
+                                                    label = { Text("Celular", fontSize = 11.sp) },
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedContainerColor = CardDark,
+                                                        unfocusedContainerColor = CardDark,
+                                                        focusedBorderColor = AccentLime,
+                                                        unfocusedBorderColor = BorderDark,
+                                                        focusedTextColor = TextPrimary,
+                                                        unfocusedTextColor = TextPrimary
+                                                    )
+                                                )
+
+                                                OutlinedTextField(
+                                                    value = editGameOrMovie,
+                                                    onValueChange = { editGameOrMovie = it },
+                                                    label = { Text("Película / Juego", fontSize = 11.sp) },
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedContainerColor = CardDark,
+                                                        unfocusedContainerColor = CardDark,
+                                                        focusedBorderColor = AccentLime,
+                                                        unfocusedBorderColor = BorderDark,
+                                                        focusedTextColor = TextPrimary,
+                                                        unfocusedTextColor = TextPrimary
+                                                    )
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                OutlinedTextField(
+                                                    value = editPriceText,
+                                                    onValueChange = { editPriceText = it },
+                                                    label = { Text("Precio Alquiler (Bs)", fontSize = 11.sp) },
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedContainerColor = CardDark,
+                                                        unfocusedContainerColor = CardDark,
+                                                        focusedBorderColor = AccentLime,
+                                                        unfocusedBorderColor = BorderDark,
+                                                        focusedTextColor = TextPrimary,
+                                                        unfocusedTextColor = TextPrimary
+                                                    )
+                                                )
+
+                                                OutlinedTextField(
+                                                    value = editExtraMinutesText,
+                                                    onValueChange = { editExtraMinutesText = it },
+                                                    label = { Text("Ajustar Tiempo (+/- min)", fontSize = 11.sp) },
+                                                    placeholder = { Text("Ej: 15 o -10", fontSize = 11.sp) },
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f),
+                                                    colors = OutlinedTextFieldDefaults.colors(
+                                                        focusedContainerColor = CardDark,
+                                                        unfocusedContainerColor = CardDark,
+                                                        focusedBorderColor = AccentLime,
+                                                        unfocusedBorderColor = BorderDark,
+                                                        focusedTextColor = TextPrimary,
+                                                        unfocusedTextColor = TextPrimary
+                                                    )
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            Text("Método de Pago:", color = TextSecondary, fontSize = 11.sp)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                                                val editMethods = listOf("Efectivo" to "💵 Efectivo", "QR" to "📱 QR", "Mixto" to "💵📱 Mixto")
+                                                for ((k, l) in editMethods) {
+                                                    val isSel = editPaymentMethod == k
+                                                    Button(
+                                                        onClick = { editPaymentMethod = k },
+                                                        colors = ButtonDefaults.buttonColors(
+                                                            containerColor = if (isSel) AccentLime else CardDark,
+                                                            contentColor = if (isSel) Color.Black else Color.White
+                                                        ),
+                                                        shape = RoundedCornerShape(6.dp),
+                                                        modifier = Modifier.weight(1f).height(32.dp),
+                                                        contentPadding = PaddingValues(2.dp)
+                                                    ) {
+                                                        Text(l, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                                    }
+                                                }
+                                            }
+
+                                            if (editSaveSuccessMessage != null) {
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text(editSaveSuccessMessage!!, color = AccentGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Button(
+                                                onClick = {
+                                                    val pr = editPriceText.toDoubleOrNull() ?: room.precioCobrado
+                                                    val extraMin = editExtraMinutesText.toIntOrNull()
+                                                    onUpdateActiveRoomSession(
+                                                        editClientName.trim(),
+                                                        editClientPhone.trim(),
+                                                        editGameOrMovie.trim(),
+                                                        pr,
+                                                        extraMin,
+                                                        editPaymentMethod
+                                                    )
+                                                    editSaveSuccessMessage = "✅ Parámetros guardados y sincronizados"
+                                                },
+                                                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                                                shape = RoundedCornerShape(6.dp),
+                                                modifier = Modifier.fillMaxWidth().height(36.dp),
+                                                enabled = !isActionInProgress && editClientName.isNotBlank()
+                                            ) {
+                                                if (isActionInProgress) {
+                                                    CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                }
+                                                Text("💾 Guardar Cambios en Sala", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            }
+                                        }
                                     }
                                 }
 
@@ -667,7 +873,8 @@ fun RoomDetailDialog(
                                             ),
                                             shape = RoundedCornerShape(6.dp),
                                             modifier = Modifier.weight(1f).height(36.dp),
-                                            contentPadding = PaddingValues(2.dp)
+                                            contentPadding = PaddingValues(2.dp),
+                                            enabled = !isActionInProgress
                                         ) {
                                             Text(lbl, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                                         }
@@ -706,7 +913,7 @@ fun RoomDetailDialog(
                                         colors = ButtonDefaults.buttonColors(containerColor = AccentLime, contentColor = Color.Black),
                                         shape = RoundedCornerShape(6.dp),
                                         modifier = Modifier.height(46.dp),
-                                        enabled = customExtraTimeText.isNotBlank()
+                                        enabled = !isActionInProgress && customExtraTimeText.isNotBlank()
                                     ) {
                                         Text("⏱️ Extender", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     }
@@ -721,8 +928,13 @@ fun RoomDetailDialog(
                                         contentColor = Color.White
                                     ),
                                     shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth().height(42.dp)
+                                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                                    enabled = !isActionInProgress
                                 ) {
+                                    if (isActionInProgress) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
                                     Text("🛑 Finalizar y Liberar Sala", fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
                                 }
                             }
@@ -956,8 +1168,12 @@ fun RoomDetailDialog(
                                     ),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.height(40.dp).widthIn(min = 160.dp),
-                                    enabled = clientName.isNotBlank()
+                                    enabled = !isActionInProgress && clientName.isNotBlank()
                                 ) {
+                                    if (isActionInProgress) {
+                                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
                                     Text("▶ Iniciar Función", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }

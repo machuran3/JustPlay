@@ -36,13 +36,19 @@ fun RoomDashboardPanel(
         }
     }
 
+    fun extractRoomNumber(name: String, id: Int): Int {
+        val num = Regex("""\d+""").find(name)?.value?.toIntOrNull()
+        return num ?: id
+    }
+
     val filteredRooms = remember(rooms, category, tick) {
-        when (category) {
+        val baseList = when (category) {
             "Minicine" -> rooms.filter { it.categoria == "Minicine" }
             "Autitos" -> rooms.filter { it.categoria == "Autitos" }
             "Just Dance" -> rooms.filter { it.categoria == "Just Dance" }
             else -> rooms
         }
+        baseList.sortedWith(compareBy({ extractRoomNumber(it.nombre, it.id) }, { it.id }))
     }
 
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
@@ -86,9 +92,9 @@ fun RoomDashboardPanel(
             }
         } else {
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 280.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                columns = GridCells.Adaptive(minSize = 300.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(filteredRooms) { room ->

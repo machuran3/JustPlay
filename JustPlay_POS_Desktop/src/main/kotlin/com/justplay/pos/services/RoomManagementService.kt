@@ -88,4 +88,38 @@ class RoomManagementService(
     suspend fun removeOrderFromRoom(roomId: Int, orderIndex: Int): Boolean {
         return roomRepository.removeOrderFromRoom(roomId, orderIndex)
     }
+
+    suspend fun updateRoomSession(
+        roomId: Int,
+        clientName: String,
+        clientPhone: String,
+        gameOrMovie: String,
+        price: Double,
+        extraDurationMinutes: Int? = null,
+        newPaymentMethod: String? = null
+    ): Boolean {
+        val currentRooms = roomRepository.fetchRooms()
+        val existing = currentRooms.find { it.id == roomId } ?: return false
+
+        var newEndTime = existing.endTimeMillis
+        var newHoraFin = existing.horaFinProgramada
+        if (extraDurationMinutes != null && extraDurationMinutes != 0) {
+            val baseTime = existing.endTimeMillis ?: System.currentTimeMillis()
+            newEndTime = baseTime + (extraDurationMinutes * 60 * 1000L)
+            val cal = java.util.Calendar.getInstance()
+            cal.timeInMillis = newEndTime
+            newHoraFin = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(cal.time)
+        }
+
+        val updated = existing.copy(
+            cliente = clientName.trim(),
+            celular = clientPhone.trim(),
+            pelicula = gameOrMovie.trim(),
+            precioCobrado = price,
+            endTimeMillis = newEndTime,
+            horaFinProgramada = newHoraFin,
+            metodoPago = newPaymentMethod ?: existing.metodoPago
+        )
+        return roomRepository.updateRoom(updated)
+    }
 }

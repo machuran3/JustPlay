@@ -1,6 +1,8 @@
 package com.justplay.pos.services
 
 import com.justplay.pos.core.models.Reservation
+import com.justplay.pos.core.models.Room
+import com.justplay.pos.core.models.RoomState
 import com.justplay.pos.core.models.SaleTransaction
 import com.justplay.pos.core.models.SessionRecord
 import java.io.File
@@ -352,6 +354,118 @@ object ExcelReportExporter {
         }
 
         createXlsxFile(xlsxFile, "Reservas", headers, rows)
+        createExcelCompatibleCsv(csvFile, headers, rows)
+
+        return Pair(xlsxFile, csvFile)
+    }
+
+    /**
+     * Exporta el Reporte General Consolidado de todo el sistema (Cine, Volantes, Just Dance, Reservas y Ventas).
+     */
+    fun exportMasterReport(
+        rooms: List<Room>,
+        reservations: List<Reservation>,
+        records: List<SessionRecord>,
+        sales: List<SaleTransaction>,
+        baseDir: File = getDefaultExportDir()
+    ): Pair<File, File> {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val xlsxFile = File(baseDir, "JustPlay_Reporte_General_Completo_$timestamp.xlsx")
+        val csvFile = File(baseDir, "JustPlay_Reporte_General_Completo_$timestamp.csv")
+
+        val headers = listOf(
+            "Categoría / Módulo",
+            "Identificador",
+            "Fecha y Hora",
+            "Recurso / Sala",
+            "Cliente",
+            "Celular",
+            "Detalle / Película / Artículos",
+            "Duración / Cantidad",
+            "Total Cobrado (Bs)",
+            "Método de Pago",
+            "Estado / Tipo"
+        )
+
+        val rows = mutableListOf<List<Any?>>()
+
+        // 1. Sesiones Activas en Salas
+        rooms.filter { it.estado == RoomState.OCUPADA }.forEach { room ->
+            rows.add(
+                listOf(
+                    room.categoria,
+                    "SALA_${room.id}",
+                    room.obtenerHoraInicioFormateada(),
+                    room.nombre,
+                    room.cliente ?: "N/A",
+                    room.celular ?: "S/N",
+                    room.pelicula ?: "En sesión",
+                    room.formatearTiempoRestante(),
+                    room.precioCobrado,
+                    room.metodoPago,
+                    "Sesión Activa"
+                )
+            )
+        }
+
+        // 2. Registros Históricos de Sesiones (Minicine, Volantes, Just Dance)
+        records.forEach { rec ->
+            rows.add(
+                listOf(
+                    rec.tipo,
+                    rec.idFirebase,
+                    rec.fechaHora,
+                    rec.nombreElemento,
+                    rec.cliente,
+                    rec.celular ?: "S/N",
+                    rec.peliculaJuego ?: rec.pedidos,
+                    rec.tiempoConfigurado ?: "N/A",
+                    rec.totalCobrado,
+                    rec.metodoPago,
+                    "Histórico Finalizado"
+                )
+            )
+        }
+
+        // 3. Reservas Programadas
+        reservations.forEach { res ->
+            rows.add(
+                listOf(
+                    "Reserva",
+                    res.idFirebase,
+                    "${res.fecha} ${res.horaProgramada}",
+                    res.tipoSala,
+                    res.nombre,
+                    res.celular,
+                    "Adelanto: ${res.adelanto} Bs",
+                    res.duracion,
+                    res.adelanto.toDoubleOrNull() ?: 0.0,
+                    res.metodoPagoAdelanto,
+                    if (res.asistio) "Asistió" else "Pendiente"
+                )
+            )
+        }
+
+        // 4. Ventas de Mostrador (Snacks, Bebidas, etc.)
+        sales.forEach { sale ->
+            rows.add(
+                listOf(
+                    "Venta POS",
+                    sale.id,
+                    sale.dateTime,
+                    "Mostrador",
+                    sale.clientName,
+                    sale.clientPhone ?: "S/N",
+                    sale.formattedSummary,
+                    "${sale.items.sumOf { it.quantity }} items",
+                    sale.totalAmount,
+                    sale.paymentMethod.displayName,
+                    if (sale.isSynced) "Sincronizado" else "Pendiente Sync"
+                )
+            )
+        }
+
+        createXlsxFile(xlsxFile, "Reporte General", headers, rows)
         createExcelCompatibleCsv(csvFile, headers, rows)
 
         return Pair(xlsxFile, csvFile)

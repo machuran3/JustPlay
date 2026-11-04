@@ -7,11 +7,13 @@ import com.justplay.pos.core.interfaces.ISaleService
 import com.justplay.pos.core.models.PaymentMethod
 import com.justplay.pos.core.models.Product
 import com.justplay.pos.core.models.Room
+import com.justplay.pos.core.models.SyncStatus
 import com.justplay.pos.infrastructure.security.DeviceSecurityService
 import com.justplay.pos.services.ProductCatalogService
 import com.justplay.pos.services.RoomManagementService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -147,6 +149,33 @@ class PosViewModel(
         // Iniciar scanner y cargar historial local
         barcodeScanner.startListening()
         loadRecentSales()
+        startAutomaticConnectivityAndSyncMonitor()
+    }
+
+    private fun startAutomaticConnectivityAndSyncMonitor() {
+        scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                kotlinx.coroutines.delay(10000)
+                try {
+                    val isOnline = cloudSyncService.isPosAuthorized()
+                    if (isOnline) {
+                        val pendingSales = localStorage.getUnsyncedSales()
+                        val pendingCatalog = localStorage.getPendingCatalogSync()
+                        if (pendingSales.isNotEmpty() || pendingCatalog.isNotEmpty()) {
+                            _uiState.update { it.copy(syncStatus = SyncStatus.SYNCING) }
+                            cloudSyncService.syncPendingOfflineSales(localStorage)
+                            productCatalogService.syncPendingCatalogWithCloud()
+                            loadRecentSales()
+                        }
+                        _uiState.update { it.copy(syncStatus = SyncStatus.ONLINE_SYNCED) }
+                    } else {
+                        _uiState.update { it.copy(syncStatus = SyncStatus.OFFLINE_SAVED) }
+                    }
+                } catch (_: Exception) {
+                    _uiState.update { it.copy(syncStatus = SyncStatus.OFFLINE_SAVED) }
+                }
+            }
+        }
     }
 
     fun switchTab(tab: String) {
@@ -181,6 +210,7 @@ class PosViewModel(
 
     fun onEnterKeyPressed() {
         val state = _uiState.value
+        if (state.isProcessingSale) return
         if (state.isPaymentDialogOpen) {
             confirmCheckout()
         } else if (state.cartItems.isNotEmpty() && state.currentTab == "POS") {
@@ -403,51 +433,58 @@ class PosViewModel(
     }
 
     fun confirmCheckout(receiptImageUrl: String? = null) {
+        val state = _uiState.value
+        if (state.isProcessingSale) return
+        _uiState.update { it.copy(isProcessingSale = true) }
         scope.launch {
-            val state = _uiState.value
-            val isAuthorized = cloudSyncService.isPosAuthorized()
-            if (!isAuthorized) {
-                _uiState.update {
-                    it.copy(
-                        scanErrorMessage = "⛔ Terminal POS Bloqueada por el Administrador. Solicita autorización en AdminJustPlay."
-                    )
+            try {
+                val isAuthorized = cloudSyncService.isPosAuthorized()
+                if (!isAuthorized) {
+                    _uiState.update {
+                        it.copy(
+                            scanErrorMessage = "⛔ Terminal POS Bloqueada por el Administrador. Solicita autorización en AdminJustPlay."
+                        )
+                    }
+                    return@launch
                 }
-                return@launch
-            }
 
-            val cash = state.cashReceivedAmount.toDoubleOrNull() ?: state.totalAmount
+                val cash = state.cashReceivedAmount.toDoubleOrNull() ?: state.totalAmount
 
-            if (state.selectedPaymentMethod == PaymentMethod.EFECTIVO && cash < state.totalAmount) {
-                _uiState.update {
-                    it.copy(scanErrorMessage = "El monto en efectivo no puede ser menor al total.")
+                if (state.selectedPaymentMethod == PaymentMethod.EFECTIVO && cash < state.totalAmount) {
+                    _uiState.update {
+                        it.copy(scanErrorMessage = "El monto en efectivo no puede ser menor al total.")
+                    }
+                    return@launch
                 }
-                return@launch
-            }
 
-            val result = saleService.checkoutSale(
-                paymentMethod = state.selectedPaymentMethod,
-                cashReceived = cash,
-                clientName = state.clientNameInput,
-                clientPhone = state.clientPhoneInput.ifBlank { null },
-                destinationType = state.saleDestinationType,
-                targetRoomId = state.selectedTargetRoomId,
-                targetRoomName = state.selectedTargetRoomName,
-                receiptImageUrl = receiptImageUrl
-            )
+                val result = saleService.checkoutSale(
+                    paymentMethod = state.selectedPaymentMethod,
+                    cashReceived = cash,
+                    clientName = state.clientNameInput,
+                    clientPhone = state.clientPhoneInput.ifBlank { null },
+                    destinationType = state.saleDestinationType,
+                    targetRoomId = state.selectedTargetRoomId,
+                    targetRoomName = state.selectedTargetRoomName,
+                    receiptImageUrl = receiptImageUrl
+                )
 
-            if (result.isSuccess) {
-                val sale = result.getOrNull()
-                _uiState.update {
-                    it.copy(
-                        isPaymentDialogOpen = false,
-                        isWaitingQrValidation = false,
-                        qrValidationSolicitudId = null,
-                        qrValidationStatusMessage = null,
-                        lastSaleCompleted = sale,
-                        scanErrorMessage = null
-                    )
+                if (result.isSuccess) {
+                    val sale = result.getOrNull()
+                    _uiState.update {
+                        it.copy(
+                            isPaymentDialogOpen = false,
+                            isWaitingQrValidation = false,
+                            qrValidationSolicitudId = null,
+                            qrValidationStatusMessage = null,
+                            lastSaleCompleted = sale,
+                            scanErrorMessage = null
+                        )
+                    }
+                    loadRecentSales()
                 }
-                loadRecentSales()
+            } finally {
+                kotlinx.coroutines.delay(600)
+                _uiState.update { it.copy(isProcessingSale = false) }
             }
         }
     }
@@ -637,41 +674,115 @@ class PosViewModel(
         receiptImageUrl: String? = null
     ) {
         val room = _uiState.value.selectedRoomForDetail ?: return
+        if (_uiState.value.isRoomActionInProgress) return
+        _uiState.update { it.copy(isRoomActionInProgress = true) }
         val finalReceipt = receiptImageUrl ?: _uiState.value.roomQrComprobanteUrl
         scope.launch {
-            val ok = roomManagementService.startRoom(
-                roomId = room.id,
-                clientName = client,
-                clientPhone = phone,
-                gameOrMovie = gameOrMovie,
-                durationMinutes = durationMin,
-                price = price,
-                paymentMethod = paymentMethod,
-                pedidos = pedidos,
-                receiptImageUrl = finalReceipt
-            )
-            closeRoomDetail()
-            if (ok) {
-                _uiState.update { it.copy(roomActionMessage = "▶ Sala ${room.nombre} iniciada con éxito") }
+            try {
+                val ok = roomManagementService.startRoom(
+                    roomId = room.id,
+                    clientName = client,
+                    clientPhone = phone,
+                    gameOrMovie = gameOrMovie,
+                    durationMinutes = durationMin,
+                    price = price,
+                    paymentMethod = paymentMethod,
+                    pedidos = pedidos,
+                    receiptImageUrl = finalReceipt
+                )
+                closeRoomDetail()
+                if (ok) {
+                    _uiState.update { it.copy(roomActionMessage = "▶ Sala ${room.nombre} iniciada con éxito") }
+                }
+            } finally {
+                kotlinx.coroutines.delay(500)
+                _uiState.update { it.copy(isRoomActionInProgress = false) }
             }
         }
     }
 
     fun confirmAddTime(roomId: Int, extraMinutes: Int) {
+        if (_uiState.value.isRoomActionInProgress) return
+        _uiState.update { it.copy(isRoomActionInProgress = true) }
         scope.launch {
-            val ok = roomManagementService.addTimeToRoom(roomId, extraMinutes)
-            if (ok) {
-                _uiState.update { it.copy(roomActionMessage = "➕ Se agregaron $extraMinutes min") }
+            try {
+                val ok = roomManagementService.addTimeToRoom(roomId, extraMinutes)
+                if (ok) {
+                    _uiState.update { it.copy(roomActionMessage = "➕ Se agregaron $extraMinutes min") }
+                }
+            } finally {
+                kotlinx.coroutines.delay(500)
+                _uiState.update { it.copy(isRoomActionInProgress = false) }
             }
         }
     }
 
     fun clearRoom(room: Room) {
+        if (_uiState.value.isRoomActionInProgress) return
+        _uiState.update { it.copy(isRoomActionInProgress = true) }
         scope.launch {
-            val ok = roomManagementService.clearRoom(room.id)
-            closeRoomDetail()
-            if (ok) {
-                _uiState.update { it.copy(roomActionMessage = "🛑 Sala ${room.nombre} finalizada y liberada") }
+            try {
+                val ok = roomManagementService.clearRoom(room.id)
+                closeRoomDetail()
+                if (ok) {
+                    _uiState.update { it.copy(roomActionMessage = "🛑 Sala ${room.nombre} finalizada y liberada") }
+                }
+            } finally {
+                kotlinx.coroutines.delay(500)
+                _uiState.update { it.copy(isRoomActionInProgress = false) }
+            }
+        }
+    }
+
+    fun updateActiveRoomSession(
+        roomId: Int,
+        clientName: String,
+        clientPhone: String,
+        gameOrMovie: String,
+        price: Double,
+        extraDurationMinutes: Int? = null,
+        newPaymentMethod: String? = null
+    ) {
+        if (_uiState.value.isRoomActionInProgress) return
+        _uiState.update { it.copy(isRoomActionInProgress = true) }
+        scope.launch {
+            try {
+                val ok = roomManagementService.updateRoomSession(
+                    roomId = roomId,
+                    clientName = clientName,
+                    clientPhone = clientPhone,
+                    gameOrMovie = gameOrMovie,
+                    price = price,
+                    extraDurationMinutes = extraDurationMinutes,
+                    newPaymentMethod = newPaymentMethod
+                )
+                if (ok) {
+                    _uiState.update { current ->
+                        val updatedRooms = current.rooms.map { r ->
+                            if (r.id == roomId) {
+                                r.copy(
+                                    cliente = clientName.trim(),
+                                    celular = clientPhone.trim(),
+                                    pelicula = gameOrMovie.trim(),
+                                    precioCobrado = price,
+                                    metodoPago = newPaymentMethod ?: r.metodoPago
+                                )
+                            } else r
+                        }
+                        current.copy(
+                            rooms = updatedRooms,
+                            roomActionMessage = "✅ Parámetros de la sala actualizados correctamente",
+                            selectedRoomForDetail = null
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(roomActionMessage = "❌ Error al actualizar los parámetros de la sala") }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(roomActionMessage = "❌ Error: ${e.message}") }
+            } finally {
+                kotlinx.coroutines.delay(500)
+                _uiState.update { it.copy(isRoomActionInProgress = false) }
             }
         }
     }
@@ -755,6 +866,39 @@ class PosViewModel(
             val sales = localStorage.getAllSales(50)
             _uiState.update { it.copy(recentSales = sales) }
         }
+    }
+
+    fun exportMasterReport() {
+        if (_uiState.value.isExportingMaster) return
+        _uiState.update { it.copy(isExportingMaster = true) }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val sales = localStorage.getAllSales(500)
+                val (xlsx, _) = com.justplay.pos.services.ExcelReportExporter.exportMasterReport(
+                    rooms = _uiState.value.rooms,
+                    reservations = _uiState.value.reservations,
+                    records = _uiState.value.sessionRecords,
+                    sales = sales
+                )
+                _uiState.update {
+                    it.copy(
+                        masterExportNotification = "✅ Reporte General Completo exportado con éxito a:\n${xlsx.name}\nCarpeta: ${xlsx.parentFile?.absolutePath}"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        masterExportNotification = "❌ Error al exportar Reporte General: ${e.message}"
+                    )
+                }
+            } finally {
+                _uiState.update { it.copy(isExportingMaster = false) }
+            }
+        }
+    }
+
+    fun dismissMasterExportNotification() {
+        _uiState.update { it.copy(masterExportNotification = null) }
     }
 
     private fun filterProducts(all: List<Product>, category: String, query: String): List<Product> {

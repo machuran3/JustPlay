@@ -374,7 +374,16 @@ class FirebaseRoomRepository(
                 .put(jsonBody)
                 .build()
 
-            client.newCall(request).execute().use { it.isSuccessful }
+            val ok = client.newCall(request).execute().use { it.isSuccessful }
+            if (ok) {
+                val current = _roomsFlow.value.toMutableList()
+                val idx = current.indexOfFirst { it.id == room.id }
+                if (idx >= 0) {
+                    current[idx] = room
+                    _roomsFlow.value = current
+                }
+            }
+            ok
         } catch (e: Exception) {
             e.printStackTrace()
             false

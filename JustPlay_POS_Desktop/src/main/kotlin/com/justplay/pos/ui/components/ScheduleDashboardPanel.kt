@@ -73,14 +73,20 @@ fun ScheduleDashboardPanel(
         sdfDay.format(cal.time)
     }
 
-    // Filtrar salas según categoría
+    fun extractRoomNumber(name: String, id: Int): Int {
+        val num = Regex("""\d+""").find(name)?.value?.toIntOrNull()
+        return num ?: id
+    }
+
+    // Filtrar salas según categoría y ordenar secuencialmente empezando por Sala 1..N
     val filteredRooms = remember(rooms, categoryFilter) {
-        when (categoryFilter) {
+        val baseList = when (categoryFilter) {
             "MINICINE" -> rooms.filter { it.categoria == "Minicine" }
             "VOLANTES" -> rooms.filter { it.categoria == "Autitos" }
             "JUST_DANCE" -> rooms.filter { it.categoria == "Just Dance" }
             else -> rooms
         }
+        baseList.sortedWith(compareBy({ extractRoomNumber(it.nombre, it.id) }, { it.id }))
     }
 
     // Normalizador de fechas para comparar dd/MM/yyyy con dd-MM-yyyy y yyyy-MM-dd
@@ -1013,9 +1019,13 @@ private fun ScheduleTableView(
             Text("COBRO / ADELANTO", color = AccentLime, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.1f))
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        fun extractRoomNumber(name: String, id: Int): Int {
+            val num = Regex("""\d+""").find(name)?.value?.toIntOrNull()
+            return num ?: id
+        }
 
         val occupiedRooms = rooms.filter { it.estado == RoomState.OCUPADA }
+            .sortedWith(compareBy({ extractRoomNumber(it.nombre, it.id) }, { it.id }))
 
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             // 1. Sesiones Activas en Vivo

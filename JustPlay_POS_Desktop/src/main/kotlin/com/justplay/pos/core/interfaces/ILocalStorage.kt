@@ -3,6 +3,13 @@ package com.justplay.pos.core.interfaces
 import com.justplay.pos.core.models.Product
 import com.justplay.pos.core.models.SaleTransaction
 
+data class PendingCatalogItem(
+    val barcode: String,
+    val action: String, // "UPSERT" or "DELETE"
+    val productJson: String,
+    val timestamp: String
+)
+
 /**
  * Liskov Substitution: Abstracción de persistencia local en disco para modo offline y auditoría.
  */
@@ -14,4 +21,7 @@ interface ILocalStorage {
     suspend fun getAllSales(limit: Int = 100): List<SaleTransaction>
     suspend fun cacheProducts(products: List<Product>)
     suspend fun getCachedProducts(): List<Product>
+    suspend fun queuePendingCatalogSync(barcode: String, action: String, product: Product?)
+    suspend fun getPendingCatalogSync(): List<PendingCatalogItem>
+    suspend fun removePendingCatalogSync(barcode: String)
 }

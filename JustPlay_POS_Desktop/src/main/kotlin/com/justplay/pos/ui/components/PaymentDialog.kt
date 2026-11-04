@@ -58,7 +58,9 @@ fun PaymentDialog(
                 .heightIn(max = 720.dp)
                 .onPreviewKeyEvent { event ->
                     if (event.key == Key.Enter && event.type == KeyEventType.KeyDown) {
-                        onConfirmCheckout()
+                        if (!state.isProcessingSale) {
+                            onConfirmCheckout()
+                        }
                         true
                     } else {
                         false
@@ -375,15 +377,27 @@ fun PaymentDialog(
                 // Botón Confirmar Cobro (Enter)
                 Button(
                     onClick = onConfirmCheckout,
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                    enabled = !state.isProcessingSale,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AccentGreen,
+                        contentColor = Color.Black,
+                        disabledContainerColor = BorderDark,
+                        disabledContentColor = TextSecondary
+                    ),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.Check, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Completar Venta y Sincronizar (Enter ↵)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    if (state.isProcessingSale) {
+                        CircularProgressIndicator(color = AccentLime, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Procesando venta...", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(imageVector = Icons.Default.Check, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Completar Venta y Sincronizar (Enter ↵)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

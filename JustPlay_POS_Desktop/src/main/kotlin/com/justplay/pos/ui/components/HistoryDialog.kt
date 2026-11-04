@@ -10,11 +10,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.runtime.*
+import com.justplay.pos.services.ExcelReportExporter
 import com.justplay.pos.core.models.SaleTransaction
 import com.justplay.pos.ui.theme.*
 
@@ -23,6 +26,8 @@ fun HistoryDialog(
     sales: List<SaleTransaction>,
     onDismiss: () -> Unit
 ) {
+    var exportNotification by remember { mutableStateOf<String?>(null) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -32,8 +37,8 @@ fun HistoryDialog(
             color = CardDark,
             border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
             modifier = Modifier
-                .width(600.dp)
-                .height(500.dp)
+                .width(620.dp)
+                .height(520.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 // Header
@@ -48,8 +53,62 @@ fun HistoryDialog(
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar", tint = TextSecondary)
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (sales.isNotEmpty()) {
+                            Button(
+                                onClick = {
+                                    try {
+                                        val (xlsx, _) = ExcelReportExporter.exportSales(sales)
+                                        exportNotification = "✅ Exportado exitosamente a:\n${xlsx.absolutePath}"
+                                    } catch (e: Exception) {
+                                        exportNotification = "❌ Error al exportar: ${e.message}"
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) {
+                                Text("📊 Exportar Excel", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar", tint = TextSecondary)
+                        }
+                    }
+                }
+
+                if (exportNotification != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        color = Color(0xFF14291D),
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentGreen)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = exportNotification ?: "",
+                                color = AccentLime,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { exportNotification = null },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Text("✕", color = TextSecondary, fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
 

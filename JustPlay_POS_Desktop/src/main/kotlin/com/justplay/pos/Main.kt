@@ -331,7 +331,7 @@ fun main() = application {
                         initialProduct = state.selectedProductForEdit,
                         prefillBarcode = state.manualBarcodeText,
                         existingProducts = state.productsCatalog,
-                        onSaveProduct = { viewModel.saveProduct(it) },
+                        onSaveProduct = { prod, oldCode -> viewModel.saveProduct(prod, oldCode) },
                         onDeleteProduct = { viewModel.deleteProduct(it) },
                         onDismiss = { viewModel.closeProductManager() }
                     )

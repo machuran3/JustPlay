@@ -192,12 +192,32 @@ fun CartItemRow(
         ) {
             // Nombre y Precio
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.product.name,
-                    color = TextPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = item.product.name,
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (item.product.gramaje.isNotBlank()) {
+                        Surface(
+                            color = Color(0xFF1E2A38),
+                            shape = RoundedCornerShape(4.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentLime.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = item.product.gramaje,
+                                color = AccentLime,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Código: ${item.product.barcode} | ${item.product.unitPrice} Bs c/u",

@@ -52,9 +52,11 @@ data class Room(
         }
 
     val precioBaseSugerido: Double
-        get() = when {
-            id < 100 -> 35.0 // Minicine: 35 Bs base
-            else -> 15.0     // Volantes y Just Dance: 15 Bs por 1 hora
+        get() = when (categoria) {
+            "Minicine" -> BasePriceConfig.precioMinicine
+            "Autitos" -> BasePriceConfig.precioVolantes
+            "Just Dance" -> BasePriceConfig.precioJustDance
+            else -> if (id < 100) BasePriceConfig.precioMinicine else BasePriceConfig.precioVolantes
         }
 
     val totalPedidos: Double get() = pedidos.sumOf { it.subtotal }
@@ -162,5 +164,17 @@ data class Room(
      */
     fun obtenerHoraInicioFormateada(): String {
         return horaReserva?.ifBlank { "N/A" } ?: "N/A"
+    }
+}
+
+object BasePriceConfig {
+    var precioMinicine: Double = 35.0
+    var precioVolantes: Double = 15.0
+    var precioJustDance: Double = 15.0
+
+    fun updateFromMap(prices: Map<String, Double>) {
+        prices["precio_minicine"]?.let { if (it > 0) precioMinicine = it }
+        prices["precio_volantes"]?.let { if (it > 0) precioVolantes = it }
+        prices["precio_just_dance"]?.let { if (it > 0) precioJustDance = it }
     }
 }

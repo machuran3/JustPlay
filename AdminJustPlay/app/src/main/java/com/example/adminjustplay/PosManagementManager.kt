@@ -221,6 +221,45 @@ class PosManagementManager(
         cardPermiso.addView(tvEstadoPermiso)
         container.addView(cardPermiso)
 
+        // 2.5 TARJETA DE GESTIÓN DE PRECIOS BASE DE SALAS
+        val cardPrecios = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 18, 20, 18)
+            setBackgroundColor(Color.parseColor("#24283B"))
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.setMargins(0, 0, 0, 16)
+            layoutParams = lp
+        }
+
+        val tvSubPrecios = TextView(context).apply {
+            text = "💲 Precios Base de Salas & Simuladores"
+            setTextColor(Color.parseColor("#DEFF9A"))
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+        }
+
+        val tvDescPrecios = TextView(context).apply {
+            text = "Tarifas base por 1 hora para Minicine, Volantes y Just Dance. Sincronizadas globalmente."
+            setTextColor(Color.parseColor("#A0A0A0"))
+            textSize = 11f
+            setPadding(0, 4, 0, 8)
+        }
+
+        val btnConfigPrecios = Button(context).apply {
+            text = "⚙️ Editar Precios Base"
+            setBackgroundColor(Color.parseColor("#1A1C29"))
+            setTextColor(Color.parseColor("#DEFF9A"))
+            textSize = 11f
+            setOnClickListener {
+                mostrarDialogoPreciosBase()
+            }
+        }
+
+        cardPrecios.addView(tvSubPrecios)
+        cardPrecios.addView(tvDescPrecios)
+        cardPrecios.addView(btnConfigPrecios)
+        container.addView(cardPrecios)
+
         // 3. TARJETA DE DISPOSITIVOS POS VINCULADOS (Device Management & Heartbeat)
         val tvHeaderDevices = TextView(context).apply {
             text = "💻 Terminales POS Vinculadas (Heartbeat & Sesión)"
@@ -463,6 +502,7 @@ class PosManagementManager(
                 for (snap in snapshot.children) {
                     val barcode = snap.child("codigo_barras").getValue(String::class.java) ?: snap.key ?: ""
                     val nombre = snap.child("nombre").getValue(String::class.java) ?: "Producto $barcode"
+                    val gramaje = snap.child("gramaje").getValue(String::class.java) ?: ""
                     val precio = snap.child("precio_unitario").getValue(Double::class.java) ?: 0.0
                     val stock = snap.child("stock_actual").getValue(Int::class.java) ?: 0
                     val categoria = snap.child("categoria").getValue(String::class.java) ?: "General"
@@ -476,7 +516,7 @@ class PosManagementManager(
                         lp.setMargins(0, 0, 0, 8)
                         layoutParams = lp
                         setOnClickListener {
-                            mostrarDialogoCrearEditarProducto(barcode, nombre, precio, stock, categoria)
+                            mostrarDialogoCrearEditarProducto(barcode, nombre, precio, stock, categoria, gramaje)
                         }
                     }
 
@@ -486,7 +526,8 @@ class PosManagementManager(
                     }
 
                     val tvNom = TextView(context).apply {
-                        text = "📦 $nombre"
+                        val nomText = if (gramaje.isNotBlank()) "📦 $nombre ($gramaje)" else "📦 $nombre"
+                        text = nomText
                         setTextColor(Color.WHITE)
                         textSize = 13f
                         setTypeface(null, Typeface.BOLD)
@@ -595,12 +636,121 @@ class PosManagementManager(
             .show()
     }
 
+    fun mostrarDialogoPreciosBase() {
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 20, 24, 20)
+            setBackgroundColor(Color.parseColor("#1A1C29"))
+        }
+
+        val tvIntro = TextView(context).apply {
+            text = "Configura la tarifa base sugerida (por 1 hora) para cada sección. Se sincroniza con terminales de escritorio y aplicaciones de empleados."
+            setTextColor(Color.parseColor("#A0A0A0"))
+            textSize = 12f
+            setPadding(0, 0, 0, 16)
+        }
+        container.addView(tvIntro)
+
+        // Minicine
+        val tvMinicine = TextView(context).apply {
+            text = "🎬 Salas de Minicine (Bs / hora):"
+            setTextColor(Color.parseColor("#DEFF9A"))
+            textSize = 13f
+            setTypeface(null, Typeface.BOLD)
+        }
+        val etMinicine = EditText(context).apply {
+            hint = "Tarifa Minicine (ej. 35.0)"
+            setText("35.0")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+        }
+        container.addView(tvMinicine)
+        container.addView(etMinicine)
+
+        // Volantes
+        val tvVolantes = TextView(context).apply {
+            text = "🏎️ Simuladores y Volantes (Bs / hora):"
+            setTextColor(Color.parseColor("#DEFF9A"))
+            textSize = 13f
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, 12, 0, 0)
+        }
+        val etVolantes = EditText(context).apply {
+            hint = "Tarifa Volantes (ej. 15.0)"
+            setText("15.0")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+        }
+        container.addView(tvVolantes)
+        container.addView(etVolantes)
+
+        // Just Dance
+        val tvJustDance = TextView(context).apply {
+            text = "💃 Sala Just Dance (Bs / hora):"
+            setTextColor(Color.parseColor("#DEFF9A"))
+            textSize = 13f
+            setTypeface(null, Typeface.BOLD)
+            setPadding(0, 12, 0, 0)
+        }
+        val etJustDance = EditText(context).apply {
+            hint = "Tarifa Just Dance (ej. 15.0)"
+            setText("15.0")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+        }
+        container.addView(tvJustDance)
+        container.addView(etJustDance)
+
+        // Cargar valores actuales de Firebase
+        database.child("config_precios").get().addOnSuccessListener { snap ->
+            val pMinicine = snap.child("precio_minicine").getValue(Double::class.java)
+                ?: snap.child("precio_minicine").getValue(Long::class.java)?.toDouble() ?: 35.0
+            val pVolantes = snap.child("precio_volantes").getValue(Double::class.java)
+                ?: snap.child("precio_volantes").getValue(Long::class.java)?.toDouble() ?: 15.0
+            val pJustDance = snap.child("precio_just_dance").getValue(Double::class.java)
+                ?: snap.child("precio_just_dance").getValue(Long::class.java)?.toDouble() ?: 15.0
+
+            etMinicine.setText(pMinicine.toString())
+            etVolantes.setText(pVolantes.toString())
+            etJustDance.setText(pJustDance.toString())
+        }
+
+        AlertDialog.Builder(context)
+            .setTitle("💲 Precios Base de Salas")
+            .setView(container)
+            .setPositiveButton("Guardar") { _, _ ->
+                val nuevoMinicine = etMinicine.text.toString().toDoubleOrNull() ?: 35.0
+                val nuevoVolantes = etVolantes.text.toString().toDoubleOrNull() ?: 15.0
+                val nuevoJustDance = etJustDance.text.toString().toDoubleOrNull() ?: 15.0
+                val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
+
+                val updateMap = mapOf(
+                    "precio_minicine" to nuevoMinicine,
+                    "precio_volantes" to nuevoVolantes,
+                    "precio_just_dance" to nuevoJustDance,
+                    "ultima_actualizacion" to fecha,
+                    "actualizado_por" to "Admin"
+                )
+                database.child("config_precios").updateChildren(updateMap).addOnSuccessListener {
+                    Toast.makeText(context, "✅ Precios base actualizados correctamente", Toast.LENGTH_SHORT).show()
+                }.addOnFailureListener {
+                    Toast.makeText(context, "❌ Error al guardar precios: ${it.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     fun mostrarDialogoCrearEditarProducto(
         codigoExistente: String? = null,
         nombreExistente: String = "",
         precioExistente: Double = 10.0,
         stockExistente: Int = 50,
-        categoriaExistente: String = "Snacks"
+        categoriaExistente: String = "Snacks",
+        gramajeExistente: String = ""
     ) {
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -611,14 +761,21 @@ class PosManagementManager(
         val etCodigo = EditText(context).apply {
             hint = "Código de Barras (ej. 77510001)"
             setText(codigoExistente ?: "")
-            isEnabled = codigoExistente == null
+            isEnabled = true
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
         }
 
         val etNombre = EditText(context).apply {
-            hint = "Nombre del Producto (ej. Coca Cola 500ml)"
+            hint = "Nombre del Producto (ej. Doritos)"
             setText(nombreExistente)
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+        }
+
+        val etGramaje = EditText(context).apply {
+            hint = "Gramaje o Volumen (ej. 500ml, 120g - Opcional)"
+            setText(gramajeExistente)
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
         }
@@ -632,18 +789,46 @@ class PosManagementManager(
         }
 
         val etStock = EditText(context).apply {
-            hint = "Stock Actual"
+            hint = "Stock Actual (ej. 50 o +10 para sumar)"
             setText(stockExistente.toString())
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
+        }
+
+        // Fila de botones para incremento rápido de stock (+5, +10, +20, +50)
+        val llStockButtons = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 4, 0, 8)
+        }
+        listOf(5, 10, 20, 50).forEach { inc ->
+            val btnInc = Button(context).apply {
+                text = "+$inc"
+                textSize = 10f
+                setBackgroundColor(Color.parseColor("#24283B"))
+                setTextColor(Color.parseColor("#DEFF9A"))
+                val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    setMargins(2, 0, 2, 0)
+                }
+                layoutParams = lp
+                setOnClickListener {
+                    val currentTxt = etStock.text.toString().trim()
+                    if (currentTxt.startsWith("+")) {
+                        val curInc = currentTxt.removePrefix("+").trim().toIntOrNull() ?: 0
+                        etStock.setText("+${curInc + inc}")
+                    } else {
+                        val curVal = currentTxt.toIntOrNull() ?: stockExistente
+                        etStock.setText((curVal + inc).toString())
+                    }
+                }
+            }
+            llStockButtons.addView(btnInc)
         }
 
         val tvCatLabel = TextView(context).apply {
             text = "Categoría:"
             setTextColor(Color.parseColor("#DEFF9A"))
             textSize = 12f
-            setPadding(0, 12, 0, 4)
+            setPadding(0, 8, 0, 4)
         }
 
         val categoriasFijas = arrayOf("Snack", "Bebidas", "Golosinas")
@@ -662,8 +847,10 @@ class PosManagementManager(
 
         container.addView(etCodigo)
         container.addView(etNombre)
+        container.addView(etGramaje)
         container.addView(etPrecio)
         container.addView(etStock)
+        container.addView(llStockButtons)
         container.addView(tvCatLabel)
         container.addView(spinnerCategoria)
 
@@ -673,8 +860,15 @@ class PosManagementManager(
             .setPositiveButton("Guardar") { _, _ ->
                 val code = etCodigo.text.toString().trim()
                 val name = etNombre.text.toString().trim()
+                val gramaje = etGramaje.text.toString().trim()
                 val price = etPrecio.text.toString().toDoubleOrNull() ?: 10.0
-                val stock = etStock.text.toString().toIntOrNull() ?: 50
+                val rawStock = etStock.text.toString().trim()
+                val stock = if (rawStock.startsWith("+")) {
+                    val inc = rawStock.removePrefix("+").trim().toIntOrNull() ?: 0
+                    stockExistente + inc
+                } else {
+                    rawStock.toIntOrNull() ?: stockExistente
+                }
                 val cat = spinnerCategoria.selectedItem?.toString() ?: "Snack"
                 val now = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
 
@@ -682,9 +876,10 @@ class PosManagementManager(
                     // Validar duplicados de código y nombre en Firebase
                     database.child("productos_catalogo").get().addOnSuccessListener { snap ->
                         val esNuevo = codigoExistente == null
+                        val codigoCambio = codigoExistente != null && codigoExistente != code
 
-                        // 1. Validar código duplicado en creación
-                        if (esNuevo && snap.hasChild(code)) {
+                        // 1. Validar código duplicado en creación o si el código fue cambiado
+                        if ((esNuevo || codigoCambio) && snap.hasChild(code)) {
                             Toast.makeText(context, "❌ Error: Ya existe un producto con el código de barras '$code'", Toast.LENGTH_LONG).show()
                             return@addOnSuccessListener
                         }
@@ -702,9 +897,15 @@ class PosManagementManager(
                             return@addOnSuccessListener
                         }
 
+                        // Si el código cambió, eliminar el código anterior de Firebase
+                        if (codigoCambio) {
+                            database.child("productos_catalogo").child(codigoExistente!!).removeValue()
+                        }
+
                         val map = mapOf(
                             "codigo_barras" to code,
                             "nombre" to name,
+                            "gramaje" to gramaje,
                             "precio_unitario" to price,
                             "stock_actual" to stock,
                             "categoria" to cat,
@@ -715,7 +916,7 @@ class PosManagementManager(
                         
                         // Registro en Auditoría
                         productAuditManager.registrarAuditoriaProducto(
-                            tipoOperacion = if (esNuevo) "CREACION" else "EDICION",
+                            tipoOperacion = if (esNuevo) "CREACION" else if (codigoCambio) "MIGRACION_CODIGO" else "EDICION",
                             codigoBarras = code,
                             nombreProducto = name,
                             categoria = cat,
@@ -725,7 +926,7 @@ class PosManagementManager(
                             stockNuevo = stock,
                             usuarioNombre = "Admin",
                             usuarioRol = "Administrador",
-                            detalles = if (esNuevo) "Producto creado por el Administrador" else "Precio/stock actualizados"
+                            detalles = if (esNuevo) "Producto creado por el Administrador" else if (codigoCambio) "Código migrado de $codigoExistente a $code" else "Precio/stock/gramaje actualizados"
                         )
 
                         Toast.makeText(context, "Producto '$name' guardado exitosamente", Toast.LENGTH_SHORT).show()

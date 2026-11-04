@@ -112,6 +112,14 @@ class PosViewModel(
         val hoyStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         _uiState.update { it.copy(scheduleSelectedDate = hoyStr) }
 
+        // Cargar precios base configurados en Firebase
+        scope.launch {
+            try {
+                val prices = cloudSyncService.fetchBasePrices()
+                com.justplay.pos.core.models.BasePriceConfig.updateFromMap(prices)
+            } catch (_: Exception) {}
+        }
+
         // Escuchar estados de seguridad y control de versiones
         if (securityService != null) {
             scope.launch {
@@ -671,6 +679,10 @@ class PosViewModel(
     fun refreshRooms() {
         scope.launch {
             roomManagementService.refreshRooms()
+            try {
+                val prices = cloudSyncService.fetchBasePrices()
+                com.justplay.pos.core.models.BasePriceConfig.updateFromMap(prices)
+            } catch (_: Exception) {}
         }
     }
 
@@ -692,9 +704,9 @@ class PosViewModel(
         }
     }
 
-    fun saveProduct(product: Product) {
+    fun saveProduct(product: Product, oldBarcode: String? = null) {
         scope.launch {
-            productCatalogService.saveOrUpdateProduct(product)
+            productCatalogService.saveOrUpdateProduct(product, oldBarcode)
             closeProductManager()
         }
     }

@@ -86,6 +86,14 @@ data class Sala(
         if (montoQR > 0.0) return montoQR
         return total
     }
+
+    fun getPrecioBaseSugerido(): Double {
+        return when {
+            nombre.contains("Dance", ignoreCase = true) || id >= 200 -> BasePriceConfig.precioJustDance
+            nombre.contains("Car", ignoreCase = true) || nombre.contains("Auto", ignoreCase = true) || nombre.contains("Volante", ignoreCase = true) || id in 101..199 -> BasePriceConfig.precioVolantes
+            else -> BasePriceConfig.precioMinicine
+        }
+    }
 }
 
 data class RegistroEntry(
@@ -168,3 +176,22 @@ data class ClienteVetado(
     var nombre: String? = null,
     var motivo: String = ""
 )
+
+object BasePriceConfig {
+    var precioMinicine: Double = 35.0
+    var precioVolantes: Double = 15.0
+    var precioJustDance: Double = 15.0
+
+    fun updateFromSnapshot(snapshot: com.google.firebase.database.DataSnapshot) {
+        val pM = snapshot.child("precio_minicine").getValue(Double::class.java)
+            ?: snapshot.child("precio_minicine").getValue(Long::class.java)?.toDouble()
+        val pV = snapshot.child("precio_volantes").getValue(Double::class.java)
+            ?: snapshot.child("precio_volantes").getValue(Long::class.java)?.toDouble()
+        val pJD = snapshot.child("precio_just_dance").getValue(Double::class.java)
+            ?: snapshot.child("precio_just_dance").getValue(Long::class.java)?.toDouble()
+
+        if (pM != null && pM > 0) precioMinicine = pM
+        if (pV != null && pV > 0) precioVolantes = pV
+        if (pJD != null && pJD > 0) precioJustDance = pJD
+    }
+}

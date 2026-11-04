@@ -24,24 +24,41 @@ fun ProductManagerDialog(
     initialProduct: Product?,
     prefillBarcode: String = "",
     existingProducts: List<Product> = emptyList(),
-    onSaveProduct: (Product) -> Unit,
+    onSaveProduct: (Product, String?) -> Unit,
     onDeleteProduct: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var barcode by remember { mutableStateOf(initialProduct?.barcode ?: prefillBarcode) }
     var name by remember { mutableStateOf(initialProduct?.name ?: "") }
+    var gramaje by remember { mutableStateOf(initialProduct?.gramaje ?: "") }
     var category by remember { mutableStateOf(initialProduct?.category ?: "Snacks") }
     var price by remember { mutableStateOf(initialProduct?.unitPrice?.toString() ?: "10.0") }
     var costPrice by remember { mutableStateOf(initialProduct?.costPrice?.toString() ?: "5.0") }
-    var stock by remember { mutableStateOf(initialProduct?.currentStock?.toString() ?: "50") }
+    var stockInput by remember { mutableStateOf(initialProduct?.currentStock?.toString() ?: "50") }
     var minStock by remember { mutableStateOf(initialProduct?.minStockAlert?.toString() ?: "5") }
     var unitOfMeasure by remember { mutableStateOf(initialProduct?.unitOfMeasure ?: "Unidad") }
 
     val cleanBarcode = barcode.trim()
     val cleanName = name.trim()
 
-    val isDuplicateBarcode = initialProduct == null && cleanBarcode.isNotBlank() && existingProducts.any {
-        it.barcode.trim().equals(cleanBarcode, ignoreCase = true)
+    val baseStock = initialProduct?.currentStock ?: 0
+    val calculatedStock = remember(stockInput, baseStock) {
+        val s = stockInput.trim()
+        when {
+            s.startsWith("+") -> {
+                val delta = s.removePrefix("+").trim().toIntOrNull() ?: 0
+                baseStock + delta
+            }
+            s.contains("+") -> {
+                s.split("+").sumOf { it.trim().toIntOrNull() ?: 0 }
+            }
+            else -> s.toIntOrNull() ?: baseStock
+        }
+    }
+
+    val isDuplicateBarcode = cleanBarcode.isNotBlank() && existingProducts.any {
+        it.barcode.trim().equals(cleanBarcode, ignoreCase = true) &&
+                (initialProduct == null || !cleanBarcode.equals(initialProduct.barcode.trim(), ignoreCase = true))
     }
 
     val isDuplicateName = cleanName.isNotBlank() && existingProducts.any {
@@ -59,7 +76,7 @@ fun ProductManagerDialog(
             shape = RoundedCornerShape(16.dp),
             color = CardDark,
             border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-            modifier = Modifier.width(460.dp)
+            modifier = Modifier.width(480.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 // Header
@@ -79,20 +96,18 @@ fun ProductManagerDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Código de Barras
+                // Código de Barras (Editable)
                 OutlinedTextField(
                     value = barcode,
                     onValueChange = { barcode = it },
                     label = { Text("Código de Barras", fontSize = 12.sp) },
-                    enabled = initialProduct == null,
                     isError = isDuplicateBarcode,
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = SurfaceDark,
                         unfocusedContainerColor = SurfaceDark,
-                        disabledContainerColor = SurfaceDark,
                         focusedBorderColor = if (isDuplicateBarcode) AlertRed else AccentLime,
                         unfocusedBorderColor = if (isDuplicateBarcode) AlertRed else BorderDark,
                         errorBorderColor = AlertRed,
@@ -104,7 +119,7 @@ fun ProductManagerDialog(
                 )
                 if (isDuplicateBarcode) {
                     Text(
-                        text = "❌ Ya existe un producto con este código de barras.",
+                        text = "❌ Ya existe otro producto con este código de barras.",
                         color = AlertRed,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
@@ -114,25 +129,48 @@ fun ProductManagerDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Nombre
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nombre del Producto", fontSize = 12.sp) },
-                    isError = isDuplicateName,
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceDark,
-                        unfocusedContainerColor = SurfaceDark,
-                        focusedBorderColor = if (isDuplicateName) AlertRed else AccentLime,
-                        unfocusedBorderColor = if (isDuplicateName) AlertRed else BorderDark,
-                        errorBorderColor = AlertRed,
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Nombre y Gramaje/Volumen separados
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nombre del Producto", fontSize = 12.sp) },
+                        isError = isDuplicateName,
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = SurfaceDark,
+                            unfocusedContainerColor = SurfaceDark,
+                            focusedBorderColor = if (isDuplicateName) AlertRed else AccentLime,
+                            unfocusedBorderColor = if (isDuplicateName) AlertRed else BorderDark,
+                            errorBorderColor = AlertRed,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1.3f)
+                    )
+
+                    OutlinedTextField(
+                        value = gramaje,
+                        onValueChange = { gramaje = it },
+                        label = { Text("Gramaje/Volumen", fontSize = 12.sp) },
+                        placeholder = { Text("500ml, 1L", fontSize = 11.sp, color = TextMuted) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = SurfaceDark,
+                            unfocusedContainerColor = SurfaceDark,
+                            focusedBorderColor = AccentLime,
+                            unfocusedBorderColor = BorderDark,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 if (isDuplicateName) {
                     Text(
                         text = "❌ Ya existe otro producto registrado con este nombre.",
@@ -213,27 +251,40 @@ fun ProductManagerDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Stock
+                // Stock con soporte para Aumento Rápido (+X)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    OutlinedTextField(
-                        value = stock,
-                        onValueChange = { stock = it },
-                        label = { Text("Stock Actual", fontSize = 11.sp) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = SurfaceDark,
-                            unfocusedContainerColor = SurfaceDark,
-                            focusedBorderColor = AccentLime,
-                            unfocusedBorderColor = BorderDark,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.weight(1f)
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        OutlinedTextField(
+                            value = stockInput,
+                            onValueChange = { stockInput = it },
+                            label = { Text("Stock Actual (o +10)", fontSize = 11.sp) },
+                            placeholder = { Text("Ej: 40 o +10", fontSize = 11.sp, color = TextMuted) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = SurfaceDark,
+                                unfocusedContainerColor = SurfaceDark,
+                                focusedBorderColor = AccentLime,
+                                unfocusedBorderColor = BorderDark,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        if (stockInput.trim().startsWith("+") || stockInput.trim().contains("+")) {
+                            Text(
+                                text = "⚡ Stock resultante: $calculatedStock u.",
+                                color = AccentLime,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(start = 2.dp, top = 2.dp)
+                            )
+                        }
+                    }
 
                     OutlinedTextField(
                         value = minStock,
@@ -253,7 +304,34 @@ fun ProductManagerDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                // Botones rápidos para sumar stock
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Suma rápida:", color = TextMuted, fontSize = 10.sp)
+                    listOf(5, 10, 20, 50).forEach { delta ->
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = SurfaceDark,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark)
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    val currentNum = stockInput.removePrefix("+").toIntOrNull() ?: baseStock
+                                    stockInput = (currentNum + delta).toString()
+                                },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                modifier = Modifier.height(24.dp)
+                            ) {
+                                Text("+$delta", color = AccentLime, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Botones Guardar / Eliminar
                 Row(
@@ -282,13 +360,15 @@ fun ProductManagerDialog(
                                     Product(
                                         barcode = cleanBarcode,
                                         name = cleanName,
+                                        gramaje = gramaje.trim(),
                                         category = category,
                                         unitPrice = price.toDoubleOrNull() ?: 10.0,
                                         costPrice = costPrice.toDoubleOrNull() ?: 5.0,
-                                        currentStock = stock.toIntOrNull() ?: 50,
+                                        currentStock = calculatedStock,
                                         minStockAlert = minStock.toIntOrNull() ?: 5,
                                         unitOfMeasure = unitOfMeasure
-                                    )
+                                    ),
+                                    initialProduct?.barcode
                                 )
                             }
                         },

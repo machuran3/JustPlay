@@ -86,9 +86,9 @@ fun RoomDashboardPanel(
             }
         } else {
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 300.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                columns = GridCells.Adaptive(minSize = 280.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(filteredRooms) { room ->
@@ -132,7 +132,7 @@ fun RoomCard(
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             // Cabecera de la tarjeta
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -142,8 +142,11 @@ fun RoomCard(
                 Text(
                     text = "$iconPrefix ${room.nombre}",
                     color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(end = 6.dp)
                 )
 
                 Surface(
@@ -168,13 +171,17 @@ fun RoomCard(
                     text = "👤 Cliente: ${room.cliente ?: "N/A"} ${if (!room.celular.isNullOrEmpty()) "(${room.celular})" else ""}",
                     color = Color.White,
                     fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 if (!room.pelicula.isNullOrEmpty()) {
                     Text(
                         text = "🎮 Contenido: ${room.pelicula}",
                         color = TextSecondary,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
 

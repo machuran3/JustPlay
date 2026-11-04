@@ -42,6 +42,7 @@ class SqliteLocalStorage(
                         CREATE TABLE IF NOT EXISTS products_cache (
                             barcode TEXT PRIMARY KEY,
                             name TEXT NOT NULL,
+                            gramaje TEXT DEFAULT '',
                             category TEXT,
                             unit_price REAL NOT NULL,
                             cost_price REAL DEFAULT 0,
@@ -53,6 +54,9 @@ class SqliteLocalStorage(
                         )
                         """.trimIndent()
                     )
+                    try {
+                        stmt.execute("ALTER TABLE products_cache ADD COLUMN gramaje TEXT DEFAULT ''")
+                    } catch (_: Exception) {}
 
                     // Tabla de Ventas Locales y Cola Offline
                     stmt.execute(
@@ -164,23 +168,24 @@ class SqliteLocalStorage(
             conn.autoCommit = false
             val sql = """
                 INSERT OR REPLACE INTO products_cache (
-                    barcode, name, category, unit_price, cost_price,
+                    barcode, name, gramaje, category, unit_price, cost_price,
                     current_stock, min_stock_alert, active, unit_of_measure, last_updated
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent()
 
             conn.prepareStatement(sql).use { pstmt ->
                 for (p in products) {
                     pstmt.setString(1, p.barcode)
                     pstmt.setString(2, p.name)
-                    pstmt.setString(3, p.category)
-                    pstmt.setDouble(4, p.unitPrice)
-                    pstmt.setDouble(5, p.costPrice)
-                    pstmt.setInt(6, p.currentStock)
-                    pstmt.setInt(7, p.minStockAlert)
-                    pstmt.setInt(8, if (p.active) 1 else 0)
-                    pstmt.setString(9, p.unitOfMeasure)
-                    pstmt.setString(10, p.lastUpdated)
+                    pstmt.setString(3, p.gramaje)
+                    pstmt.setString(4, p.category)
+                    pstmt.setDouble(5, p.unitPrice)
+                    pstmt.setDouble(6, p.costPrice)
+                    pstmt.setInt(7, p.currentStock)
+                    pstmt.setInt(8, p.minStockAlert)
+                    pstmt.setInt(9, if (p.active) 1 else 0)
+                    pstmt.setString(10, p.unitOfMeasure)
+                    pstmt.setString(11, p.lastUpdated)
                     pstmt.addBatch()
                 }
                 pstmt.executeBatch()
@@ -197,10 +202,12 @@ class SqliteLocalStorage(
             conn.createStatement().use { stmt ->
                 val rs = stmt.executeQuery(sql)
                 while (rs.next()) {
+                    val gramaje = try { rs.getString("gramaje") ?: "" } catch (_: Exception) { "" }
                     list.add(
                         Product(
                             barcode = rs.getString("barcode"),
                             name = rs.getString("name"),
+                            gramaje = gramaje,
                             category = rs.getString("category") ?: "Snacks & Bebidas",
                             unitPrice = rs.getDouble("unit_price"),
                             costPrice = rs.getDouble("cost_price"),

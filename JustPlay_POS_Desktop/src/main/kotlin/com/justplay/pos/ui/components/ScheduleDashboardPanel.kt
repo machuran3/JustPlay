@@ -84,14 +84,15 @@ fun ScheduleDashboardPanel(
     }
 
     // Normalizador de fechas para comparar dd/MM/yyyy con dd-MM-yyyy y yyyy-MM-dd
+    val isAllDates = selectedDate == "TODAS"
     val currentDateStr = if (selectedDate.isBlank()) todayStr else selectedDate
     val normCurrentDate = remember(currentDateStr) { normalizeDate(currentDateStr) }
 
-    // Filtrar reservas por fecha y categoría
-    val filteredReservations = remember(reservations, normCurrentDate, categoryFilter) {
+    // Filtrar reservas por fecha y categoría (o ver todas si isAllDates es true)
+    val filteredReservations = remember(reservations, normCurrentDate, categoryFilter, isAllDates) {
         reservations.filter { res ->
             val resNormDate = normalizeDate(res.fecha)
-            val matchDate = res.fecha.isBlank() || resNormDate == normCurrentDate || res.fecha == currentDateStr || res.fecha == currentDateStr.replace("/", "-")
+            val matchDate = isAllDates || res.fecha.isBlank() || resNormDate == normCurrentDate || res.fecha == currentDateStr || res.fecha == currentDateStr.replace("/", "-")
             
             val isAutitos = res.tipoSala.contains("Auto", ignoreCase = true) || 
                             res.tipoSala.contains("Volante", ignoreCase = true) || 
@@ -115,12 +116,12 @@ fun ScheduleDashboardPanel(
     }
 
     // Filtrar registros finalizados del día por fecha y categoría (no borrados)
-    val filteredRecords = remember(records, normCurrentDate, categoryFilter) {
+    val filteredRecords = remember(records, normCurrentDate, categoryFilter, isAllDates) {
         records.filter { rec ->
             if (rec.eliminado) return@filter false
             val recDate = rec.extraerFecha()
             val recNormDate = normalizeDate(recDate)
-            val matchDate = recDate.isBlank() || recNormDate == normCurrentDate || recDate == currentDateStr || recDate == currentDateStr.replace("/", "-")
+            val matchDate = isAllDates || recDate.isBlank() || recNormDate == normCurrentDate || recDate == currentDateStr || recDate == currentDateStr.replace("/", "-")
             
             val isAutitos = rec.nombreElemento.contains("Auto", ignoreCase = true) || 
                             rec.nombreElemento.contains("Volante", ignoreCase = true) || 
@@ -151,6 +152,8 @@ fun ScheduleDashboardPanel(
     val countCines = remember(rooms) { rooms.count { it.categoria == "Minicine" } }
     val countVolantes = remember(rooms) { rooms.count { it.categoria == "Autitos" } }
     val countDance = remember(rooms) { rooms.count { it.categoria == "Just Dance" } }
+
+    var exportNotification by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -184,9 +187,9 @@ fun ScheduleDashboardPanel(
                         )
                     }
 
-                    // Chips de Fecha Rápida
+                    // Chips de Fecha Rápida (Ayer, Hoy, Mañana, Todas)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        val isAyer = currentDateStr == yesterdayStr
+                        val isAyer = !isAllDates && currentDateStr == yesterdayStr
                         FilterChip(
                             selected = isAyer,
                             onClick = { onDateChange(yesterdayStr) },
@@ -199,7 +202,7 @@ fun ScheduleDashboardPanel(
                             )
                         )
 
-                        val isHoy = currentDateStr == todayStr
+                        val isHoy = !isAllDates && currentDateStr == todayStr
                         FilterChip(
                             selected = isHoy,
                             onClick = { onDateChange(todayStr) },
@@ -212,7 +215,7 @@ fun ScheduleDashboardPanel(
                             )
                         )
 
-                        val isManana = currentDateStr == tomorrowStr
+                        val isManana = !isAllDates && currentDateStr == tomorrowStr
                         FilterChip(
                             selected = isManana,
                             onClick = { onDateChange(tomorrowStr) },
@@ -224,10 +227,22 @@ fun ScheduleDashboardPanel(
                                 labelColor = TextPrimary
                             )
                         )
+
+                        FilterChip(
+                            selected = isAllDates,
+                            onClick = { onDateChange(if (isAllDates) todayStr else "TODAS") },
+                            label = { Text("📅 Todas (${reservations.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFF64B5F6),
+                                selectedLabelColor = Color.Black,
+                                containerColor = CardDark,
+                                labelColor = TextPrimary
+                            )
+                        )
                     }
                 }
 
-                // Filtro de Categoría, Selector de Vista y Botón Refrescar
+                // Filtro de Categoría, Selector de Vista, Botón Excel y Botón Refrescar
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     // Selector de Categoría
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -282,12 +297,58 @@ fun ScheduleDashboardPanel(
                         }
                     }
 
+                    // Botón Exportar Reporte a Excel
+                    Button(
+                        onClick = {
+                            try {
+                                val (xlsxRec, _) = com.justplay.pos.services.ExcelReportExporter.exportSessions(records)
+                                val (xlsxRes, _) = com.justplay.pos.services.ExcelReportExporter.exportReservations(reservations)
+                                exportNotification = "✅ Reportes exportados a:\n${xlsxRec.name} y ${xlsxRes.name}\nCarpeta: ${xlsxRec.parentFile?.absolutePath}"
+                            } catch (e: Exception) {
+                                exportNotification = "❌ Error al exportar: ${e.message}"
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Text("📊 Excel", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
                     IconButton(
                         onClick = onRefresh,
                         colors = IconButtonDefaults.iconButtonColors(containerColor = CardDark, contentColor = AccentLime),
                         modifier = Modifier.size(34.dp)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = "Actualizar", modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+
+        if (exportNotification != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                color = Color(0xFF14291D),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, AccentGreen),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = exportNotification ?: "",
+                        color = AccentLime,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { exportNotification = null }, modifier = Modifier.size(24.dp)) {
+                        Text("✕", color = TextSecondary, fontSize = 12.sp)
                     }
                 }
             }
@@ -415,11 +476,46 @@ private fun ScheduleExcelGridView(
 ) {
     val scrollVertical = rememberScrollState()
 
-    val hourSlots = remember {
-        (10..21).map { h ->
-            val start = String.format("%02d:00", h)
-            val end = String.format("%02d:00", h + 1)
-            h to "$start - $end"
+    var showFull24h by remember { mutableStateOf(false) }
+
+    val hourSlots = remember(reservations, records, showFull24h) {
+        if (showFull24h) {
+            (0..23).map { h ->
+                val start = String.format("%02d:00", h)
+                val end = String.format("%02d:00", (h + 1) % 24)
+                h to "$start - $end"
+            }
+        } else {
+            var minHour = 10
+            var maxHour = 21
+
+            reservations.forEach { res ->
+                val hStart = res.horaProgramada.trim().take(5).split(":").getOrNull(0)?.toIntOrNull()
+                if (hStart != null && hStart in 0..23) {
+                    if (hStart < minHour) minHour = hStart
+                    if (hStart > maxHour) maxHour = hStart
+                }
+                val hEnd = res.calcularHoraFin().take(5).split(":").getOrNull(0)?.toIntOrNull()
+                if (hEnd != null && hEnd in 0..23) {
+                    if (hEnd > maxHour) maxHour = hEnd
+                }
+            }
+            records.forEach { rec ->
+                val startMin = rec.extraerHoraInicioMinutos()
+                if (startMin != null) {
+                    val hStart = (startMin / 60).coerceIn(0, 23)
+                    if (hStart < minHour) minHour = hStart
+                    if (hStart > maxHour) maxHour = hStart
+                    val hEnd = ((startMin + rec.parsearDuracionMinutos()) / 60).coerceIn(0, 23)
+                    if (hEnd > maxHour) maxHour = hEnd
+                }
+            }
+
+            (minHour..maxHour).map { h ->
+                val start = String.format("%02d:00", h)
+                val end = String.format("%02d:00", (h + 1) % 24)
+                h to "$start - $end"
+            }
         }
     }
 
@@ -438,6 +534,32 @@ private fun ScheduleExcelGridView(
                 .padding(end = 14.dp)
                 .verticalScroll(scrollVertical)
         ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Horario: ${hourSlots.firstOrNull()?.second?.take(5) ?: "10:00"} a ${hourSlots.lastOrNull()?.second?.takeLast(5) ?: "22:00"} (${hourSlots.size} hrs)",
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (showFull24h) AccentLime.copy(alpha = 0.2f) else CardDark,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (showFull24h) AccentLime else BorderDark),
+                    modifier = Modifier.clickable { showFull24h = !showFull24h }
+                ) {
+                    Text(
+                        text = if (showFull24h) "🕒 Vista 24h ✓" else "🕒 Ver 24 Horas",
+                        color = if (showFull24h) AccentLime else TextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
             when (categoryFilter) {
                 "MINICINE" -> {
                     CategoryScheduleGrid(

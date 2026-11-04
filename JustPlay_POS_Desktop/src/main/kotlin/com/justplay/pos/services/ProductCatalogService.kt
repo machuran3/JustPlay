@@ -70,11 +70,19 @@ class ProductCatalogService(
         }
     }
 
-    override suspend fun saveOrUpdateProduct(product: Product) {
+    fun saveOrUpdateProduct(product: Product, oldBarcode: String? = null) {
         val now = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
         val updated = product.copy(lastUpdated = now)
 
         val currentList = _productsFlow.value.toMutableList()
+
+        if (oldBarcode != null && oldBarcode.isNotBlank() && oldBarcode != updated.barcode) {
+            currentList.removeAll { it.barcode == oldBarcode }
+            scope.launch {
+                cloudSyncService.deleteProductFromCloud(oldBarcode)
+            }
+        }
+
         val index = currentList.indexOfFirst { it.barcode == updated.barcode }
         if (index >= 0) {
             currentList[index] = updated
@@ -83,11 +91,14 @@ class ProductCatalogService(
         }
 
         _productsFlow.value = currentList
-        localStorage.cacheProducts(listOf(updated))
-
         scope.launch {
+            localStorage.cacheProducts(listOf(updated))
             cloudSyncService.pushProductToCloud(updated)
         }
+    }
+
+    override suspend fun saveOrUpdateProduct(product: Product) {
+        saveOrUpdateProduct(product, null)
     }
 
     override suspend fun updateStock(barcode: String, quantitySold: Int) {
@@ -98,9 +109,13 @@ class ProductCatalogService(
     }
 
     override suspend fun deleteProduct(barcode: String) {
-        val current = getProductByBarcode(barcode) ?: return
-        val disabled = current.copy(active = false)
-        saveOrUpdateProduct(disabled)
+        val currentList = _productsFlow.value.toMutableList()
+        currentList.removeAll { it.barcode == barcode }
+        _productsFlow.value = currentList
+
+        scope.launch {
+            cloudSyncService.deleteProductFromCloud(barcode)
+        }
     }
 
     private suspend fun seedInitialDemoProducts() {

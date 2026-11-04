@@ -172,13 +172,34 @@ fun ProductCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            Text(
-                text = product.name,
-                color = TextPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = product.name,
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (product.gramaje.isNotBlank()) {
+                    Surface(
+                        color = Color(0xFF1E2A38),
+                        shape = RoundedCornerShape(4.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentLime.copy(alpha = 0.4f))
+                    ) {
+                        Text(
+                            text = product.gramaje,
+                            color = AccentLime,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(4.dp))
 

@@ -340,6 +340,7 @@ class MainActivity : AppCompatActivity() {
         navigationView.menu.add(0, 12, 11, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
         navigationView.menu.add(0, 13, 12, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
         navigationView.menu.add(0, 14, 13, "🛡️ Historial Global de Salas").setIcon(android.R.drawable.ic_menu_info_details)
+        navigationView.menu.add(0, 15, 14, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
 
         navigationView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
@@ -352,6 +353,7 @@ class MainActivity : AppCompatActivity() {
                 12 -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
                 13 -> egresosManager.mostrarDialogoGestionEgresos()
                 14 -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
+                15 -> posManager.mostrarDialogoPreciosBase()
                 else -> {
                     val title = item.title.toString()
                     when {
@@ -364,6 +366,7 @@ class MainActivity : AppCompatActivity() {
                         title.contains("Auditoría Productos") -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
                         title.contains("Egresos") -> egresosManager.mostrarDialogoGestionEgresos()
                         title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
+                        title.contains("Precios Base") -> posManager.mostrarDialogoPreciosBase()
                         else -> navegarAPantalla(title)
                     }
                 }
@@ -472,6 +475,14 @@ class MainActivity : AppCompatActivity() {
             }
         )
         rvUsuariosOnline.adapter = usuariosOnlineAdapter
+
+        findViewById<Button>(R.id.btnCrearNuevoUsuario).setOnClickListener {
+            if (!estaConectadoInternet) {
+                Toast.makeText(this, "⚠️ Sin conexión: Se requiere internet para registrar usuarios.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            mostrarDialogoCrearNuevoUsuario()
+        }
 
         findViewById<FloatingActionButton>(R.id.fabAgregarVetado).setOnClickListener {
             if (!estaConectadoInternet) {
@@ -705,6 +716,92 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun mostrarDialogoCrearNuevoUsuario() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 20, 24, 20)
+            setBackgroundColor(Color.parseColor("#1A1C29"))
+        }
+
+        val etNombre = EditText(this).apply {
+            hint = "Nombre del Empleado o Usuario"
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+        }
+
+        val etPin = EditText(this).apply {
+            hint = "PIN de Acceso (4 dígitos, ej. 1234)"
+            setText("0001")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+        }
+
+        val tvRol = TextView(this).apply {
+            text = "Rol asignado:"
+            setTextColor(Color.parseColor("#DEFF9A"))
+            textSize = 12f
+            setPadding(0, 10, 0, 4)
+        }
+
+        val roles = arrayOf("Empleado", "Administrador")
+        val spinnerRol = Spinner(this).apply {
+            val adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, roles)
+            setAdapter(adapter)
+            setBackgroundColor(Color.parseColor("#24283B"))
+        }
+
+        container.addView(etNombre)
+        container.addView(etPin)
+        container.addView(tvRol)
+        container.addView(spinnerRol)
+
+        AlertDialog.Builder(this)
+            .setTitle("➕ Registrar Nuevo Usuario")
+            .setView(container)
+            .setPositiveButton("Crear") { _, _ ->
+                val nombre = etNombre.text.toString().trim()
+                val pin = etPin.text.toString().trim().ifEmpty { "0001" }
+                val rol = spinnerRol.selectedItem?.toString() ?: "Empleado"
+
+                if (nombre.isEmpty()) {
+                    Toast.makeText(this, "El nombre es obligatorio", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                val newId = UUID.randomUUID().toString().substring(0, 8)
+                val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+                val usuarioNuevo = mapOf(
+                    "id" to newId,
+                    "nombre" to nombre,
+                    "pin" to pin,
+                    "rol" to rol,
+                    "app" to "Employ_JustPlay",
+                    "dispositivo" to "Asignado manualmente",
+                    "enLinea" to false,
+                    "ultimaConexion" to 0L,
+                    "ultimaConexionTexto" to "Nunca (Pre-registrado)",
+                    "seccionActual" to "Ninguna",
+                    "bloqueado" to false,
+                    "motivoBloqueo" to "",
+                    "tiempoLimiteMillis" to 0L,
+                    "tipoTiempoAcceso" to "Indefinido",
+                    "fechaFinAccesoTexto" to "Sin límite",
+                    "fechaCreacion" to fecha
+                )
+
+                database.child("presencia_usuarios").child(newId).setValue(usuarioNuevo)
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "✅ Usuario '$nombre' registrado exitosamente (PIN: $pin)", Toast.LENGTH_LONG).show()
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "❌ Error al crear usuario: ${it.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     private fun crearCanalNotificaciones() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Alarmas de Tiempo Just Play Admin"
@@ -931,6 +1028,16 @@ class MainActivity : AppCompatActivity() {
                 tvBadgeUsuariosOnline.setBackgroundColor(
                     if (conectadosContador > 0) Color.parseColor("#1B3E2B") else Color.parseColor("#2A2C39")
                 )
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
+        // 6. ESCUCHAR CONFIGURACIÓN DE PRECIOS BASE
+        database.child("config_precios").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    BasePriceConfig.updateFromSnapshot(snapshot)
+                }
             }
             override fun onCancelled(error: DatabaseError) {}
         })

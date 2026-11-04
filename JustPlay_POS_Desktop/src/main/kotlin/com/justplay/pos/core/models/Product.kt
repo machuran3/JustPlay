@@ -13,8 +13,12 @@ data class Product(
     val minStockAlert: Int = 5,
     val active: Boolean = true,
     val unitOfMeasure: String = "Unidad",
-    val lastUpdated: String = ""
+    val lastUpdated: String = "",
+    val gramaje: String = ""
 ) {
     val isLowStock: Boolean
         get() = currentStock <= minStockAlert
+
+    val displayName: String
+        get() = if (gramaje.isNotBlank() && !name.contains(gramaje, ignoreCase = true)) "$name $gramaje" else name
 }

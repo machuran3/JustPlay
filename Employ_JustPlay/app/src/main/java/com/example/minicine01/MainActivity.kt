@@ -747,9 +747,20 @@ class MainActivity : AppCompatActivity() {
             database.child("registros").keepSynced(true)
             database.child("reservas").keepSynced(true)
             database.child("vetados").keepSynced(true)
+            database.child("config_precios").keepSynced(true)
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // 0. ESCUCHAR CONFIGURACIÓN DE PRECIOS BASE
+        database.child("config_precios").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    BasePriceConfig.updateFromSnapshot(snapshot)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
 
         // 1. ESCUCHAR SALAS EN TIEMPO REAL
         database.child("salas").addValueEventListener(object : ValueEventListener {
@@ -1491,6 +1502,7 @@ class MainActivity : AppCompatActivity() {
                 for (snap in snapshot.children) {
                     val barcode = snap.child("codigo_barras").getValue(String::class.java) ?: snap.key ?: ""
                     val nombre = snap.child("nombre").getValue(String::class.java) ?: "Producto $barcode"
+                    val gramaje = snap.child("gramaje").getValue(String::class.java) ?: ""
                     val precio = snap.child("precio_unitario").getValue(Double::class.java) ?: 0.0
                     val stock = snap.child("stock_actual").getValue(Int::class.java) ?: 0
                     val categoria = snap.child("categoria").getValue(String::class.java) ?: "General"
@@ -1504,7 +1516,7 @@ class MainActivity : AppCompatActivity() {
                         lp.setMargins(0, 0, 0, 8)
                         layoutParams = lp
                         setOnClickListener {
-                            mostrarDialogoCrearEditarProductoEmpleado(barcode, nombre, precio, stock, categoria)
+                            mostrarDialogoCrearEditarProductoEmpleado(barcode, nombre, precio, stock, categoria, gramaje)
                         }
                     }
 
@@ -1514,7 +1526,8 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val tvNom = TextView(this@MainActivity).apply {
-                        text = "📦 $nombre"
+                        val nomText = if (gramaje.isNotBlank()) "📦 $nombre ($gramaje)" else "📦 $nombre"
+                        text = nomText
                         setTextColor(Color.WHITE)
                         textSize = 13f
                         setTypeface(null, Typeface.BOLD)
@@ -1555,7 +1568,8 @@ class MainActivity : AppCompatActivity() {
         nombreExistente: String = "",
         precioExistente: Double = 10.0,
         stockExistente: Int = 50,
-        categoriaExistente: String = "Snacks"
+        categoriaExistente: String = "Snacks",
+        gramajeExistente: String = ""
     ) {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1566,14 +1580,21 @@ class MainActivity : AppCompatActivity() {
         val etCodigo = EditText(this).apply {
             hint = "Código de Barras (ej. 77510001)"
             setText(codigoExistente ?: "")
-            isEnabled = codigoExistente == null
+            isEnabled = true
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
         }
 
         val etNombre = EditText(this).apply {
-            hint = "Nombre del Producto (ej. Doritos 150g)"
+            hint = "Nombre del Producto (ej. Doritos)"
             setText(nombreExistente)
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+        }
+
+        val etGramaje = EditText(this).apply {
+            hint = "Gramaje o Volumen (ej. 500ml, 120g - Opcional)"
+            setText(gramajeExistente)
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
         }
@@ -1587,18 +1608,46 @@ class MainActivity : AppCompatActivity() {
         }
 
         val etStock = EditText(this).apply {
-            hint = "Stock Actual"
+            hint = "Stock Actual (ej. 50 o +10 para sumar)"
             setText(stockExistente.toString())
-            inputType = InputType.TYPE_CLASS_NUMBER
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
+        }
+
+        // Fila de botones para incremento rápido de stock (+5, +10, +20, +50)
+        val llStockButtons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 4, 0, 8)
+        }
+        listOf(5, 10, 20, 50).forEach { inc ->
+            val btnInc = Button(this).apply {
+                text = "+$inc"
+                textSize = 10f
+                setBackgroundColor(Color.parseColor("#24283B"))
+                setTextColor(Color.parseColor("#DEFF9A"))
+                val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    setMargins(2, 0, 2, 0)
+                }
+                layoutParams = lp
+                setOnClickListener {
+                    val currentTxt = etStock.text.toString().trim()
+                    if (currentTxt.startsWith("+")) {
+                        val curInc = currentTxt.removePrefix("+").trim().toIntOrNull() ?: 0
+                        etStock.setText("+${curInc + inc}")
+                    } else {
+                        val curVal = currentTxt.toIntOrNull() ?: stockExistente
+                        etStock.setText((curVal + inc).toString())
+                    }
+                }
+            }
+            llStockButtons.addView(btnInc)
         }
 
         val tvCatLabel = TextView(this).apply {
             text = "Categoría:"
             setTextColor(Color.parseColor("#DEFF9A"))
             textSize = 12f
-            setPadding(0, 12, 0, 4)
+            setPadding(0, 8, 0, 4)
         }
 
         val categoriasFijas = arrayOf("Snack", "Bebidas", "Golosinas")
@@ -1617,8 +1666,10 @@ class MainActivity : AppCompatActivity() {
 
         container.addView(etCodigo)
         container.addView(etNombre)
+        container.addView(etGramaje)
         container.addView(etPrecio)
         container.addView(etStock)
+        container.addView(llStockButtons)
         container.addView(tvCatLabel)
         container.addView(spinnerCategoria)
 
@@ -1628,8 +1679,15 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Guardar") { _, _ ->
                 val code = etCodigo.text.toString().trim()
                 val name = etNombre.text.toString().trim()
+                val gramaje = etGramaje.text.toString().trim()
                 val price = etPrecio.text.toString().toDoubleOrNull() ?: 10.0
-                val stock = etStock.text.toString().toIntOrNull() ?: 50
+                val rawStock = etStock.text.toString().trim()
+                val stock = if (rawStock.startsWith("+")) {
+                    val inc = rawStock.removePrefix("+").trim().toIntOrNull() ?: 0
+                    stockExistente + inc
+                } else {
+                    rawStock.toIntOrNull() ?: stockExistente
+                }
                 val cat = spinnerCategoria.selectedItem?.toString() ?: "Snack"
                 val now = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
 
@@ -1637,9 +1695,10 @@ class MainActivity : AppCompatActivity() {
                     // Validar duplicados de código y nombre en Firebase
                     database.child("productos_catalogo").get().addOnSuccessListener { snap ->
                         val esNuevo = codigoExistente == null
+                        val codigoCambio = codigoExistente != null && codigoExistente != code
 
-                        // 1. Validar código duplicado en creación
-                        if (esNuevo && snap.hasChild(code)) {
+                        // 1. Validar código duplicado en creación o si el código fue cambiado
+                        if ((esNuevo || codigoCambio) && snap.hasChild(code)) {
                             Toast.makeText(this@MainActivity, "❌ Error: Ya existe un producto con el código de barras '$code'", Toast.LENGTH_LONG).show()
                             return@addOnSuccessListener
                         }
@@ -1657,9 +1716,15 @@ class MainActivity : AppCompatActivity() {
                             return@addOnSuccessListener
                         }
 
+                        // Si el código cambió, eliminar el código anterior de Firebase
+                        if (codigoCambio) {
+                            database.child("productos_catalogo").child(codigoExistente!!).removeValue()
+                        }
+
                         val map = mapOf(
                             "codigo_barras" to code,
                             "nombre" to name,
+                            "gramaje" to gramaje,
                             "precio_unitario" to price,
                             "stock_actual" to stock,
                             "categoria" to cat,
@@ -1670,7 +1735,7 @@ class MainActivity : AppCompatActivity() {
 
                         // Registro en Auditoría con Trazabilidad de Empleado y Dispositivo
                         productAuditManager.registrarAuditoriaProducto(
-                            tipoOperacion = if (esNuevo) "CREACION" else "EDICION",
+                            tipoOperacion = if (esNuevo) "CREACION" else if (codigoCambio) "MIGRACION_CODIGO" else "EDICION",
                             codigoBarras = code,
                             nombreProducto = name,
                             categoria = cat,
@@ -1680,7 +1745,7 @@ class MainActivity : AppCompatActivity() {
                             stockNuevo = stock,
                             usuarioNombre = PresenciaManager.obtenerNombreUsuario(this@MainActivity).ifEmpty { "Empleado" },
                             usuarioRol = "Empleado",
-                            detalles = if (esNuevo) "Producto registrado por Empleado" else "Precio/Stock modificado por Empleado"
+                            detalles = if (esNuevo) "Producto registrado por Empleado" else if (codigoCambio) "Código migrado de $codigoExistente a $code" else "Precio/Stock/Gramaje modificado por Empleado"
                         )
 
                         Toast.makeText(this@MainActivity, "Producto '$name' guardado exitosamente", Toast.LENGTH_SHORT).show()

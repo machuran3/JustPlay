@@ -261,11 +261,13 @@ class FirebaseSyncService(
                     val active = data["activo"] as? Boolean ?: data["active"] as? Boolean ?: true
                     val unitOfMeasure = data["unidad_medida"] as? String ?: data["unitOfMeasure"] as? String ?: "Unidad"
                     val lastUpdated = data["fecha_actualizacion"] as? String ?: ""
+                    val gramaje = data["gramaje"] as? String ?: ""
 
                     products.add(
                         Product(
                             barcode = barcode,
                             name = name,
+                            gramaje = gramaje,
                             category = category,
                             unitPrice = unitPrice,
                             costPrice = costPrice,
@@ -292,6 +294,7 @@ class FirebaseSyncService(
             val payload = mapOf(
                 "codigo_barras" to product.barcode,
                 "nombre" to product.name,
+                "gramaje" to product.gramaje,
                 "categoria" to product.category,
                 "precio_unitario" to product.unitPrice,
                 "costo_compra" to product.costPrice,
@@ -314,6 +317,53 @@ class FirebaseSyncService(
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    override suspend fun deleteProductFromCloud(barcode: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            securityService?.validateAuthGuard("/productos_catalogo")
+
+            val request = Request.Builder()
+                .url("$baseUrl/productos_catalogo/$barcode.json")
+                .delete()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                response.isSuccessful
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    override suspend fun fetchBasePrices(): Map<String, Double> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("$baseUrl/config_precios.json")
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext emptyMap()
+                val body = response.body?.string() ?: return@withContext emptyMap()
+                if (body == "null" || body.isBlank()) return@withContext emptyMap()
+
+                val mapType = object : TypeToken<Map<String, Any>>() {}.type
+                val rawMap: Map<String, Any> = gson.fromJson(body, mapType) ?: emptyMap()
+                val result = mutableMapOf<String, Double>()
+                for ((k, v) in rawMap) {
+                    val d = (v as? Number)?.toDouble() ?: v.toString().toDoubleOrNull()
+                    if (d != null) {
+                        result[k] = d
+                    }
+                }
+                result
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyMap()
         }
     }
 

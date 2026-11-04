@@ -163,6 +163,19 @@ fun main() = application {
                                 ) {
                                     Text("📅 Tablero Reservas (${state.reservations.size})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
+
+                                val isPos = state.currentTab == "POS"
+                                Button(
+                                    onClick = { viewModel.switchTab("POS") },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isPos) AccentGreen else BgDark,
+                                        contentColor = if (isPos) Color.Black else Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(38.dp)
+                                ) {
+                                    Text("🛒 Venta Mostrador (POS)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
                             }
                         }
                     }

@@ -182,8 +182,16 @@ class FirebaseRoomRepository(
                     if (eliminado) return null // Ignorar registros eliminados por el usuario
 
                     val tipo = rObj.get("tipo")?.asString ?: ""
-                    // Filtrar sólo sesiones de Salas, Minicines, Volantes y Just Dance (excluyendo ventas de mostrador puras)
                     val nombreElemento = rObj.get("nombreElemento")?.asString ?: ""
+                    // Excluir ventas puras de mostrador y ventas directas de productos del tablero de reservas/salas
+                    val isVentaPura = tipo.contains("Venta Directa", ignoreCase = true) ||
+                                     tipo.contains("Venta", ignoreCase = true) ||
+                                     nombreElemento.contains("Mostrador", ignoreCase = true) ||
+                                     nombreElemento.contains("Venta Directa", ignoreCase = true) ||
+                                     nombreElemento.contains("Snack", ignoreCase = true)
+                    if (isVentaPura && !nombreElemento.contains("Sala", ignoreCase = true) && !nombreElemento.contains("Cine", ignoreCase = true)) {
+                        return null
+                    }
                     val idFirebase = rObj.get("idFirebase")?.asString ?: key
                     val cliente = rObj.get("cliente")?.asString ?: ""
                     val celular = if (rObj.has("celular") && !rObj.get("celular").isJsonNull) rObj.get("celular").asString else null

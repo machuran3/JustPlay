@@ -97,6 +97,12 @@ fun ScheduleDashboardPanel(
     // Filtrar reservas por fecha y categoría (o ver todas si isAllDates es true)
     val filteredReservations = remember(reservations, normCurrentDate, categoryFilter, isAllDates) {
         reservations.filter { res ->
+            // Excluir ventas de mostrador si se registraron en reservas
+            val isVenta = res.tipoSala.contains("Mostrador", ignoreCase = true) ||
+                          res.tipoSala.contains("Venta Directa", ignoreCase = true) ||
+                          res.nombre.contains("Venta Mostrador", ignoreCase = true)
+            if (isVenta) return@filter false
+
             val resNormDate = normalizeDate(res.fecha)
             val matchDate = isAllDates || res.fecha.isBlank() || resNormDate == normCurrentDate || res.fecha == currentDateStr || res.fecha == currentDateStr.replace("/", "-")
             
@@ -125,6 +131,15 @@ fun ScheduleDashboardPanel(
     val filteredRecords = remember(records, normCurrentDate, categoryFilter, isAllDates) {
         records.filter { rec ->
             if (rec.eliminado) return@filter false
+            // Excluir ventas de mostrador / ventas de snacks del tablero de reservas
+            val isVentaMostrador = rec.tipo.contains("Venta", ignoreCase = true) ||
+                                  rec.nombreElemento.contains("Mostrador", ignoreCase = true) ||
+                                  rec.nombreElemento.contains("Venta Directa", ignoreCase = true) ||
+                                  rec.nombreElemento.contains("Snack", ignoreCase = true)
+            if (isVentaMostrador && !rec.nombreElemento.contains("Sala", ignoreCase = true) && !rec.nombreElemento.contains("Cine", ignoreCase = true)) {
+                return@filter false
+            }
+
             val recDate = rec.extraerFecha()
             val recNormDate = normalizeDate(recDate)
             val matchDate = isAllDates || recDate.isBlank() || recNormDate == normCurrentDate || recDate == currentDateStr || recDate == currentDateStr.replace("/", "-")
@@ -138,7 +153,7 @@ fun ScheduleDashboardPanel(
             val isMinicine = rec.nombreElemento.contains("Cine", ignoreCase = true) || 
                              rec.nombreElemento.contains("Minicine", ignoreCase = true) || 
                              rec.nombreElemento.contains("Sala", ignoreCase = true) || 
-                             (!isAutitos && !isDance)
+                             rec.nombreElemento.contains("Consumo Sala", ignoreCase = true)
 
             val matchCat = when (categoryFilter) {
                 "MINICINE" -> isMinicine

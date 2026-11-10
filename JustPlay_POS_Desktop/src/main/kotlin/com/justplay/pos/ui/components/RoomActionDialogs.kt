@@ -31,6 +31,7 @@ import com.justplay.pos.core.models.Product
 import com.justplay.pos.core.models.Room
 import com.justplay.pos.core.models.RoomOrder
 import com.justplay.pos.core.models.RoomState
+import com.justplay.pos.core.utils.ReceiptImageUtils
 import com.justplay.pos.ui.theme.*
 
 @Composable
@@ -44,6 +45,10 @@ fun RoomDetailDialog(
     verifiedReceiptUrl: String? = null,
     onRequestQrValidation: (client: String, phone: String, gameOrMovie: String, durationMin: Int, price: Double, method: String, efec: Double, qr: Double, pedidos: List<RoomOrder>) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
     onCancelQrValidation: () -> Unit = {},
+    onPickReceiptPhotos: (() -> Unit)? = null,
+    onUpdateReceiptPhotos: ((String?) -> Unit)? = null,
+    onPickActiveRoomPhotos: ((roomId: Int) -> Unit)? = null,
+    onUpdateActiveRoomPhotos: ((roomId: Int, newReceiptString: String?) -> Unit)? = null,
     onAddProduct: (Product) -> Unit,
     onRemoveProduct: (Int) -> Unit,
     onAddTime: (extraMinutes: Int) -> Unit,
@@ -54,8 +59,11 @@ fun RoomDetailDialog(
     onDismiss: () -> Unit
 ) {
     val isOccupied = room.estado == RoomState.OCUPADA
+    var showReceiptViewerForStarting by remember { mutableStateOf(false) }
+    var showReceiptViewerForOccupied by remember { mutableStateOf(false) }
 
     var clientName by remember { mutableStateOf(room.cliente ?: "") }
+
     var clientPhone by remember { mutableStateOf(room.celular ?: "") }
     var gameOrMovie by remember { mutableStateOf(room.pelicula ?: "") }
     var manualTimeText by remember { mutableStateOf("") }
@@ -509,19 +517,20 @@ fun RoomDetailDialog(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
-                                                    text = "📸 Comprobante Móvil",
+                                                    text = "📸 Comprobante de Pago",
                                                     color = if (verifiedReceiptUrl != null) AccentGreen else AccentLime,
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
-                                                if (verifiedReceiptUrl != null) {
+                                                if (!verifiedReceiptUrl.isNullOrBlank()) {
+                                                    val urls = ReceiptImageUtils.splitReceiptUrls(verifiedReceiptUrl)
                                                     Surface(
                                                         shape = RoundedCornerShape(4.dp),
                                                         color = AccentGreen.copy(alpha = 0.2f),
                                                         border = androidx.compose.foundation.BorderStroke(1.dp, AccentGreen)
                                                     ) {
                                                         Text(
-                                                            text = "✅ Verificado",
+                                                            text = "✅ ${urls.size} Foto(s)",
                                                             color = AccentGreen,
                                                             fontSize = 10.sp,
                                                             fontWeight = FontWeight.Bold,
@@ -557,37 +566,97 @@ fun RoomDetailDialog(
                                                         Text("Cancelar Solicitud Móvil", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                                     }
                                                 }
-                                            } else if (verifiedReceiptUrl != null) {
-                                                Text(
-                                                    text = "Foto del comprobante validada y adjuntada correctamente para la auditoría.",
-                                                    color = TextPrimary,
-                                                    fontSize = 11.sp
-                                                )
+                                            } else if (!verifiedReceiptUrl.isNullOrBlank()) {
+                                                val urls = ReceiptImageUtils.splitReceiptUrls(verifiedReceiptUrl)
+                                                Column {
+                                                    Text(
+                                                        text = "Foto(s) del comprobante (${urls.size}) adjuntada(s) correctamente.",
+                                                        color = TextPrimary,
+                                                        fontSize = 11.sp
+                                                    )
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Button(
+                                                            onClick = { showReceiptViewerForStarting = true },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            modifier = Modifier.weight(1.2f).height(32.dp),
+                                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                                        ) {
+                                                            Text("🖼️ Ver Fotos (${urls.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        }
+
+                                                        if (onPickReceiptPhotos != null) {
+                                                            Button(
+                                                                onClick = onPickReceiptPhotos,
+                                                                colors = ButtonDefaults.buttonColors(containerColor = CardDark, contentColor = AccentLime),
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                modifier = Modifier.weight(1.1f).height(32.dp),
+                                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                                            ) {
+                                                                Text("➕ Foto PC", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+
+                                                        if (onUpdateReceiptPhotos != null) {
+                                                            Button(
+                                                                onClick = { onUpdateReceiptPhotos(null) },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = AlertRed.copy(alpha = 0.8f), contentColor = Color.White),
+                                                                shape = RoundedCornerShape(6.dp),
+                                                                modifier = Modifier.width(36.dp).height(32.dp),
+                                                                contentPadding = PaddingValues(0.dp)
+                                                            ) {
+                                                                Text("🗑️", fontSize = 12.sp)
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             } else {
-                                                Button(
-                                                    onClick = {
-                                                        val price = priceText.toDoubleOrNull() ?: room.precioBaseSugerido
-                                                        val duration = parseDurationMinutes(manualTimeText)
-                                                        val efec = if (selectedPaymentMethod == "Mixto") (cashAmountMixto.toDoubleOrNull() ?: 0.0) else 0.0
-                                                        val qr = if (selectedPaymentMethod == "QR") grandTotal else maxOf(0.0, grandTotal - efec)
-                                                        onRequestQrValidation(
-                                                            clientName.trim(),
-                                                            clientPhone.trim(),
-                                                            gameOrMovie.trim(),
-                                                            duration,
-                                                            price,
-                                                            selectedPaymentMethod,
-                                                            efec,
-                                                            qr,
-                                                            pendingOrders
-                                                        )
-                                                    },
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5), contentColor = Color.White),
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.fillMaxWidth().height(36.dp),
-                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                                 ) {
-                                                    Text("📱 Solicitar Comprobante / Validación al Celular", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    Button(
+                                                        onClick = {
+                                                            val price = priceText.toDoubleOrNull() ?: room.precioBaseSugerido
+                                                            val duration = parseDurationMinutes(manualTimeText)
+                                                            val efec = if (selectedPaymentMethod == "Mixto") (cashAmountMixto.toDoubleOrNull() ?: 0.0) else 0.0
+                                                            val qr = if (selectedPaymentMethod == "QR") grandTotal else maxOf(0.0, grandTotal - efec)
+                                                            onRequestQrValidation(
+                                                                clientName.trim(),
+                                                                clientPhone.trim(),
+                                                                gameOrMovie.trim(),
+                                                                duration,
+                                                                price,
+                                                                selectedPaymentMethod,
+                                                                efec,
+                                                                qr,
+                                                                pendingOrders
+                                                            )
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5), contentColor = Color.White),
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        modifier = Modifier.weight(1.3f).height(36.dp),
+                                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text("📱 Pedir al Celular", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    if (onPickReceiptPhotos != null) {
+                                                        Button(
+                                                            onClick = onPickReceiptPhotos,
+                                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF263238), contentColor = AccentLime),
+                                                            shape = RoundedCornerShape(8.dp),
+                                                            modifier = Modifier.weight(1.1f).height(36.dp),
+                                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                                        ) {
+                                                            Text("📁 Foto(s) de PC", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -653,6 +722,63 @@ fun RoomDetailDialog(
                                         }
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text("💳 Alquiler Cobrado: ${room.precioCobrado} Bs (${room.metodoPago})", color = TextSecondary, fontSize = 13.sp)
+
+                                        if (!room.comprobanteUri.isNullOrBlank()) {
+                                            val occupiedUrls = ReceiptImageUtils.splitReceiptUrls(room.comprobanteUri)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = Color(0xFF14241B),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, AccentGreen.copy(alpha = 0.5f)),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                        Text("📸", fontSize = 14.sp)
+                                                        Text("Comprobante (${occupiedUrls.size} foto(s))", color = AccentGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                        Button(
+                                                            onClick = { showReceiptViewerForOccupied = true },
+                                                            colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                                                            shape = RoundedCornerShape(4.dp),
+                                                            modifier = Modifier.height(26.dp),
+                                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 1.dp)
+                                                        ) {
+                                                            Text("🖼️ Ver Fotos (${occupiedUrls.size})", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                        }
+
+                                                        if (onPickActiveRoomPhotos != null) {
+                                                            Button(
+                                                                onClick = { onPickActiveRoomPhotos(room.id) },
+                                                                colors = ButtonDefaults.buttonColors(containerColor = CardDark, contentColor = AccentLime),
+                                                                shape = RoundedCornerShape(4.dp),
+                                                                modifier = Modifier.height(26.dp),
+                                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 1.dp)
+                                                            ) {
+                                                                Text("➕ Foto", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else if (onPickActiveRoomPhotos != null) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Button(
+                                                onClick = { onPickActiveRoomPhotos(room.id) },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E2638), contentColor = AccentLime),
+                                                shape = RoundedCornerShape(6.dp),
+                                                modifier = Modifier.height(28.dp),
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("📁 Adjuntar Comprobante(s) desde PC", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
                                     }
                                 }
 
@@ -1264,6 +1390,27 @@ fun RoomDetailDialog(
             containerColor = Color(0xFF1A1C29)
         )
     }
+
+    if (showReceiptViewerForStarting && !verifiedReceiptUrl.isNullOrBlank()) {
+        ReceiptViewerDialog(
+            receiptString = verifiedReceiptUrl,
+            title = "Comprobante(s) de Inicio de Sala",
+            onDeletePhoto = onUpdateReceiptPhotos,
+            onDismiss = { showReceiptViewerForStarting = false }
+        )
+    }
+
+    if (showReceiptViewerForOccupied && !room.comprobanteUri.isNullOrBlank()) {
+        ReceiptViewerDialog(
+            receiptString = room.comprobanteUri!!,
+            title = "Comprobante(s) de Sesión - ${room.nombre}",
+            onDeletePhoto = { newStr ->
+                onUpdateActiveRoomPhotos?.invoke(room.id, newStr)
+            },
+            onDismiss = { showReceiptViewerForOccupied = false }
+        )
+    }
 }
+
 
 

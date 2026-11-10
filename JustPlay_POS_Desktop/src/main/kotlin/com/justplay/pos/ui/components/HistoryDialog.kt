@@ -19,6 +19,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.*
 import com.justplay.pos.services.ExcelReportExporter
 import com.justplay.pos.core.models.SaleTransaction
+import com.justplay.pos.core.utils.ReceiptImageUtils
 import com.justplay.pos.ui.theme.*
 
 @Composable
@@ -27,6 +28,8 @@ fun HistoryDialog(
     onDismiss: () -> Unit
 ) {
     var exportNotification by remember { mutableStateOf<String?>(null) }
+    var selectedReceiptForView by remember { mutableStateOf<String?>(null) }
+
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -163,6 +166,20 @@ fun HistoryDialog(
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium
                                         )
+
+                                        if (!sale.receiptImageUrl.isNullOrBlank()) {
+                                            val urls = ReceiptImageUtils.splitReceiptUrls(sale.receiptImageUrl)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Button(
+                                                onClick = { selectedReceiptForView = sale.receiptImageUrl },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF162D20), contentColor = AccentGreen),
+                                                shape = RoundedCornerShape(4.dp),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(24.dp)
+                                            ) {
+                                                Text("🖼️ Ver Comprobante (${urls.size})", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
                                     }
 
                                     Text(
@@ -180,4 +197,13 @@ fun HistoryDialog(
             }
         }
     }
+
+    if (selectedReceiptForView != null) {
+        ReceiptViewerDialog(
+            receiptString = selectedReceiptForView!!,
+            title = "Comprobante de Venta Histórica",
+            onDismiss = { selectedReceiptForView = null }
+        )
+    }
 }
+

@@ -9,6 +9,7 @@ import com.justplay.pos.core.models.Product
 import com.justplay.pos.core.models.Room
 import com.justplay.pos.core.models.SyncStatus
 import com.justplay.pos.infrastructure.security.DeviceSecurityService
+import com.justplay.pos.core.utils.ReceiptImageUtils
 import com.justplay.pos.services.ProductCatalogService
 import com.justplay.pos.services.RoomManagementService
 import kotlinx.coroutines.CoroutineScope
@@ -330,13 +331,14 @@ class PosViewModel(
                 cashReceivedAmount = String.format("%.2f", it.totalAmount),
                 saleDestinationType = "MOSTRADOR",
                 selectedTargetRoomId = null,
-                selectedTargetRoomName = null
+                selectedTargetRoomName = null,
+                saleReceiptImageUrl = null
             )
         }
     }
 
     fun closePaymentDialog() {
-        _uiState.update { it.copy(isPaymentDialogOpen = false) }
+        _uiState.update { it.copy(isPaymentDialogOpen = false, saleReceiptImageUrl = null) }
     }
 
     fun onPaymentMethodChanged(method: PaymentMethod) {
@@ -353,6 +355,19 @@ class PosViewModel(
 
     fun onClientPhoneChanged(phone: String) {
         _uiState.update { it.copy(clientPhoneInput = phone) }
+    }
+
+    fun pickAndAttachSalePhotos() {
+        val files = ReceiptImageUtils.pickImagesFromNativeDialog("Seleccionar Comprobante(s) para Venta Mostrador")
+        if (files.isNotEmpty()) {
+            val payloads = files.map { ReceiptImageUtils.processAndCompressImageFile(it) }
+            val merged = ReceiptImageUtils.addReceiptUrls(_uiState.value.saleReceiptImageUrl, payloads)
+            _uiState.update { it.copy(saleReceiptImageUrl = merged) }
+        }
+    }
+
+    fun updateSaleReceiptUrl(newReceiptString: String?) {
+        _uiState.update { it.copy(saleReceiptImageUrl = newReceiptString) }
     }
 
     fun requestQrValidationFromMobile() {
@@ -392,14 +407,16 @@ class PosViewModel(
                     val estado = data["estado"] as? String
                     if (estado == "APROBADO") {
                         val comprobante = (data["comprobanteUrl"] ?: data["comprobanteUri"]) as? String
+                        val merged = ReceiptImageUtils.addReceiptUrls(_uiState.value.saleReceiptImageUrl, listOfNotNull(comprobante))
                         _uiState.update {
                             it.copy(
                                 isWaitingQrValidation = false,
                                 qrValidationSolicitudId = null,
-                                qrValidationStatusMessage = "✅ ¡Pago QR y Comprobante Aprobados desde el Móvil!"
+                                qrValidationStatusMessage = "✅ ¡Pago QR y Comprobante(s) Aprobados desde el Móvil!",
+                                saleReceiptImageUrl = merged
                             )
                         }
-                        confirmCheckout(receiptImageUrl = comprobante)
+                        confirmCheckout(receiptImageUrl = merged)
                         break
                     } else if (estado == "RECHAZADO") {
                         _uiState.update {
@@ -457,6 +474,8 @@ class PosViewModel(
                     return@launch
                 }
 
+                val finalReceipt = receiptImageUrl ?: state.saleReceiptImageUrl
+
                 val result = saleService.checkoutSale(
                     paymentMethod = state.selectedPaymentMethod,
                     cashReceived = cash,
@@ -465,7 +484,7 @@ class PosViewModel(
                     destinationType = state.saleDestinationType,
                     targetRoomId = state.selectedTargetRoomId,
                     targetRoomName = state.selectedTargetRoomName,
-                    receiptImageUrl = receiptImageUrl
+                    receiptImageUrl = finalReceipt
                 )
 
                 if (result.isSuccess) {
@@ -476,6 +495,7 @@ class PosViewModel(
                             isWaitingQrValidation = false,
                             qrValidationSolicitudId = null,
                             qrValidationStatusMessage = null,
+                            saleReceiptImageUrl = null,
                             lastSaleCompleted = sale,
                             scanErrorMessage = null
                         )
@@ -566,12 +586,13 @@ class PosViewModel(
                     val estado = data["estado"] as? String
                     if (estado == "APROBADO") {
                         val comprobante = (data["comprobanteUrl"] ?: data["comprobanteUri"]) as? String
+                        val merged = ReceiptImageUtils.addReceiptUrls(_uiState.value.roomQrComprobanteUrl, listOfNotNull(comprobante))
                         _uiState.update {
                             it.copy(
                                 isWaitingRoomQrValidation = false,
                                 roomQrValidationSolicitudId = null,
-                                roomQrComprobanteUrl = comprobante,
-                                roomQrValidationStatusMessage = "✅ ¡Comprobante Aprobado desde el Móvil!"
+                                roomQrComprobanteUrl = merged,
+                                roomQrValidationStatusMessage = "✅ ¡Comprobante(s) Aprobado(s) desde el Móvil!"
                             )
                         }
                         break
@@ -605,6 +626,43 @@ class PosViewModel(
             )
         }
     }
+
+    fun pickAndAttachRoomPhotos() {
+        val files = ReceiptImageUtils.pickImagesFromNativeDialog("Seleccionar Comprobante(s) para Sala")
+        if (files.isNotEmpty()) {
+            val payloads = files.map { ReceiptImageUtils.processAndCompressImageFile(it) }
+            val merged = ReceiptImageUtils.addReceiptUrls(_uiState.value.roomQrComprobanteUrl, payloads)
+            _uiState.update { it.copy(roomQrComprobanteUrl = merged) }
+        }
+    }
+
+    fun updateRoomReceiptUrl(newReceiptString: String?) {
+        _uiState.update { it.copy(roomQrComprobanteUrl = newReceiptString) }
+    }
+
+    fun pickAndAttachPhotosToActiveRoom(roomId: Int) {
+        val files = ReceiptImageUtils.pickImagesFromNativeDialog("Agregar Comprobante(s) a la Sala")
+        if (files.isNotEmpty()) {
+            val payloads = files.map { ReceiptImageUtils.processAndCompressImageFile(it) }
+            val room = _uiState.value.rooms.find { it.id == roomId } ?: return
+            val merged = ReceiptImageUtils.addReceiptUrls(room.comprobanteUri, payloads)
+            updateActiveRoomComprobante(roomId, merged)
+        }
+    }
+
+    fun updateActiveRoomComprobante(roomId: Int, newReceiptString: String?) {
+        scope.launch {
+            roomManagementService.updateRoomComprobante(roomId, newReceiptString)
+            _uiState.update { current ->
+                val updatedRooms = current.rooms.map { if (it.id == roomId) it.copy(comprobanteUri = newReceiptString) else it }
+                val updatedSelected = if (current.selectedRoomForDetail?.id == roomId) {
+                    current.selectedRoomForDetail.copy(comprobanteUri = newReceiptString)
+                } else current.selectedRoomForDetail
+                current.copy(rooms = updatedRooms, selectedRoomForDetail = updatedSelected)
+            }
+        }
+    }
+
 
     fun addProductToOpenRoom(product: Product, quantity: Int = 1) {
         val currentRoom = _uiState.value.selectedRoomForDetail ?: return

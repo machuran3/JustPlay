@@ -288,6 +288,8 @@ fun main() = application {
                         onTargetRoomSelected = { id, name -> viewModel.setTargetRoom(id, name) },
                         onRequestQrValidation = { viewModel.requestQrValidationFromMobile() },
                         onCancelQrValidation = { viewModel.cancelQrValidation() },
+                        onPickReceiptPhotos = { viewModel.pickAndAttachSalePhotos() },
+                        onUpdateReceiptPhotos = { viewModel.updateSaleReceiptUrl(it) },
                         onConfirmCheckout = { viewModel.confirmCheckout() },
                         onDismiss = { viewModel.closePaymentDialog() }
                     )
@@ -317,6 +319,10 @@ fun main() = application {
                             )
                         },
                         onCancelQrValidation = { viewModel.cancelRoomQrValidation() },
+                        onPickReceiptPhotos = { viewModel.pickAndAttachRoomPhotos() },
+                        onUpdateReceiptPhotos = { viewModel.updateRoomReceiptUrl(it) },
+                        onPickActiveRoomPhotos = { roomId -> viewModel.pickAndAttachPhotosToActiveRoom(roomId) },
+                        onUpdateActiveRoomPhotos = { roomId, newStr -> viewModel.updateActiveRoomComprobante(roomId, newStr) },
                         onAddProduct = { viewModel.addProductToOpenRoom(it, 1) },
                         onRemoveProduct = { viewModel.removeProductFromOpenRoom(it) },
                         onAddTime = { viewModel.confirmAddTime(state.selectedRoomForDetail!!.id, it) },

@@ -122,4 +122,12 @@ class RoomManagementService(
         )
         return roomRepository.updateRoom(updated)
     }
+
+    suspend fun updateRoomComprobante(roomId: Int, comprobanteUri: String?): Boolean {
+        val currentRooms = roomRepository.fetchRooms()
+        val existing = currentRooms.find { it.id == roomId } ?: return false
+        val updated = existing.copy(comprobanteUri = comprobanteUri)
+        return roomRepository.updateRoom(updated)
+    }
 }
+

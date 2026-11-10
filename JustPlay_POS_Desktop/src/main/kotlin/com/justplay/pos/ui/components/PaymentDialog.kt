@@ -20,6 +20,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.justplay.pos.core.models.PaymentMethod
 import com.justplay.pos.core.models.RoomState
+import com.justplay.pos.core.utils.ReceiptImageUtils
 import com.justplay.pos.ui.state.PosUiState
 import com.justplay.pos.ui.theme.*
 
@@ -37,12 +38,17 @@ fun PaymentDialog(
     onTargetRoomSelected: (roomId: Int?, roomName: String?) -> Unit,
     onRequestQrValidation: () -> Unit = {},
     onCancelQrValidation: () -> Unit = {},
+    onPickReceiptPhotos: (() -> Unit)? = null,
+    onUpdateReceiptPhotos: ((String?) -> Unit)? = null,
     onConfirmCheckout: () -> Unit,
     onDismiss: () -> Unit
 ) {
+
     val occupiedRooms = remember(state.rooms) {
         state.rooms.filter { it.estado == RoomState.OCUPADA }
     }
+    var showReceiptViewer by remember { mutableStateOf(false) }
+
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -330,7 +336,7 @@ fun PaymentDialog(
                     }
                 }
 
-                // Sección QR: Validación Push / Socket en tiempo real con Móviles
+                // Sección QR: Validación Push / Socket en tiempo real con Móviles o Carga Local
                 if (state.selectedPaymentMethod == PaymentMethod.QR || state.selectedPaymentMethod == PaymentMethod.MIXTO) {
                     Spacer(modifier = Modifier.height(10.dp))
                     if (state.isWaitingQrValidation) {
@@ -360,14 +366,88 @@ fun PaymentDialog(
                                 }
                             }
                         }
-                    } else {
-                        Button(
-                            onClick = onRequestQrValidation,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5), contentColor = Color.White),
+                    } else if (!state.saleReceiptImageUrl.isNullOrBlank()) {
+                        val urls = ReceiptImageUtils.splitReceiptUrls(state.saleReceiptImageUrl)
+                        Surface(
+                            color = Color(0xFF162D20),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth().height(38.dp)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentGreen),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                         ) {
-                            Text("📱 Solicitar Validación y Comprobante al Celular", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("📸", fontSize = 16.sp)
+                                    Column {
+                                        Text("Comprobante(s) Adjunto(s)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text("✅ ${urls.size} foto(s) lista(s)", color = AccentGreen, fontSize = 11.sp)
+                                    }
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Button(
+                                        onClick = { showReceiptViewer = true },
+                                        colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier.height(30.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("🖼️ Ver Fotos (${urls.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    if (onPickReceiptPhotos != null) {
+                                        Button(
+                                            onClick = onPickReceiptPhotos,
+                                            colors = ButtonDefaults.buttonColors(containerColor = CardDark, contentColor = AccentLime),
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier.height(30.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("➕ Foto", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    if (onUpdateReceiptPhotos != null) {
+                                        Button(
+                                            onClick = { onUpdateReceiptPhotos(null) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = AlertRed.copy(alpha = 0.8f), contentColor = Color.White),
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier.height(30.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("🗑️", fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onRequestQrValidation,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5), contentColor = Color.White),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1.3f).height(38.dp)
+                            ) {
+                                Text("📱 Pedir al Celular", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            if (onPickReceiptPhotos != null) {
+                                Button(
+                                    onClick = onPickReceiptPhotos,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF263238), contentColor = AccentLime),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1.1f).height(38.dp)
+                                ) {
+                                    Text("📁 Foto(s) de PC", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
                 }
@@ -401,5 +481,14 @@ fun PaymentDialog(
                 }
             }
         }
+    }
+
+    if (showReceiptViewer && !state.saleReceiptImageUrl.isNullOrBlank()) {
+        ReceiptViewerDialog(
+            receiptString = state.saleReceiptImageUrl!!,
+            title = "Comprobante(s) de Venta Mostrador",
+            onDeletePhoto = onUpdateReceiptPhotos,
+            onDismiss = { showReceiptViewer = false }
+        )
     }
 }

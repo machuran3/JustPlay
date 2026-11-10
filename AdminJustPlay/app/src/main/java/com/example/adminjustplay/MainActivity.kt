@@ -209,6 +209,38 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun capturarComprobantesParaSolicitud(solicitudId: String, fotosAcumuladas: String? = null) {
+        mostrarOpcionesFoto { path ->
+            if (path != null) {
+                val fotosActualizadas = ImageUtils.agregarComprobante(fotosAcumuladas, path)
+                val listaFotos = ImageUtils.separarRutasComprobantes(fotosActualizadas)
+
+                AlertDialog.Builder(this)
+                    .setTitle("📸 Comprobante (${listaFotos.size} foto${if (listaFotos.size > 1) "s" else ""})")
+                    .setMessage("Foto adjuntada correctamente.\n\n¿Deseas tomar o adjuntar otra foto adicional o enviar ya a la PC?")
+                    .setPositiveButton("✅ Enviar a PC (${listaFotos.size})") { _, _ ->
+                        qrValidationHelper.aprobarSolicitud(solicitudId, fotosActualizadas)
+                    }
+                    .setNeutralButton("➕ Agregar Otra Foto") { _, _ ->
+                        capturarComprobantesParaSolicitud(solicitudId, fotosActualizadas)
+                    }
+                    .setNegativeButton("Cancelar Todo") { _, _ -> }
+                    .setCancelable(false)
+                    .show()
+            } else if (!fotosAcumuladas.isNullOrBlank()) {
+                val listaFotos = ImageUtils.separarRutasComprobantes(fotosAcumuladas)
+                AlertDialog.Builder(this)
+                    .setTitle("📸 Comprobantes Pendientes")
+                    .setMessage("¿Deseas enviar a la PC las ${listaFotos.size} foto(s) ya adjuntadas?")
+                    .setPositiveButton("Sí, enviar (${listaFotos.size})") { _, _ ->
+                        qrValidationHelper.aprobarSolicitud(solicitudId, fotosAcumuladas)
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -227,11 +259,7 @@ class MainActivity : AppCompatActivity() {
         productAuditManager = ProductAuditManager(this, database)
         egresosManager = EgresosManager(this, database)
         qrValidationHelper = QrPaymentValidationHelper(this, database) { solicitudId ->
-            mostrarOpcionesFoto { path ->
-                if (path != null) {
-                    qrValidationHelper.aprobarSolicitud(solicitudId, path)
-                }
-            }
+            capturarComprobantesParaSolicitud(solicitudId)
         }
         qrValidationHelper.iniciarEscucha()
         otgScanner = OtgBarcodeScannerHelper(object : IBarcodeScanListener {

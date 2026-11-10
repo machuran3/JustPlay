@@ -50,6 +50,7 @@ data class PosUiState(
     val isWaitingQrValidation: Boolean = false,
     val qrValidationSolicitudId: String? = null,
     val qrValidationStatusMessage: String? = null,
+    val saleReceiptImageUrl: String? = null,
 
     // Validación QR en tiempo real Móvil <-> PC (Salas / Volantes / Just Dance)
     val isWaitingRoomQrValidation: Boolean = false,

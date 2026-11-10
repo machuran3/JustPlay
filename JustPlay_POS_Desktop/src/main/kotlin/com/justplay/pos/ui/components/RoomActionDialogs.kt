@@ -95,6 +95,7 @@ fun RoomDetailDialog(
     }
     var customExtraTimeText by remember { mutableStateOf("") }
     var showQrVerificationPromptDialog by remember { mutableStateOf(false) }
+    var isSubmittingAction by remember { mutableStateOf(false) }
 
     // Limpieza automática de cualquier dígito o código de barras que se filtre al escanear productos en la sala
     LaunchedEffect(lastScannedBarcode, pendingOrders.size, room.pedidos.size) {
@@ -164,12 +165,13 @@ fun RoomDetailDialog(
     val grandTotal = basePrice + totalConsumos
 
     val performConfirmStart: () -> Unit = {
-        if (!isOccupied && !isActionInProgress && clientName.isNotBlank()) {
+        if (!isOccupied && !isActionInProgress && !isSubmittingAction && clientName.isNotBlank()) {
             val price = priceText.toDoubleOrNull() ?: room.precioBaseSugerido
             val duration = parseDurationMinutes(manualTimeText)
             if ((selectedPaymentMethod == "QR" || selectedPaymentMethod == "Mixto") && verifiedReceiptUrl == null) {
                 showQrVerificationPromptDialog = true
             } else {
+                isSubmittingAction = true
                 onConfirmStart(
                     clientName.trim(),
                     clientPhone.trim(),
@@ -185,7 +187,8 @@ fun RoomDetailDialog(
     }
 
     val performUpdateSession: () -> Unit = {
-        if (isOccupied && isEditModeActive && !isActionInProgress && editClientName.isNotBlank() && onUpdateActiveRoomSession != null) {
+        if (isOccupied && isEditModeActive && !isActionInProgress && !isSubmittingAction && editClientName.isNotBlank() && onUpdateActiveRoomSession != null) {
+            isSubmittingAction = true
             val pr = editPriceText.toDoubleOrNull() ?: room.precioCobrado
             val extraMin = editExtraMinutesText.toIntOrNull()
             onUpdateActiveRoomSession(
@@ -219,12 +222,12 @@ fun RoomDetailDialog(
                             return@onPreviewKeyEvent false
                         }
                         if (!isOccupied) {
-                            if (clientName.isNotBlank() && !isActionInProgress) {
+                            if (clientName.isNotBlank() && !isActionInProgress && !isSubmittingAction) {
                                 performConfirmStart()
                                 return@onPreviewKeyEvent true
                             }
                         } else if (isEditModeActive) {
-                            if (editClientName.isNotBlank() && !isActionInProgress) {
+                            if (editClientName.isNotBlank() && !isActionInProgress && !isSubmittingAction) {
                                 performUpdateSession()
                                 return@onPreviewKeyEvent true
                             }
@@ -1101,16 +1104,21 @@ fun RoomDetailDialog(
                                 Spacer(modifier = Modifier.weight(1f))
 
                                 Button(
-                                    onClick = onClearRoom,
+                                    onClick = {
+                                        if (!isActionInProgress && !isSubmittingAction) {
+                                            isSubmittingAction = true
+                                            onClearRoom()
+                                        }
+                                    },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = AlertRed,
                                         contentColor = Color.White
                                     ),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.fillMaxWidth().height(42.dp),
-                                    enabled = !isActionInProgress
+                                    enabled = !isActionInProgress && !isSubmittingAction
                                 ) {
-                                    if (isActionInProgress) {
+                                    if (isActionInProgress || isSubmittingAction) {
                                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }
@@ -1328,9 +1336,9 @@ fun RoomDetailDialog(
                                     ),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.height(40.dp).widthIn(min = 160.dp),
-                                    enabled = !isActionInProgress && clientName.isNotBlank()
+                                    enabled = !isActionInProgress && !isSubmittingAction && clientName.isNotBlank()
                                 ) {
-                                    if (isActionInProgress) {
+                                    if (isActionInProgress || isSubmittingAction) {
                                         CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                     }

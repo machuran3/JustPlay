@@ -48,7 +48,7 @@ fun PaymentDialog(
         state.rooms.filter { it.estado == RoomState.OCUPADA }
     }
     var showReceiptViewer by remember { mutableStateOf(false) }
-
+    var isSubmitting by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -64,7 +64,8 @@ fun PaymentDialog(
                 .heightIn(max = 720.dp)
                 .onPreviewKeyEvent { event ->
                     if (event.key == Key.Enter && event.type == KeyEventType.KeyDown) {
-                        if (!state.isProcessingSale) {
+                        if (!state.isProcessingSale && !isSubmitting) {
+                            isSubmitting = true
                             onConfirmCheckout()
                         }
                         true
@@ -456,8 +457,13 @@ fun PaymentDialog(
 
                 // Botón Confirmar Cobro (Enter)
                 Button(
-                    onClick = onConfirmCheckout,
-                    enabled = !state.isProcessingSale,
+                    onClick = {
+                        if (!state.isProcessingSale && !isSubmitting) {
+                            isSubmitting = true
+                            onConfirmCheckout()
+                        }
+                    },
+                    enabled = !state.isProcessingSale && !isSubmitting,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AccentGreen,
                         contentColor = Color.Black,
@@ -469,7 +475,7 @@ fun PaymentDialog(
                         .fillMaxWidth()
                         .height(48.dp)
                 ) {
-                    if (state.isProcessingSale) {
+                    if (state.isProcessingSale || isSubmitting) {
                         CircularProgressIndicator(color = AccentLime, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Procesando venta...", fontSize = 14.sp, fontWeight = FontWeight.Bold)

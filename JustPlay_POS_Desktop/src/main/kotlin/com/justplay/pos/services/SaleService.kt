@@ -81,9 +81,14 @@ class SaleService(
         targetRoomName: String?,
         receiptImageUrl: String?
     ): Result<SaleTransaction> {
-        val items = _cartItemsFlow.value
-        if (items.isEmpty()) {
-            return Result.failure(IllegalStateException("El carrito de compras está vacío"))
+        val items: List<CartItem>
+        synchronized(this) {
+            val current = _cartItemsFlow.value
+            if (current.isEmpty()) {
+                return Result.failure(IllegalStateException("El carrito de compras está vacío o la venta ya fue cobrada."))
+            }
+            items = current.toList()
+            clearCart()
         }
 
         val total = items.sumOf { it.subtotal }

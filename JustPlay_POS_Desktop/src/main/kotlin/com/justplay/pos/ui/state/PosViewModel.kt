@@ -44,6 +44,12 @@ class PosViewModel(
     )
     val uiState: StateFlow<PosUiState> = _uiState.asStateFlow()
 
+    private val isCheckingOut = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var lastCheckoutTimestamp = 0L
+
+    private val isStartingRoom = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var lastRoomActionTimestamp = 0L
+
     init {
         // Escuchar escaneos globales de la pistola de códigos de barras
         scope.launch {
@@ -209,11 +215,14 @@ class PosViewModel(
     }
 
     fun onEnterKeyPressed() {
+        val now = System.currentTimeMillis()
+        if (now - lastCheckoutTimestamp < 1200L || now - lastRoomActionTimestamp < 1200L) return
         val state = _uiState.value
-        if (state.isProcessingSale) return
+        if (state.isProcessingSale || isCheckingOut.get() || state.isRoomActionInProgress || isStartingRoom.get()) return
+
         if (state.isPaymentDialogOpen) {
             confirmCheckout()
-        } else if (state.cartItems.isNotEmpty() && state.currentTab == "POS") {
+        } else if (state.cartItems.isNotEmpty() && state.currentTab == "POS" && state.selectedRoomForDetail == null && !state.isProductManagerOpen) {
             openPaymentDialog()
         }
     }
@@ -479,9 +488,42 @@ class PosViewModel(
     }
 
     fun confirmCheckout(receiptImageUrl: String? = null) {
+        val now = System.currentTimeMillis()
+        if (now - lastCheckoutTimestamp < 1200L) return
+        if (!isCheckingOut.compareAndSet(false, true)) return
+        lastCheckoutTimestamp = now
+
         val state = _uiState.value
-        if (state.isProcessingSale) return
-        _uiState.update { it.copy(isProcessingSale = true) }
+        if (state.cartItems.isEmpty()) {
+            isCheckingOut.set(false)
+            _uiState.update { it.copy(isPaymentDialogOpen = false) }
+            return
+        }
+
+        val cash = state.cashReceivedAmount.toDoubleOrNull() ?: state.totalAmount
+        if (state.selectedPaymentMethod == PaymentMethod.EFECTIVO && cash < state.totalAmount) {
+            isCheckingOut.set(false)
+            _uiState.update {
+                it.copy(scanErrorMessage = "El monto en efectivo no puede ser menor al total.")
+            }
+            return
+        }
+
+        val finalReceipt = receiptImageUrl ?: state.saleReceiptImageUrl
+
+        // CERRAR VENTANA INMEDIATAMENTE para respuesta instantánea de UI y evitar re-entradas por Enter
+        _uiState.update {
+            it.copy(
+                isPaymentDialogOpen = false,
+                isProcessingSale = true,
+                scanErrorMessage = null,
+                isWaitingQrValidation = false,
+                qrValidationSolicitudId = null,
+                qrValidationStatusMessage = null,
+                saleReceiptImageUrl = null
+            )
+        }
+
         scope.launch {
             try {
                 val isAuthorized = cloudSyncService.isPosAuthorized()
@@ -493,17 +535,6 @@ class PosViewModel(
                     }
                     return@launch
                 }
-
-                val cash = state.cashReceivedAmount.toDoubleOrNull() ?: state.totalAmount
-
-                if (state.selectedPaymentMethod == PaymentMethod.EFECTIVO && cash < state.totalAmount) {
-                    _uiState.update {
-                        it.copy(scanErrorMessage = "El monto en efectivo no puede ser menor al total.")
-                    }
-                    return@launch
-                }
-
-                val finalReceipt = receiptImageUrl ?: state.saleReceiptImageUrl
 
                 val result = saleService.checkoutSale(
                     paymentMethod = state.selectedPaymentMethod,
@@ -520,19 +551,27 @@ class PosViewModel(
                     val sale = result.getOrNull()
                     _uiState.update {
                         it.copy(
-                            isPaymentDialogOpen = false,
-                            isWaitingQrValidation = false,
-                            qrValidationSolicitudId = null,
-                            qrValidationStatusMessage = null,
-                            saleReceiptImageUrl = null,
                             lastSaleCompleted = sale,
+                            cartItems = emptyList(),
+                            totalAmount = 0.0,
                             scanErrorMessage = null
                         )
                     }
                     loadRecentSales()
+                } else {
+                    val errorMsg = result.exceptionOrNull()?.message ?: "Error al procesar la venta"
+                    _uiState.update {
+                        it.copy(scanErrorMessage = "❌ $errorMsg")
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update {
+                    it.copy(scanErrorMessage = "❌ Error: ${e.message}")
                 }
             } finally {
-                kotlinx.coroutines.delay(600)
+                kotlinx.coroutines.delay(1000L)
+                isCheckingOut.set(false)
                 _uiState.update { it.copy(isProcessingSale = false) }
             }
         }
@@ -760,9 +799,20 @@ class PosViewModel(
         pedidos: List<com.justplay.pos.core.models.RoomOrder> = emptyList(),
         receiptImageUrl: String? = null
     ) {
-        val room = _uiState.value.selectedRoomForDetail ?: return
-        if (_uiState.value.isRoomActionInProgress) return
+        val now = System.currentTimeMillis()
+        if (now - lastRoomActionTimestamp < 1500L) return
+        if (!isStartingRoom.compareAndSet(false, true)) return
+        lastRoomActionTimestamp = now
+
+        val room = _uiState.value.selectedRoomForDetail ?: run {
+            isStartingRoom.set(false)
+            return
+        }
+
+        // CERRAR VENTANA INMEDIATAMENTE para respuesta instantánea de UI
+        closeRoomDetail()
         _uiState.update { it.copy(isRoomActionInProgress = true) }
+
         val finalReceipt = receiptImageUrl ?: _uiState.value.roomQrComprobanteUrl
         scope.launch {
             try {
@@ -777,12 +827,17 @@ class PosViewModel(
                     pedidos = pedidos,
                     receiptImageUrl = finalReceipt
                 )
-                closeRoomDetail()
                 if (ok) {
                     _uiState.update { it.copy(roomActionMessage = "▶ Sala ${room.nombre} iniciada con éxito") }
+                } else {
+                    _uiState.update { it.copy(roomActionMessage = "⚠️ No se pudo iniciar la sala ${room.nombre}") }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update { it.copy(roomActionMessage = "❌ Error: ${e.message}") }
             } finally {
-                kotlinx.coroutines.delay(500)
+                kotlinx.coroutines.delay(1000L)
+                isStartingRoom.set(false)
                 _uiState.update { it.copy(isRoomActionInProgress = false) }
             }
         }
@@ -805,17 +860,29 @@ class PosViewModel(
     }
 
     fun clearRoom(room: Room) {
-        if (_uiState.value.isRoomActionInProgress) return
+        val now = System.currentTimeMillis()
+        if (now - lastRoomActionTimestamp < 1500L) return
+        if (!isStartingRoom.compareAndSet(false, true)) return
+        lastRoomActionTimestamp = now
+
+        // CERRAR VENTANA INMEDIATAMENTE
+        closeRoomDetail()
         _uiState.update { it.copy(isRoomActionInProgress = true) }
+
         scope.launch {
             try {
                 val ok = roomManagementService.clearRoom(room.id)
-                closeRoomDetail()
                 if (ok) {
                     _uiState.update { it.copy(roomActionMessage = "🛑 Sala ${room.nombre} finalizada y liberada") }
+                } else {
+                    _uiState.update { it.copy(roomActionMessage = "⚠️ No se pudo finalizar la sala ${room.nombre}") }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _uiState.update { it.copy(roomActionMessage = "❌ Error: ${e.message}") }
             } finally {
-                kotlinx.coroutines.delay(500)
+                kotlinx.coroutines.delay(1000L)
+                isStartingRoom.set(false)
                 _uiState.update { it.copy(isRoomActionInProgress = false) }
             }
         }

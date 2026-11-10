@@ -1119,7 +1119,7 @@ private fun ScheduleTableView(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(res.tipoSala.ifBlank { "Sala General" }, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
-                            Text("📅 Reserva", color = Color(0xFF64B5F6), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                            Text("📅 ${if (res.fecha.isNotBlank()) res.fecha else "Reserva"}", color = Color(0xFF64B5F6), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                             Text("${res.nombre} (${res.celular})", color = Color.White, fontSize = 11.sp, modifier = Modifier.weight(1.4f))
                             Text(res.horaProgramada, color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
                             Text("🏁 ${res.calcularHoraFin()} (${res.duracion})", color = Color(0xFFBBDEFB), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.2f))

@@ -42,7 +42,7 @@ data class PosUiState(
     val roomActionMessage: String? = null,
 
     // Tablero de Horarios / Cronograma Tipo Excel
-    val scheduleSelectedDate: String = "",
+    val scheduleSelectedDate: String = "TODAS",
     val scheduleCategoryFilter: String = "TODOS", // "TODOS", "MINICINE", "VOLANTES", "JUST_DANCE"
     val scheduleViewMode: String = "GRID", // "GRID" (Cuadrícula Excel) o "TABLE" (Tabla Resumen)
 

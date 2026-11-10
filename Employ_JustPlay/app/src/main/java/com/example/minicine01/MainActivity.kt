@@ -1262,8 +1262,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun actualizarRegistroDeSala(sala: Sala) {
-        val ultimoRegistro = historialCompleto.lastOrNull { it.nombreElemento == sala.nombre && it.pedidos == "Alquiler de Sala" }
-        if (ultimoRegistro != null) {
+        val ultimoRegistro = historialCompleto.lastOrNull {
+            it.nombreElemento == sala.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance"))
+        }
+
+        fun aplicarActualizacion(regId: String, entradaActual: RegistroEntry?) {
+            val cliente = sala.cliente ?: entradaActual?.cliente ?: ""
+            val celular = sala.celular ?: entradaActual?.celular
+            val pelicula = sala.pelicula ?: entradaActual?.peliculaJuego
+            val precio = sala.precioCobrado
+            val metodo = sala.metodoPago
+            val efec = sala.montoEfectivo
+            val qr = sala.montoQR
+            val comp = sala.comprobanteUri ?: entradaActual?.comprobanteUri
+
+            val updates = mapOf<String, Any?>(
+                "cliente" to cliente,
+                "celular" to celular,
+                "peliculaJuego" to pelicula,
+                "totalCobrado" to precio,
+                "metodoPago" to metodo,
+                "montoEfectivo" to efec,
+                "montoQR" to qr,
+                "comprobanteUri" to comp
+            )
+
+            database.child("registros").child(regId).updateChildren(updates)
+            database.child("auditoria_registros").child(regId).updateChildren(updates)
+        }
+
+        if (ultimoRegistro != null && ultimoRegistro.idFirebase.isNotEmpty()) {
             ultimoRegistro.cliente = sala.cliente ?: ""
             ultimoRegistro.celular = sala.celular
             ultimoRegistro.peliculaJuego = sala.pelicula
@@ -1273,8 +1301,24 @@ class MainActivity : AppCompatActivity() {
             ultimoRegistro.montoQR = sala.montoQR
             ultimoRegistro.comprobanteUri = sala.comprobanteUri
 
-            database.child("registros").child(ultimoRegistro.idFirebase).setValue(ultimoRegistro)
-            database.child("auditoria_registros").child(ultimoRegistro.idFirebase).setValue(ultimoRegistro)
+            aplicarActualizacion(ultimoRegistro.idFirebase, ultimoRegistro)
+        } else {
+            database.child("registros").orderByChild("nombreElemento").equalTo(sala.nombre)
+                .addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        val matchingSnap = snapshot.children.lastOrNull { child ->
+                            val del = child.child("eliminado").getValue(Boolean::class.java) ?: false
+                            !del
+                        }
+                        if (matchingSnap != null) {
+                            val idFb = matchingSnap.key ?: return
+                            val regObj = matchingSnap.getValue(RegistroEntry::class.java)
+                            aplicarActualizacion(idFb, regObj)
+                        }
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {}
+                })
         }
     }
 

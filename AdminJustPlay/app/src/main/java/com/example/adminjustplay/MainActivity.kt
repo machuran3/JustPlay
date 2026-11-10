@@ -2282,15 +2282,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val btnGuardarCambios = dialogView.findViewById<Button>(R.id.btnGuardarCambios)
+
         if (esNueva) {
             tvTituloDialog.text = "🎬 Iniciar en ${sala.nombre}"
             btnConfirmar.text = "Iniciar Función"
+            btnGuardarCambios?.visibility = View.GONE
             sala.pedidos.clear()
             redibujarPedidos()
             refrescarTotalUI()
         } else {
             tvTituloDialog.text = "⚙️ Gestionar ${sala.nombre}"
             btnConfirmar.text = "Liberar Sala / Cobrar"
+            btnGuardarCambios?.visibility = View.VISIBLE
             etCliente.setText(sala.cliente)
             etCelular.setText(sala.celular)
             etPelicula.setText(sala.pelicula)
@@ -2311,6 +2315,55 @@ class MainActivity : AppCompatActivity() {
 
             redibujarPedidos()
             refrescarTotalUI()
+        }
+
+        btnGuardarCambios?.setOnClickListener {
+            val cliente = etCliente.text.toString().trim()
+            val celular = etCelular.text.toString().trim()
+            val pelicula = etPelicula.text.toString().trim()
+            val tiempoStr = etTiempo.text.toString().trim()
+            val precio = etPrecioSala.text.toString().toDoubleOrNull() ?: sala.precioCobrado
+
+            val metodo = when (rgMetodoPago.checkedRadioButtonId) {
+                R.id.rbPagoQR -> "QR"
+                R.id.rbPagoMixto -> {
+                    val efec = etMontoEfectivoMixto?.text.toString().toDoubleOrNull() ?: 0.0
+                    val total = precio + sala.pedidos.sumOf { it.subtotal() }
+                    val qr = maxOf(0.0, total - efec)
+                    "Mixto (💵 $efec Bs | 📱 $qr Bs)"
+                }
+                else -> "Efectivo"
+            }
+
+            val montoEfec = if (metodo.startsWith("Mixto", true)) (etMontoEfectivoMixto?.text.toString().toDoubleOrNull() ?: 0.0) else if (metodo == "Efectivo") precio else 0.0
+            val montoQR = if (metodo.startsWith("Mixto", true)) maxOf(0.0, precio - montoEfec) else if (metodo.contains("QR", true)) precio else 0.0
+
+            sala.cliente = cliente
+            sala.celular = celular
+            sala.pelicula = pelicula
+            sala.precioCobrado = precio
+            sala.metodoPago = metodo
+            sala.montoEfectivo = montoEfec
+            sala.montoQR = montoQR
+            sala.comprobanteUri = if (metodo.contains("QR", true) || metodo.startsWith("Mixto", true)) rutaComprobanteActual else null
+
+            database.child("salas").child(sala.id.toString()).setValue(sala)
+            actualizarRegistroDeSala(sala)
+
+            val catSala = if (sala.id < 100) "Minicine" else if (sala.id in 101..199) "Autitos" else "Just Dance"
+            roomAuditManager.registrarAccionSala(
+                tipoAccion = "EDICION_PARAMETROS",
+                salaId = sala.id.toString(),
+                salaNombre = sala.nombre,
+                categoria = catSala,
+                tiempoMinutos = 0,
+                usuarioNombre = PresenciaManager.obtenerNombreUsuario(this),
+                usuarioRol = "Administrador",
+                detalles = "Parámetros actualizados: $cliente | $precio Bs ($metodo)"
+            )
+
+            Toast.makeText(this, "✅ Cambios guardados y sincronizados en registros", Toast.LENGTH_SHORT).show()
+            dialog.dismiss()
         }
 
         etPrecioSala.addTextChangedListener(object : TextWatcher {
@@ -2470,6 +2523,9 @@ class MainActivity : AppCompatActivity() {
                         AlarmUtils.cancelarAlarmaSala(this, sala.id)
                         salasNotificadasFin.remove(sala.id)
 
+                        // Sincronizar al registro antes de limpiar el estado en memoria
+                        actualizarRegistroDeSala(sala)
+
                         sala.estado = EstadoSala.DISPONIBLE
                         sala.cliente = null
                         sala.celular = null
@@ -2505,6 +2561,67 @@ class MainActivity : AppCompatActivity() {
 
         btnCancelar.setOnClickListener { dialog.dismiss() }
         dialog.show()
+    }
+
+    private fun actualizarRegistroDeSala(sala: Sala) {
+        val ultimoRegistro = historialCompleto.lastOrNull {
+            it.nombreElemento == sala.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance"))
+        }
+
+        fun aplicarActualizacion(regId: String, entradaActual: RegistroEntry?) {
+            val cliente = sala.cliente ?: entradaActual?.cliente ?: ""
+            val celular = sala.celular ?: entradaActual?.celular
+            val pelicula = sala.pelicula ?: entradaActual?.peliculaJuego
+            val precio = sala.precioCobrado
+            val metodo = sala.metodoPago
+            val efec = sala.montoEfectivo
+            val qr = sala.montoQR
+            val comp = sala.comprobanteUri ?: entradaActual?.comprobanteUri
+
+            val updates = mapOf<String, Any?>(
+                "cliente" to cliente,
+                "celular" to celular,
+                "peliculaJuego" to pelicula,
+                "totalCobrado" to precio,
+                "metodoPago" to metodo,
+                "montoEfectivo" to efec,
+                "montoQR" to qr,
+                "comprobanteUri" to comp
+            )
+
+            database.child("registros").child(regId).updateChildren(updates)
+            database.child("auditoria_registros").child(regId).updateChildren(updates)
+        }
+
+        if (ultimoRegistro != null && ultimoRegistro.idFirebase.isNotEmpty()) {
+            ultimoRegistro.cliente = sala.cliente ?: ""
+            ultimoRegistro.celular = sala.celular
+            ultimoRegistro.peliculaJuego = sala.pelicula
+            ultimoRegistro.totalCobrado = sala.precioCobrado
+            ultimoRegistro.metodoPago = sala.metodoPago
+            ultimoRegistro.montoEfectivo = sala.montoEfectivo
+            ultimoRegistro.montoQR = sala.montoQR
+            ultimoRegistro.comprobanteUri = sala.comprobanteUri
+
+            aplicarActualizacion(ultimoRegistro.idFirebase, ultimoRegistro)
+        } else {
+            database.child("registros").orderByChild("nombreElemento").equalTo(sala.nombre)
+                .addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        val matchingSnap = snapshot.children.lastOrNull { child ->
+                            val del = child.child("eliminado").getValue(Boolean::class.java) ?: false
+                            !del
+                        }
+                        if (matchingSnap != null) {
+                            val idFb = matchingSnap.key ?: return
+                            val regObj = matchingSnap.getValue(RegistroEntry::class.java)
+                            aplicarActualizacion(idFb, regObj)
+                        }
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {}
+                })
+        }
     }
 
     private fun mostrarDialogoEditarReserva(reserva: Reserva) { mostrarDialogoReservasConfigurado(reserva) }

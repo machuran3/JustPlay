@@ -381,6 +381,16 @@
                     android:backgroundTint="@android:color/transparent"
                     android:textColor="#A0A0A0"/>
                 <Button
+                    android:id="@+id/btnGuardarCambios"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💾 Guardar Cambios"
+                    android:backgroundTint="#DEFF9A"
+                    android:textColor="#000000"
+                    android:textStyle="bold"
+                    android:layout_marginStart="8dp"
+                    android:visibility="gone"/>
+                <Button
                     android:id="@+id/btnConfirmar"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"

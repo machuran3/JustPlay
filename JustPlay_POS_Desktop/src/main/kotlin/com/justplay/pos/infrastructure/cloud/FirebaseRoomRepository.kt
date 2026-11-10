@@ -669,6 +669,51 @@ class FirebaseRoomRepository(
         }
     }
 
+    override suspend fun updateRoomRecordSession(room: Room): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // 1. Obtener registros existentes para encontrar la sesión activa de esta sala
+            val allRecords = fetchRecords()
+            val targetRecord = allRecords.lastOrNull {
+                it.nombreElemento == room.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance"))
+            }
+
+            val regId = targetRecord?.idFirebase
+            if (regId.isNullOrBlank()) {
+                return@withContext false
+            }
+
+            val updates = mapOf<String, Any?>(
+                "cliente" to (room.cliente ?: targetRecord.cliente),
+                "celular" to (room.celular ?: targetRecord.celular),
+                "peliculaJuego" to (room.pelicula ?: targetRecord.peliculaJuego),
+                "totalCobrado" to room.precioCobrado,
+                "metodoPago" to room.metodoPago,
+                "comprobanteUri" to (room.comprobanteUri ?: targetRecord.comprobanteUri)
+            )
+
+            val jsonBody = gson.toJson(updates).toRequestBody(jsonMediaType)
+
+            val regRequest = Request.Builder()
+                .url("$baseUrl/registros/$regId.json")
+                .patch(jsonBody)
+                .build()
+            client.newCall(regRequest).execute().close()
+
+            val regAuditRequest = Request.Builder()
+                .url("$baseUrl/auditoria_registros/$regId.json")
+                .patch(jsonBody)
+                .build()
+            client.newCall(regAuditRequest).execute().close()
+
+            // Refrescar registros locales
+            fetchRecords()
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     override suspend fun logRoomAudit(
         actionType: String,
         roomId: String,

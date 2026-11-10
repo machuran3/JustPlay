@@ -120,7 +120,12 @@ class RoomManagementService(
             horaFinProgramada = newHoraFin,
             metodoPago = newPaymentMethod ?: existing.metodoPago
         )
-        return roomRepository.updateRoom(updated)
+        val roomUpdated = roomRepository.updateRoom(updated)
+        if (roomUpdated) {
+            // Sincronizar inmediatamente a /registros y /auditoria_registros para que refleje el nuevo precio
+            roomRepository.updateRoomRecordSession(updated)
+        }
+        return roomUpdated
     }
 
     suspend fun updateRoomComprobante(roomId: Int, comprobanteUri: String?): Boolean {

@@ -224,6 +224,32 @@ class PosViewModel(
             val product = productCatalogService.getProductByBarcode(barcode)
             val currentState = _uiState.value
 
+            // Limpieza defensiva en caso de que algún campo de texto de venta mostrador tuviera el foco
+            val cleanClientName = run {
+                var s = currentState.clientNameInput
+                if (s.endsWith(barcode)) s = s.removeSuffix(barcode)
+                for (len in minOf(4, barcode.length) downTo 1) {
+                    val p = barcode.take(len)
+                    if (s.endsWith(p) && s.length > p.length) {
+                        s = s.removeSuffix(p)
+                        break
+                    }
+                }
+                s.trimEnd()
+            }
+            val cleanSearchQuery = run {
+                var s = currentState.searchQuery
+                if (s.endsWith(barcode)) s = s.removeSuffix(barcode)
+                for (len in minOf(4, barcode.length) downTo 1) {
+                    val p = barcode.take(len)
+                    if (s.endsWith(p) && s.length > p.length) {
+                        s = s.removeSuffix(p)
+                        break
+                    }
+                }
+                s.trimEnd()
+            }
+
             if (product != null && product.active) {
                 try {
                     Toolkit.getDefaultToolkit().beep()
@@ -242,7 +268,9 @@ class PosViewModel(
                             lastScannedBarcode = barcode,
                             lastScannedProduct = product,
                             scanErrorMessage = null,
-                            manualBarcodeText = ""
+                            manualBarcodeText = "",
+                            clientNameInput = if (cleanClientName.isBlank()) "Venta Mostrador" else cleanClientName,
+                            searchQuery = cleanSearchQuery
                         )
                     }
                 }
@@ -252,7 +280,9 @@ class PosViewModel(
                         lastScannedBarcode = barcode,
                         lastScannedProduct = null,
                         scanErrorMessage = "Código no encontrado: '$barcode'. Pulsa '➕ Crear Producto' para registrarlo.",
-                        manualBarcodeText = barcode
+                        manualBarcodeText = barcode,
+                        clientNameInput = if (cleanClientName.isBlank()) "Venta Mostrador" else cleanClientName,
+                        searchQuery = cleanSearchQuery
                     )
                 }
             }

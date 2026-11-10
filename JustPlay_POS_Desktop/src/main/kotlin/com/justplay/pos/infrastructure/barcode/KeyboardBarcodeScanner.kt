@@ -96,7 +96,7 @@ class KeyboardBarcodeScanner(
 
                 // Si la tecla llegó a velocidad de lector de código de barras (< 75ms) o ya tenemos acumulación rápida,
                 // CONSUMIMOS el evento para que NO se escriba en ningún TextField activo (como el nombre de cliente en sala)
-                if (timeSinceLastKey <= 75L || (buffer.length >= 3 && timeSinceLastKey <= 120L)) {
+                if (timeSinceLastKey <= 75L || (buffer.length >= 2 && timeSinceLastKey <= 120L)) {
                     return true
                 }
             }

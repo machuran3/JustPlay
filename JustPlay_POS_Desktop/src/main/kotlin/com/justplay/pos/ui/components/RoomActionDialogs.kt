@@ -109,9 +109,17 @@ fun RoomDetailDialog(
                 if (code.length >= 4 && s.endsWith(code.takeLast(4))) {
                     s = s.removeSuffix(code.takeLast(4))
                 }
+                // Si se filtró el primer caracter (o primeros caracteres) del código al principio de la ráfaga
+                for (prefixLen in minOf(4, code.length) downTo 1) {
+                    val prefix = code.take(prefixLen)
+                    if (s.endsWith(prefix) && s.length > prefixLen) {
+                        s = s.removeSuffix(prefix)
+                        break
+                    }
+                }
                 // Limpiar dígitos sueltos al final si vinieron de una ráfaga
                 val trailingDigits = s.takeLastWhile { it.isDigit() }
-                if (trailingDigits.length >= 3 && code.startsWith(trailingDigits)) {
+                if (trailingDigits.length >= 1 && code.startsWith(trailingDigits) && s.length > trailingDigits.length) {
                     s = s.dropLast(trailingDigits.length)
                 }
                 return s.trimEnd()
@@ -155,6 +163,43 @@ fun RoomDetailDialog(
     val totalConsumos = currentOrders.sumOf { it.subtotal }
     val grandTotal = basePrice + totalConsumos
 
+    val performConfirmStart: () -> Unit = {
+        if (!isOccupied && !isActionInProgress && clientName.isNotBlank()) {
+            val price = priceText.toDoubleOrNull() ?: room.precioBaseSugerido
+            val duration = parseDurationMinutes(manualTimeText)
+            if ((selectedPaymentMethod == "QR" || selectedPaymentMethod == "Mixto") && verifiedReceiptUrl == null) {
+                showQrVerificationPromptDialog = true
+            } else {
+                onConfirmStart(
+                    clientName.trim(),
+                    clientPhone.trim(),
+                    gameOrMovie.trim(),
+                    duration,
+                    price,
+                    selectedPaymentMethod,
+                    pendingOrders,
+                    verifiedReceiptUrl
+                )
+            }
+        }
+    }
+
+    val performUpdateSession: () -> Unit = {
+        if (isOccupied && isEditModeActive && !isActionInProgress && editClientName.isNotBlank() && onUpdateActiveRoomSession != null) {
+            val pr = editPriceText.toDoubleOrNull() ?: room.precioCobrado
+            val extraMin = editExtraMinutesText.toIntOrNull()
+            onUpdateActiveRoomSession(
+                editClientName.trim(),
+                editClientPhone.trim(),
+                editGameOrMovie.trim(),
+                pr,
+                extraMin,
+                editPaymentMethod
+            )
+            editSaveSuccessMessage = "✅ Parámetros guardados y sincronizados"
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -167,6 +212,26 @@ fun RoomDetailDialog(
                 .width(980.dp)
                 .heightIn(min = 680.dp, max = 760.dp)
                 .fillMaxHeight(0.94f)
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.key == Key.Enter && keyEvent.type == KeyEventType.KeyDown) {
+                        if (barcodeSearchInput.isNotBlank()) {
+                            // Si el foco está en el buscador de snacks de sala, no interrumpe el escaneo/búsqueda de snack
+                            return@onPreviewKeyEvent false
+                        }
+                        if (!isOccupied) {
+                            if (clientName.isNotBlank() && !isActionInProgress) {
+                                performConfirmStart()
+                                return@onPreviewKeyEvent true
+                            }
+                        } else if (isEditModeActive) {
+                            if (editClientName.isNotBlank() && !isActionInProgress) {
+                                performUpdateSession()
+                                return@onPreviewKeyEvent true
+                            }
+                        }
+                    }
+                    false
+                }
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
                 // 1. Cabecera del diálogo
@@ -914,19 +979,7 @@ fun RoomDetailDialog(
                                             Spacer(modifier = Modifier.height(8.dp))
 
                                             Button(
-                                                onClick = {
-                                                    val pr = editPriceText.toDoubleOrNull() ?: room.precioCobrado
-                                                    val extraMin = editExtraMinutesText.toIntOrNull()
-                                                    onUpdateActiveRoomSession(
-                                                        editClientName.trim(),
-                                                        editClientPhone.trim(),
-                                                        editGameOrMovie.trim(),
-                                                        pr,
-                                                        extraMin,
-                                                        editPaymentMethod
-                                                    )
-                                                    editSaveSuccessMessage = "✅ Parámetros guardados y sincronizados"
-                                                },
+                                                onClick = performUpdateSession,
                                                 colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
                                                 shape = RoundedCornerShape(6.dp),
                                                 modifier = Modifier.fillMaxWidth().height(36.dp),
@@ -1268,26 +1321,7 @@ fun RoomDetailDialog(
 
                             if (!isOccupied) {
                                 Button(
-                                    onClick = {
-                                        val price = priceText.toDoubleOrNull() ?: room.precioBaseSugerido
-                                        val duration = parseDurationMinutes(manualTimeText)
-                                        if (clientName.isNotBlank()) {
-                                            if ((selectedPaymentMethod == "QR" || selectedPaymentMethod == "Mixto") && verifiedReceiptUrl == null) {
-                                                showQrVerificationPromptDialog = true
-                                            } else {
-                                                onConfirmStart(
-                                                    clientName.trim(),
-                                                    clientPhone.trim(),
-                                                    gameOrMovie.trim(),
-                                                    duration,
-                                                    price,
-                                                    selectedPaymentMethod,
-                                                    pendingOrders,
-                                                    verifiedReceiptUrl
-                                                )
-                                            }
-                                        }
-                                    },
+                                    onClick = performConfirmStart,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = AccentGreen,
                                         contentColor = Color.Black

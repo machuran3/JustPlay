@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,6 +74,11 @@ fun ProductManagerDialog(
     val cleanBarcode = barcode.trim()
     val cleanName = name.trim()
 
+    val parsedPrice = price.toDoubleOrNull() ?: 0.0
+    val parsedCost = costPrice.toDoubleOrNull() ?: 0.0
+    // Validación: El costo de compra no puede ser mayor o igual al costo de venta
+    val isCostInvalid = price.isNotBlank() && costPrice.isNotBlank() && (parsedCost >= parsedPrice)
+
     val baseStock = initialProduct?.currentStock ?: 0
     val calculatedStock = remember(stockInput, baseStock) {
         val s = stockInput.trim()
@@ -98,7 +104,27 @@ fun ProductManagerDialog(
                 it.name.trim().equals(cleanName, ignoreCase = true)
     }
 
-    val canSave = cleanBarcode.isNotBlank() && cleanName.isNotBlank() && !isDuplicateBarcode && !isDuplicateName
+    val canSave = cleanBarcode.isNotBlank() && cleanName.isNotBlank() && !isDuplicateBarcode && !isDuplicateName && !isCostInvalid && parsedPrice > 0.0
+
+    val performSave: () -> Unit = {
+        if (canSave && !isSaving) {
+            isSaving = true
+            onSaveProduct(
+                Product(
+                    barcode = cleanBarcode,
+                    name = cleanName,
+                    gramaje = effectiveGramaje.trim(),
+                    category = category,
+                    unitPrice = parsedPrice,
+                    costPrice = parsedCost,
+                    currentStock = calculatedStock,
+                    minStockAlert = minStock.toIntOrNull() ?: 5,
+                    unitOfMeasure = if (selectedUnit == "Otro") customUnitText.ifBlank { "Unidad" } else selectedUnit
+                ),
+                initialProduct?.barcode
+            )
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -108,7 +134,17 @@ fun ProductManagerDialog(
             shape = RoundedCornerShape(16.dp),
             color = CardDark,
             border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-            modifier = Modifier.width(480.dp)
+            modifier = Modifier
+                .width(480.dp)
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.key == Key.Enter && keyEvent.type == KeyEventType.KeyDown) {
+                        if (canSave && !isSaving) {
+                            performSave()
+                            return@onPreviewKeyEvent true
+                        }
+                    }
+                    false
+                }
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 // Header
@@ -310,12 +346,14 @@ fun ProductManagerDialog(
                         value = price,
                         onValueChange = { price = it },
                         label = { Text("Precio Venta (Bs)", fontSize = 11.sp) },
+                        isError = isCostInvalid,
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = SurfaceDark,
                             unfocusedContainerColor = SurfaceDark,
-                            focusedBorderColor = AccentLime,
-                            unfocusedBorderColor = BorderDark,
+                            focusedBorderColor = if (isCostInvalid) AlertRed else AccentLime,
+                            unfocusedBorderColor = if (isCostInvalid) AlertRed else BorderDark,
+                            errorBorderColor = AlertRed,
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary
                         ),
@@ -327,17 +365,28 @@ fun ProductManagerDialog(
                         value = costPrice,
                         onValueChange = { costPrice = it },
                         label = { Text("Costo Compra (Bs)", fontSize = 11.sp) },
+                        isError = isCostInvalid,
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = SurfaceDark,
                             unfocusedContainerColor = SurfaceDark,
-                            focusedBorderColor = AccentLime,
-                            unfocusedBorderColor = BorderDark,
+                            focusedBorderColor = if (isCostInvalid) AlertRed else AccentLime,
+                            unfocusedBorderColor = if (isCostInvalid) AlertRed else BorderDark,
+                            errorBorderColor = AlertRed,
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary
                         ),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
+                    )
+                }
+                if (isCostInvalid) {
+                    Text(
+                        text = "❌ El costo de compra ($parsedCost Bs) no puede ser mayor o igual al precio de venta ($parsedPrice Bs).",
+                        color = AlertRed,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                     )
                 }
 
@@ -446,25 +495,7 @@ fun ProductManagerDialog(
                     }
 
                     Button(
-                        onClick = {
-                            if (canSave && !isSaving) {
-                                isSaving = true
-                                onSaveProduct(
-                                    Product(
-                                        barcode = cleanBarcode,
-                                        name = cleanName,
-                                        gramaje = effectiveGramaje.trim(),
-                                        category = category,
-                                        unitPrice = price.toDoubleOrNull() ?: 10.0,
-                                        costPrice = costPrice.toDoubleOrNull() ?: 5.0,
-                                        currentStock = calculatedStock,
-                                        minStockAlert = minStock.toIntOrNull() ?: 5,
-                                        unitOfMeasure = if (selectedUnit == "Otro") customUnitText.ifBlank { "Unidad" } else selectedUnit
-                                    ),
-                                    initialProduct?.barcode
-                                )
-                            }
-                        },
+                        onClick = performSave,
                         enabled = canSave && !isSaving,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AccentLime,

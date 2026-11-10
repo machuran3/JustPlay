@@ -71,6 +71,11 @@ class ProductCatalogService(
     }
 
     fun saveOrUpdateProduct(product: Product, oldBarcode: String? = null) {
+        // Enforce business invariant: costPrice cannot be greater than or equal to unitPrice
+        require(product.costPrice < product.unitPrice) {
+            "El costo de compra (${product.costPrice}) no puede ser mayor o igual al precio de venta (${product.unitPrice})."
+        }
+
         val now = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
         val updated = product.copy(lastUpdated = now)
 

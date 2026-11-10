@@ -45,6 +45,8 @@ dependencies {
 
     // HTTP Client para Firebase Realtime Database REST API
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    testImplementation(kotlin("test"))
 }
 
 compose.desktop {

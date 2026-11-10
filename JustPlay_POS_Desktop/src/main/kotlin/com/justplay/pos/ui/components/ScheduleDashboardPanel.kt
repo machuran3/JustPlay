@@ -37,6 +37,7 @@ import com.justplay.pos.core.models.Reservation
 import com.justplay.pos.core.models.Room
 import com.justplay.pos.core.models.RoomState
 import com.justplay.pos.core.models.SessionRecord
+import com.justplay.pos.services.ReservationScheduleAllocator
 import com.justplay.pos.ui.theme.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -106,7 +107,7 @@ fun ScheduleDashboardPanel(
             val resNormDate = normalizeDate(res.fecha)
             val matchDate = isAllDates || res.fecha.isBlank() || resNormDate == normCurrentDate || res.fecha == currentDateStr || res.fecha == currentDateStr.replace("/", "-")
             
-            val isAutitos = res.tipoSala.contains("Auto", ignoreCase = true) || 
+            val isAutitos = res.tipoSala.contains("Aut", ignoreCase = true) || 
                             res.tipoSala.contains("Volante", ignoreCase = true) || 
                             res.tipoSala.contains("Car", ignoreCase = true) || 
                             res.tipoSala.contains("Simulador", ignoreCase = true) || 
@@ -144,7 +145,7 @@ fun ScheduleDashboardPanel(
             val recNormDate = normalizeDate(recDate)
             val matchDate = isAllDates || recDate.isBlank() || recNormDate == normCurrentDate || recDate == currentDateStr || recDate == currentDateStr.replace("/", "-")
             
-            val isAutitos = rec.nombreElemento.contains("Auto", ignoreCase = true) || 
+            val isAutitos = rec.nombreElemento.contains("Aut", ignoreCase = true) || 
                             rec.nombreElemento.contains("Volante", ignoreCase = true) || 
                             rec.nombreElemento.contains("Car", ignoreCase = true) || 
                             rec.nombreElemento.contains("Simulador", ignoreCase = true) || 
@@ -453,6 +454,16 @@ fun ScheduleDashboardPanel(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Precomputar asignación secuencial inteligente de reservas a salas (SOLID)
+        val reservationAssignments = remember(filteredRooms, filteredReservations, filteredRecords, currentDateStr == todayStr) {
+            ReservationScheduleAllocator.computeAssignments(
+                rooms = filteredRooms,
+                reservations = filteredReservations,
+                records = filteredRecords,
+                isToday = currentDateStr == todayStr
+            )
+        }
+
         // 3. Contenido Principal: Cuadrícula Horario Tipo Excel O Tabla Resumen
         Surface(
             shape = RoundedCornerShape(12.dp),
@@ -467,6 +478,8 @@ fun ScheduleDashboardPanel(
                     records = filteredRecords,
                     categoryFilter = categoryFilter,
                     isToday = currentDateStr == todayStr,
+                    isAllDates = isAllDates,
+                    reservationAssignments = reservationAssignments,
                     onRoomClick = onRoomClick
                 )
             } else {
@@ -474,6 +487,7 @@ fun ScheduleDashboardPanel(
                     rooms = filteredRooms,
                     reservations = filteredReservations,
                     records = filteredRecords,
+                    reservationAssignments = reservationAssignments,
                     onRoomClick = onRoomClick
                 )
             }
@@ -493,6 +507,8 @@ private fun ScheduleExcelGridView(
     records: List<SessionRecord>,
     categoryFilter: String,
     isToday: Boolean,
+    isAllDates: Boolean,
+    reservationAssignments: Map<String, List<Int>>,
     onRoomClick: (Room) -> Unit
 ) {
     val scrollVertical = rememberScrollState()
@@ -593,6 +609,8 @@ private fun ScheduleExcelGridView(
                         records = records,
                         hourSlots = hourSlots,
                         isToday = isToday,
+                        isAllDates = isAllDates,
+                        reservationAssignments = reservationAssignments,
                         onRoomClick = onRoomClick
                     )
                 }
@@ -607,6 +625,8 @@ private fun ScheduleExcelGridView(
                         records = records,
                         hourSlots = hourSlots,
                         isToday = isToday,
+                        isAllDates = isAllDates,
+                        reservationAssignments = reservationAssignments,
                         onRoomClick = onRoomClick
                     )
                 }
@@ -621,6 +641,8 @@ private fun ScheduleExcelGridView(
                         records = records,
                         hourSlots = hourSlots,
                         isToday = isToday,
+                        isAllDates = isAllDates,
+                        reservationAssignments = reservationAssignments,
                         onRoomClick = onRoomClick
                     )
                 }
@@ -636,6 +658,8 @@ private fun ScheduleExcelGridView(
                             records = records,
                             hourSlots = hourSlots,
                             isToday = isToday,
+                            isAllDates = isAllDates,
+                            reservationAssignments = reservationAssignments,
                             onRoomClick = onRoomClick
                         )
                     }
@@ -651,6 +675,8 @@ private fun ScheduleExcelGridView(
                             records = records,
                             hourSlots = hourSlots,
                             isToday = isToday,
+                            isAllDates = isAllDates,
+                            reservationAssignments = reservationAssignments,
                             onRoomClick = onRoomClick
                         )
                     }
@@ -666,6 +692,8 @@ private fun ScheduleExcelGridView(
                             records = records,
                             hourSlots = hourSlots,
                             isToday = isToday,
+                            isAllDates = isAllDates,
+                            reservationAssignments = reservationAssignments,
                             onRoomClick = onRoomClick
                         )
                     }
@@ -691,6 +719,8 @@ private fun CategoryScheduleGrid(
     records: List<SessionRecord>,
     hourSlots: List<Pair<Int, String>>,
     isToday: Boolean,
+    isAllDates: Boolean = false,
+    reservationAssignments: Map<String, List<Int>> = emptyMap(),
     onRoomClick: (Room) -> Unit
 ) {
     if (categoryRooms.isEmpty()) return
@@ -814,7 +844,7 @@ private fun CategoryScheduleGrid(
                         isRecordInHourSlot(rec, room, categoryRooms, hourInt)
                     }
                     val matchingReservations = reservations.filter { res ->
-                        isReservationInHourSlot(res, room, categoryRooms, hourInt)
+                        isReservationInHourSlot(res, room, categoryRooms, hourInt, reservationAssignments)
                     }
 
                     Box(
@@ -953,12 +983,31 @@ private fun CategoryScheduleGrid(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            text = "📅 RESERVA",
-                                            color = Color(0xFF64B5F6),
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.ExtraBold
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isAllDates && res.fecha.isNotBlank()) "📅 ${res.fecha.take(5)}" else "📅 RESERVA",
+                                                color = Color(0xFF64B5F6),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                            if (matchingReservations.size > 1) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = Color(0xFFE53935).copy(alpha = 0.85f)
+                                                ) {
+                                                    Text(
+                                                        text = "+${matchingReservations.size - 1}",
+                                                        color = Color.White,
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                         Text(
                                             text = "${res.horaProgramada} - ${res.calcularHoraFin()}",
                                             color = Color(0xFFBBDEFB),
@@ -980,7 +1029,7 @@ private fun CategoryScheduleGrid(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        if (res.cantidadVolantes > 1 || res.tipoSala.contains("Auto", ignoreCase = true)) {
+                                        if (res.cantidadVolantes > 1 || res.tipoSala.contains("Aut", ignoreCase = true) || res.tipoSala.contains("Volante", ignoreCase = true)) {
                                             Text("🏎️ ${res.cantidadVolantes} vol.", color = WarningYellow, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                         }
                                         if (res.adelanto.isNotBlank()) {
@@ -1014,6 +1063,7 @@ private fun ScheduleTableView(
     rooms: List<Room>,
     reservations: List<Reservation>,
     records: List<SessionRecord> = emptyList(),
+    reservationAssignments: Map<String, List<Int>> = emptyMap(),
     onRoomClick: (Room) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
@@ -1106,6 +1156,18 @@ private fun ScheduleTableView(
                 }
             } else {
                 items(reservations) { res ->
+                    val assignedIds = reservationAssignments[res.idFirebase] ?: emptyList()
+                    val assignedNames = if (assignedIds.isNotEmpty()) {
+                        rooms.filter { it.id in assignedIds }.joinToString(", ") { it.nombre }
+                    } else null
+
+                    val roomTitle = when {
+                        !assignedNames.isNullOrBlank() && !res.tipoSala.contains(assignedNames, ignoreCase = true) ->
+                            "${res.tipoSala.ifBlank { "Sala" }} ($assignedNames)"
+                        res.tipoSala.isNotBlank() -> res.tipoSala
+                        else -> "Sala General"
+                    }
+
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = Color(0xFF132233),
@@ -1118,12 +1180,12 @@ private fun ScheduleTableView(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(res.tipoSala.ifBlank { "Sala General" }, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
+                            Text(roomTitle, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
                             Text("📅 ${if (res.fecha.isNotBlank()) res.fecha else "Reserva"}", color = Color(0xFF64B5F6), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                             Text("${res.nombre} (${res.celular})", color = Color.White, fontSize = 11.sp, modifier = Modifier.weight(1.4f))
                             Text(res.horaProgramada, color = TextSecondary, fontSize = 11.sp, modifier = Modifier.weight(1f))
                             Text("🏁 ${res.calcularHoraFin()} (${res.duracion})", color = Color(0xFFBBDEFB), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.2f))
-                            val volanteTxt = if (res.cantidadVolantes > 1 || res.tipoSala.contains("Auto", ignoreCase = true)) "🏎️ ${res.cantidadVolantes} Volantes" else "Estándar"
+                            val volanteTxt = if (res.cantidadVolantes > 1 || res.tipoSala.contains("Aut", ignoreCase = true) || res.tipoSala.contains("Volante", ignoreCase = true)) "🏎️ ${res.cantidadVolantes} Volantes" else "Estándar"
                             Text(volanteTxt, color = WarningYellow, fontSize = 11.sp, modifier = Modifier.weight(1.4f))
                             Text("Adelanto: ${res.adelanto.ifBlank { "0" }} Bs", color = AccentLime, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.1f))
                         }
@@ -1256,68 +1318,77 @@ private fun isRoomOccupiedInHourSlot(room: Room, hourInt: Int, isToday: Boolean)
     return hourInt == currentHour
 }
 
-private fun isReservationInHourSlot(res: Reservation, room: Room, allRooms: List<Room>, hourInt: Int): Boolean {
+private fun isReservationInHourSlot(
+    res: Reservation,
+    room: Room,
+    allRooms: List<Room>,
+    hourInt: Int,
+    reservationAssignments: Map<String, List<Int>> = emptyMap()
+): Boolean {
     // 1. Validar si la reserva corresponde a esta sala
-    val resType = res.tipoSala.trim().lowercase()
-    val roomName = room.nombre.trim().lowercase()
+    val assignedRooms = reservationAssignments[res.idFirebase]
+    val matchesRoom = if (assignedRooms != null) {
+        assignedRooms.contains(room.id)
+    } else {
+        val resType = res.tipoSala.trim().lowercase()
+        val roomName = room.nombre.trim().lowercase()
 
-    val isAutitosReservation = resType.contains("auto") || 
-                               resType.contains("volante") || 
-                               resType.contains("car") || 
-                               resType.contains("simulador") || 
-                               res.cantidadVolantes > 1
-    val isDanceReservation = resType.contains("dance")
-    val isMinicineReservation = resType.contains("cine") || 
-                                resType.contains("sala") || 
-                                (!isAutitosReservation && !isDanceReservation)
+        val isAutitosReservation = resType.contains("aut") || 
+                                   resType.contains("volante") || 
+                                   resType.contains("car") || 
+                                   resType.contains("simulador") || 
+                                   res.cantidadVolantes > 1
+        val isDanceReservation = resType.contains("dance")
+        val isMinicineReservation = resType.contains("cine") || 
+                                    resType.contains("sala") || 
+                                    (!isAutitosReservation && !isDanceReservation)
 
-    val matchesRoom = when {
-        // Coincidencia de texto directa
-        resType.isNotEmpty() && (resType == roomName || resType.contains(roomName) || roomName.contains(resType)) -> true
+        when {
+            // Coincidencia de texto directa
+            resType.isNotEmpty() && (resType == roomName || resType.contains(roomName) || roomName.contains(resType)) -> true
 
-        // Reserva de Autitos / Volantes
-        isAutitosReservation && room.categoria == "Autitos" -> {
-            val resDigits = resType.filter { it.isDigit() }
-            val roomDigits = roomName.filter { it.isDigit() }
-            if (resDigits.isNotEmpty() && roomDigits.isNotEmpty()) {
-                // Si la reserva especificó un número de Car / Volante particular (ej: "Car 3" o "Volante 2")
-                resDigits == roomDigits || resDigits == (room.id % 100).toString() || resDigits == room.id.toString()
-            } else {
-                // Reserva general de autitos: asigna a los primeros N volantes según cantidadVolantes
-                val autitosRooms = allRooms.filter { it.categoria == "Autitos" }.sortedBy { it.id }
-                val carIndex = autitosRooms.indexOf(room)
-                val requiredVolantes = if (res.cantidadVolantes > 0) res.cantidadVolantes else 1
-                if (carIndex >= 0) carIndex < requiredVolantes else room.id in 101..(100 + requiredVolantes)
+            // Reserva de Autitos / Volantes
+            isAutitosReservation && room.categoria == "Autitos" -> {
+                val resDigits = resType.filter { it.isDigit() }
+                val roomDigits = roomName.filter { it.isDigit() }
+                if (resDigits.isNotEmpty() && roomDigits.isNotEmpty()) {
+                    resDigits == roomDigits || resDigits == (room.id % 100).toString() || resDigits == room.id.toString()
+                } else {
+                    val autitosRooms = allRooms.filter { it.categoria == "Autitos" }.sortedBy { it.id }
+                    val carIndex = autitosRooms.indexOf(room)
+                    val requiredVolantes = if (res.cantidadVolantes > 0) res.cantidadVolantes else 1
+                    if (carIndex >= 0) carIndex < requiredVolantes else room.id in 101..(100 + requiredVolantes)
+                }
             }
-        }
 
-        // Reserva de Just Dance
-        isDanceReservation && room.categoria == "Just Dance" -> {
-            val resDigits = resType.filter { it.isDigit() }
-            val roomDigits = roomName.filter { it.isDigit() }
-            if (resDigits.isNotEmpty() && roomDigits.isNotEmpty()) {
-                resDigits == roomDigits || resDigits == (room.id % 100).toString() || resDigits == room.id.toString()
-            } else {
-                val danceRooms = allRooms.filter { it.categoria == "Just Dance" }.sortedBy { it.id }
-                val danceIndex = danceRooms.indexOf(room)
-                if (danceIndex >= 0) danceIndex == 0 else room.id >= 200
+            // Reserva de Just Dance
+            isDanceReservation && room.categoria == "Just Dance" -> {
+                val resDigits = resType.filter { it.isDigit() }
+                val roomDigits = roomName.filter { it.isDigit() }
+                if (resDigits.isNotEmpty() && roomDigits.isNotEmpty()) {
+                    resDigits == roomDigits || resDigits == (room.id % 100).toString() || resDigits == room.id.toString()
+                } else {
+                    val danceRooms = allRooms.filter { it.categoria == "Just Dance" }.sortedBy { it.id }
+                    val danceIndex = danceRooms.indexOf(room)
+                    if (danceIndex >= 0) danceIndex == 0 else room.id >= 200
+                }
             }
-        }
 
-        // Reserva de Minicine
-        isMinicineReservation && room.categoria == "Minicine" -> {
-            val resDigits = resType.filter { it.isDigit() }
-            val roomDigits = roomName.filter { it.isDigit() }
-            if (resDigits.isNotEmpty() && roomDigits.isNotEmpty()) {
-                resDigits == roomDigits || resDigits == (room.id % 100).toString() || resDigits == room.id.toString()
-            } else {
-                val cineRooms = allRooms.filter { it.categoria == "Minicine" }.sortedBy { it.id }
-                val cineIndex = cineRooms.indexOf(room)
-                if (cineIndex >= 0) cineIndex == 0 else room.id == 1
+            // Reserva de Minicine
+            isMinicineReservation && room.categoria == "Minicine" -> {
+                val resDigits = resType.filter { it.isDigit() }
+                val roomDigits = roomName.filter { it.isDigit() }
+                if (resDigits.isNotEmpty() && roomDigits.isNotEmpty()) {
+                    resDigits == roomDigits || resDigits == (room.id % 100).toString() || resDigits == room.id.toString()
+                } else {
+                    val cineRooms = allRooms.filter { it.categoria == "Minicine" }.sortedBy { it.id }
+                    val cineIndex = cineRooms.indexOf(room)
+                    if (cineIndex >= 0) cineIndex == 0 else room.id == 1
+                }
             }
-        }
 
-        else -> false
+            else -> false
+        }
     }
 
     if (!matchesRoom) return false
@@ -1339,7 +1410,7 @@ private fun isRecordInHourSlot(rec: SessionRecord, room: Room, allRooms: List<Ro
     val recRoom = rec.nombreElemento.trim().lowercase()
     val roomName = room.nombre.trim().lowercase()
 
-    val isAutitosRecord = recRoom.contains("auto") || 
+    val isAutitosRecord = recRoom.contains("aut") || 
                           recRoom.contains("volante") || 
                           recRoom.contains("car") || 
                           recRoom.contains("simulador") || 

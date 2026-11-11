@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
 import android.widget.*
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -84,76 +86,121 @@ class ProductAuditManager(
     }
 
     fun mostrarDialogoHistorialAuditoriaProductos() {
-        val scrollView = ScrollView(context)
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(28, 28, 28, 28)
-            setBackgroundColor(Color.parseColor("#1A1C29"))
-        }
-        scrollView.addView(container)
+        val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_historial_auditoria, null)
+        val tvTitulo = dialogView.findViewById<TextView>(R.id.tvDialogAuditTitulo)
+        val tvContador = dialogView.findViewById<TextView>(R.id.tvDialogAuditContador)
+        val tvSub = dialogView.findViewById<TextView>(R.id.tvDialogAuditSubtitulo)
+        val btnCerrar = dialogView.findViewById<TextView>(R.id.btnDialogAuditCerrar)
+        val etBuscar = dialogView.findViewById<EditText>(R.id.etDialogAuditBuscar)
+        val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llDialogAuditContenedor)
+        val tvEstado = dialogView.findViewById<TextView>(R.id.tvDialogAuditEstado)
+
+        tvTitulo.text = "📦 Auditoría de Catálogo & Precios"
+        tvSub.text = "Registro forense de quién (Empleado / Admin) creó, modificó precios, ajustó stock o eliminó productos."
 
         val dialog = AlertDialog.Builder(context)
-            .setView(scrollView)
+            .setView(dialogView)
             .create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        val header = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val tvTitulo = TextView(context).apply {
-            text = "📜 Historial de Cambios en Productos"
-            setTextColor(Color.WHITE)
-            textSize = 17f
-            setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val btnCerrar = TextView(context).apply {
-            text = "✕"
-            setTextColor(Color.parseColor("#A0A0A0"))
-            textSize = 20f
-            setPadding(12, 0, 12, 0)
-            setOnClickListener { dialog.dismiss() }
-        }
-        header.addView(tvTitulo)
-        header.addView(btnCerrar)
-        container.addView(header)
+        btnCerrar.setOnClickListener { dialog.dismiss() }
 
-        val tvSub = TextView(context).apply {
-            text = "Registro histórico de quién (Empleado / Admin) creó, modificó precios/stock o eliminó productos."
-            setTextColor(Color.parseColor("#A0A0A0"))
-            textSize = 12f
-            setPadding(0, 6, 0, 16)
-        }
-        container.addView(tvSub)
+        val todosLosItems = mutableListOf<ProductAuditEvent>()
 
-        val llListaLogs = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        container.addView(llListaLogs)
+        fun renderizarEventos(lista: List<ProductAuditEvent>) {
+            llContenedor.removeAllViews()
+            tvContador.text = "${lista.size} eventos"
 
-        val tvCargando = TextView(context).apply {
-            text = "Cargando historial de cambios..."
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 13f
+            if (lista.isEmpty()) {
+                val tvVacio = TextView(context).apply {
+                    text = "No se encontraron registros de cambios de productos."
+                    setTextColor(Color.parseColor("#888888"))
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    setPadding(0, 24, 0, 24)
+                }
+                llContenedor.addView(tvVacio)
+                return
+            }
+
+            for (ev in lista) {
+                val itemView = LayoutInflater.from(context).inflate(R.layout.item_auditoria, llContenedor, false)
+
+                val tvFecha = itemView.findViewById<TextView>(R.id.tvAuditFechaHora)
+                val tvBadge = itemView.findViewById<TextView>(R.id.tvAuditBadgeAccion)
+                val tvTituloItem = itemView.findViewById<TextView>(R.id.tvAuditTitulo)
+                val tvResp = itemView.findViewById<TextView>(R.id.tvAuditResponsable)
+                val tvDisp = itemView.findViewById<TextView>(R.id.tvAuditDispositivo)
+                val tvDet = itemView.findViewById<TextView>(R.id.tvAuditDetalles)
+                val tvHighlight = itemView.findViewById<TextView>(R.id.tvAuditHighlight)
+
+                tvFecha.text = ev.fechaHora
+
+                val (badgeColor, badgeIcon, badgeText) = when (ev.tipoOperacion.uppercase()) {
+                    "CREACION" -> Triple("#00E676", "✨", "CREACIÓN")
+                    "ELIMINACION" -> Triple("#FF5252", "🗑️", "ELIMINACIÓN")
+                    "EDICION", "MODIFICACION" -> Triple("#FFB300", "✏️", "EDICIÓN")
+                    "VENTA_DESCUENTO", "AJUSTE_STOCK" -> Triple("#00E5FF", "📦", "STOCK")
+                    else -> Triple("#DEFF9A", "🏷️", ev.tipoOperacion)
+                }
+                tvBadge.text = "$badgeIcon $badgeText"
+                tvBadge.setTextColor(Color.parseColor(badgeColor))
+
+                val catTag = if (ev.categoria.isNotBlank() && ev.categoria != "General") " (${ev.categoria})" else ""
+                tvTituloItem.text = "🍿 ${ev.nombreProducto}$catTag"
+
+                tvResp.text = "👤 Autor: ${ev.usuarioNombre} (${ev.usuarioRol})"
+                val dispStr = if (ev.dispositivoModelo.isNotBlank()) ev.dispositivoModelo else "Terminal POS / Móvil"
+                tvDisp.text = "📱 Dispositivo: $dispStr"
+
+                val barCodeStr = if (ev.codigoBarras.isNotBlank()) "Cód: ${ev.codigoBarras}" else ""
+                val detStr = if (ev.detalles.isNotBlank()) " | ${ev.detalles}" else ""
+                tvDet.text = "$barCodeStr$detStr".trimStart(' ', '|')
+
+                // Comparación de cambios de precio y stock estilo registros
+                val textoHighlight = if (ev.tipoOperacion.uppercase() in listOf("EDICION", "MODIFICACION")) {
+                    "💰 ${ev.precioAnterior} Bs ➔ ${ev.precioNuevo} Bs  |  📦 Stock: ${ev.stockAnterior} ➔ ${ev.stockNuevo}"
+                } else {
+                    "💰 Precio: ${ev.precioNuevo} Bs  |  📦 Stock: ${ev.stockNuevo}"
+                }
+                tvHighlight.text = textoHighlight
+                tvHighlight.setTextColor(Color.parseColor(if (ev.tipoOperacion.uppercase() == "ELIMINACION") "#FF5252" else "#00E676"))
+
+                llContenedor.addView(itemView)
+            }
         }
-        llListaLogs.addView(tvCargando)
+
+        etBuscar.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val q = s?.toString()?.trim()?.lowercase() ?: ""
+                if (q.isEmpty()) {
+                    renderizarEventos(todosLosItems)
+                } else {
+                    val filtrados = todosLosItems.filter {
+                        it.nombreProducto.lowercase().contains(q) ||
+                                it.codigoBarras.lowercase().contains(q) ||
+                                it.usuarioNombre.lowercase().contains(q) ||
+                                it.tipoOperacion.lowercase().contains(q) ||
+                                it.categoria.lowercase().contains(q) ||
+                                it.fechaHora.lowercase().contains(q) ||
+                                it.detalles.lowercase().contains(q)
+                    }
+                    renderizarEventos(filtrados)
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
 
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                llListaLogs.removeAllViews()
+                todosLosItems.clear()
                 if (!snapshot.exists() || !snapshot.hasChildren()) {
-                    val tvVacio = TextView(context).apply {
-                        text = "No hay registros de cambios de productos."
-                        setTextColor(Color.parseColor("#888888"))
-                        textSize = 13f
-                        setPadding(0, 10, 0, 10)
-                    }
-                    llListaLogs.addView(tvVacio)
+                    tvEstado.text = "No hay registros de cambios de productos."
+                    tvContador.text = "0 eventos"
                     return
                 }
 
-                val items = mutableListOf<ProductAuditEvent>()
                 for (snap in snapshot.children) {
                     val ev = ProductAuditEvent(
                         id = snap.child("id").getValue(String::class.java) ?: snap.key ?: "",
@@ -172,67 +219,31 @@ class ProductAuditManager(
                         timestamp = snap.child("timestamp").getValue(Long::class.java) ?: 0L,
                         detalles = snap.child("detalles").getValue(String::class.java) ?: ""
                     )
-                    items.add(ev)
+                    todosLosItems.add(ev)
                 }
 
-                items.sortByDescending { it.timestamp }
+                todosLosItems.sortByDescending { it.timestamp }
 
-                for (ev in items) {
-                    val card = LinearLayout(context).apply {
-                        orientation = LinearLayout.VERTICAL
-                        setPadding(16, 14, 16, 14)
-                        setBackgroundColor(Color.parseColor("#24283B"))
-                        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                        lp.setMargins(0, 0, 0, 10)
-                        layoutParams = lp
+                val q = etBuscar.text?.toString()?.trim()?.lowercase() ?: ""
+                if (q.isEmpty()) {
+                    renderizarEventos(todosLosItems)
+                } else {
+                    val filtrados = todosLosItems.filter {
+                        it.nombreProducto.lowercase().contains(q) ||
+                                it.codigoBarras.lowercase().contains(q) ||
+                                it.usuarioNombre.lowercase().contains(q) ||
+                                it.tipoOperacion.lowercase().contains(q) ||
+                                it.categoria.lowercase().contains(q) ||
+                                it.fechaHora.lowercase().contains(q) ||
+                                it.detalles.lowercase().contains(q)
                     }
-
-                    val colorOperacion = when (ev.tipoOperacion) {
-                        "CREACION" -> "#00E676"
-                        "ELIMINACION" -> "#FF5252"
-                        "EDICION", "MODIFICACION" -> "#FFD700"
-                        "VENTA_DESCUENTO" -> "#00E5FF"
-                        else -> "#DEFF9A"
-                    }
-
-                    val tvOperacion = TextView(context).apply {
-                        text = "🏷️ [${ev.tipoOperacion}] ${ev.nombreProducto} (Cód: ${ev.codigoBarras})"
-                        setTextColor(Color.parseColor(colorOperacion))
-                        textSize = 13f
-                        setTypeface(null, Typeface.BOLD)
-                    }
-
-                    val tvCambio = TextView(context).apply {
-                        text = if (ev.tipoOperacion == "EDICION") {
-                            "Precio: ${ev.precioAnterior} Bs ➔ ${ev.precioNuevo} Bs | Stock: ${ev.stockAnterior} ➔ ${ev.stockNuevo}"
-                        } else {
-                            "Precio: ${ev.precioNuevo} Bs | Stock: ${ev.stockNuevo} | Cat: ${ev.categoria}"
-                        }
-                        setTextColor(Color.WHITE)
-                        textSize = 12f
-                    }
-
-                    val tvAutor = TextView(context).apply {
-                        text = "👤 Autor: ${ev.usuarioNombre} (${ev.usuarioRol}) | 📱 ${ev.dispositivoModelo}"
-                        setTextColor(Color.parseColor("#DEFF9A"))
-                        textSize = 11f
-                    }
-
-                    val tvFecha = TextView(context).apply {
-                        text = "🕒 ${ev.fechaHora} ${if (ev.detalles.isNotEmpty()) "| " + ev.detalles else ""}"
-                        setTextColor(Color.parseColor("#A0A0A0"))
-                        textSize = 11f
-                    }
-
-                    card.addView(tvOperacion)
-                    card.addView(tvCambio)
-                    card.addView(tvAutor)
-                    card.addView(tvFecha)
-                    llListaLogs.addView(card)
+                    renderizarEventos(filtrados)
                 }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                tvEstado.text = "Error al cargar historial: ${error.message}"
+            }
         }
 
         database.child("auditoria_productos").limitToLast(100).addValueEventListener(listener)

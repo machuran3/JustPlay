@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
 import android.widget.*
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -91,92 +93,138 @@ class RoomAuditManager(
      * Muestra la vista de bitácora de auditoría filtrada por área específica (Cine, Volantes, Just Dance).
      */
     fun mostrarDialogoHistorialAuditoriaPorArea(categoriaFiltro: String?, tituloArea: String) {
-        val scrollView = ScrollView(context)
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(28, 28, 28, 28)
-            setBackgroundColor(Color.parseColor("#1A1C29"))
+        val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_historial_auditoria, null)
+        val tvTitulo = dialogView.findViewById<TextView>(R.id.tvDialogAuditTitulo)
+        val tvContador = dialogView.findViewById<TextView>(R.id.tvDialogAuditContador)
+        val tvSub = dialogView.findViewById<TextView>(R.id.tvDialogAuditSubtitulo)
+        val btnCerrar = dialogView.findViewById<TextView>(R.id.btnDialogAuditCerrar)
+        val etBuscar = dialogView.findViewById<EditText>(R.id.etDialogAuditBuscar)
+        val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llDialogAuditContenedor)
+        val tvEstado = dialogView.findViewById<TextView>(R.id.tvDialogAuditEstado)
+
+        tvTitulo.text = tituloArea
+        tvSub.text = if (categoriaFiltro != null) {
+            "Historial forense exclusivo del área $categoriaFiltro: quién, cuándo y desde qué dispositivo se operó."
+        } else {
+            "Registro forense global de quién y desde qué celular/dispositivo se operaron las salas."
         }
-        scrollView.addView(container)
 
         val dialog = AlertDialog.Builder(context)
-            .setView(scrollView)
+            .setView(dialogView)
             .create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        // Header
-        val header = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val tvTitulo = TextView(context).apply {
-            text = tituloArea
-            setTextColor(Color.WHITE)
-            textSize = 17f
-            setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val btnCerrar = TextView(context).apply {
-            text = "✕"
-            setTextColor(Color.parseColor("#A0A0A0"))
-            textSize = 20f
-            setPadding(12, 0, 12, 0)
-            setOnClickListener { dialog.dismiss() }
-        }
-        header.addView(tvTitulo)
-        header.addView(btnCerrar)
-        container.addView(header)
+        btnCerrar.setOnClickListener { dialog.dismiss() }
 
-        val tvSub = TextView(context).apply {
-            text = if (categoriaFiltro != null) {
-                "Historial forense exclusivo del área $categoriaFiltro: usuario, dispositivo, tiempo y cambios."
-            } else {
-                "Registro forense global de quién y desde qué celular/dispositivo se operaron las salas."
+        val todosLosItems = mutableListOf<RoomAuditEvent>()
+
+        fun renderizarEventos(lista: List<RoomAuditEvent>) {
+            llContenedor.removeAllViews()
+            tvContador.text = "${lista.size} eventos"
+
+            if (lista.isEmpty()) {
+                val tvVacio = TextView(context).apply {
+                    text = "No se encontraron eventos para el criterio de búsqueda."
+                    setTextColor(Color.parseColor("#888888"))
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    setPadding(0, 24, 0, 24)
+                }
+                llContenedor.addView(tvVacio)
+                return
             }
-            setTextColor(Color.parseColor("#A0A0A0"))
-            textSize = 12f
-            setPadding(0, 6, 0, 16)
-        }
-        container.addView(tvSub)
 
-        val llListaLogs = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        container.addView(llListaLogs)
+            for (ev in lista) {
+                val itemView = LayoutInflater.from(context).inflate(R.layout.item_auditoria, llContenedor, false)
 
-        val tvCargando = TextView(context).apply {
-            text = "Cargando bitácora de auditoría..."
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 13f
+                val tvFecha = itemView.findViewById<TextView>(R.id.tvAuditFechaHora)
+                val tvBadge = itemView.findViewById<TextView>(R.id.tvAuditBadgeAccion)
+                val tvTituloItem = itemView.findViewById<TextView>(R.id.tvAuditTitulo)
+                val tvResp = itemView.findViewById<TextView>(R.id.tvAuditResponsable)
+                val tvDisp = itemView.findViewById<TextView>(R.id.tvAuditDispositivo)
+                val tvDet = itemView.findViewById<TextView>(R.id.tvAuditDetalles)
+                val tvHighlight = itemView.findViewById<TextView>(R.id.tvAuditHighlight)
+
+                tvFecha.text = ev.fechaHora
+
+                // Badge de acción con colores semánticos
+                val (badgeColor, badgeIcon) = when (ev.tipoAccion.uppercase()) {
+                    "INICIO_TIEMPO", "INICIAR" -> Pair("#00E676", "▶")
+                    "ELIMINACION", "ELIMINAR", "LIBERAR", "FINALIZAR" -> Pair("#FF5252", "🛑")
+                    "PAUSAR", "PAUSA" -> Pair("#FFD700", "⏸️")
+                    "AGREGAR_TIEMPO" -> Pair("#00E5FF", "⏱️")
+                    "MODIFICACION", "EDICION" -> Pair("#FFB300", "✏️")
+                    else -> Pair("#DEFF9A", "📌")
+                }
+                tvBadge.text = "$badgeIcon ${ev.tipoAccion}"
+                tvBadge.setTextColor(Color.parseColor(badgeColor))
+
+                // Icono según categoría
+                val iconoCat = when {
+                    ev.categoria.contains("Cine", ignoreCase = true) || ev.categoria.contains("Minicine", ignoreCase = true) -> "🎬"
+                    ev.categoria.contains("Auto", ignoreCase = true) || ev.categoria.contains("Volante", ignoreCase = true) -> "🏎️"
+                    ev.categoria.contains("Dance", ignoreCase = true) -> "💃"
+                    else -> "🛋️"
+                }
+                val catNombre = if (ev.categoria.isNotBlank()) "(${ev.categoria})" else ""
+                tvTituloItem.text = "$iconoCat ${ev.salaNombre} $catNombre"
+
+                tvResp.text = "👤 Responsable: ${ev.usuarioNombre} (${ev.usuarioRol})"
+                val dispId = if (ev.dispositivoId.isNotBlank()) " | ID: ${ev.dispositivoId}" else ""
+                tvDisp.text = "📱 Dispositivo: ${ev.dispositivoModelo}$dispId"
+
+                val tiempoStr = if (ev.tiempoMinutos > 0) "⏱️ Tiempo: ${ev.tiempoMinutos} min" else "⏱️ Tiempo: Libre"
+                val extraDet = if (ev.detalles.isNotBlank()) " | ${ev.detalles}" else ""
+                tvDet.text = "$tiempoStr$extraDet"
+
+                // Resaltado de acción
+                tvHighlight.text = "⚡ Acción registrada con trazabilidad de seguridad"
+                tvHighlight.setTextColor(Color.parseColor(badgeColor))
+
+                llContenedor.addView(itemView)
+            }
         }
-        llListaLogs.addView(tvCargando)
+
+        etBuscar.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val q = s?.toString()?.trim()?.lowercase() ?: ""
+                if (q.isEmpty()) {
+                    renderizarEventos(todosLosItems)
+                } else {
+                    val filtrados = todosLosItems.filter {
+                        it.salaNombre.lowercase().contains(q) ||
+                                it.usuarioNombre.lowercase().contains(q) ||
+                                it.tipoAccion.lowercase().contains(q) ||
+                                it.dispositivoModelo.lowercase().contains(q) ||
+                                it.fechaHora.lowercase().contains(q) ||
+                                it.detalles.lowercase().contains(q)
+                    }
+                    renderizarEventos(filtrados)
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
 
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                llListaLogs.removeAllViews()
+                todosLosItems.clear()
                 if (!snapshot.exists() || !snapshot.hasChildren()) {
-                    val tvVacio = TextView(context).apply {
-                        text = "No hay registros de auditoría disponibles para esta sección."
-                        setTextColor(Color.parseColor("#888888"))
-                        textSize = 13f
-                        setPadding(0, 10, 0, 10)
-                    }
-                    llListaLogs.addView(tvVacio)
+                    tvEstado.text = "No hay registros de auditoría disponibles para esta sección."
+                    tvContador.text = "0 eventos"
                     return
                 }
 
-                val items = mutableListOf<RoomAuditEvent>()
                 for (snap in snapshot.children) {
                     val cat = snap.child("categoria").getValue(String::class.java) ?: ""
                     val sId = snap.child("sala_id").getValue(String::class.java) ?: ""
                     val sIdInt = sId.toIntOrNull() ?: 0
 
-                    // Filtrar por categoría si se especificó
                     if (categoriaFiltro != null) {
                         val coincide = when (categoriaFiltro) {
-                            "Minicine" -> cat.equals("Minicine", ignoreCase = true) || (sIdInt in 1..99)
-                            "Autitos" -> cat.equals("Autitos", ignoreCase = true) || (sIdInt in 100..199)
-                            "Just Dance" -> cat.equals("Just Dance", ignoreCase = true) || (sIdInt >= 200)
+                            "Minicine", "CINE" -> cat.equals("Minicine", ignoreCase = true) || (sIdInt in 1..99)
+                            "Autitos", "AUTITOS" -> cat.equals("Autitos", ignoreCase = true) || (sIdInt in 100..199)
+                            "Just Dance", "JUST_DANCE" -> cat.equals("Just Dance", ignoreCase = true) || (sIdInt >= 200)
                             else -> cat.contains(categoriaFiltro, ignoreCase = true)
                         }
                         if (!coincide) continue
@@ -197,77 +245,30 @@ class RoomAuditManager(
                         timestamp = snap.child("timestamp").getValue(Long::class.java) ?: 0L,
                         detalles = snap.child("detalles").getValue(String::class.java) ?: ""
                     )
-                    items.add(ev)
+                    todosLosItems.add(ev)
                 }
 
-                if (items.isEmpty()) {
-                    val tvVacio = TextView(context).apply {
-                        text = "No se encontraron eventos para $tituloArea."
-                        setTextColor(Color.parseColor("#888888"))
-                        textSize = 13f
-                        setPadding(0, 10, 0, 10)
+                todosLosItems.sortByDescending { it.timestamp }
+
+                val q = etBuscar.text?.toString()?.trim()?.lowercase() ?: ""
+                if (q.isEmpty()) {
+                    renderizarEventos(todosLosItems)
+                } else {
+                    val filtrados = todosLosItems.filter {
+                        it.salaNombre.lowercase().contains(q) ||
+                                it.usuarioNombre.lowercase().contains(q) ||
+                                it.tipoAccion.lowercase().contains(q) ||
+                                it.dispositivoModelo.lowercase().contains(q) ||
+                                it.fechaHora.lowercase().contains(q) ||
+                                it.detalles.lowercase().contains(q)
                     }
-                    llListaLogs.addView(tvVacio)
-                    return
-                }
-
-                // Ordenar cronológicamente descendente (más recientes primero)
-                items.sortByDescending { it.timestamp }
-
-                for (ev in items) {
-                    val card = LinearLayout(context).apply {
-                        orientation = LinearLayout.VERTICAL
-                        setPadding(16, 14, 16, 14)
-                        setBackgroundColor(Color.parseColor("#24283B"))
-                        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                        lp.setMargins(0, 0, 0, 10)
-                        layoutParams = lp
-                    }
-
-                    val badgeColor = when (ev.tipoAccion) {
-                        "INICIO_TIEMPO", "INICIAR" -> "#00E676"
-                        "ELIMINACION", "ELIMINAR" -> "#FF5252"
-                        "PAUSAR", "PAUSA" -> "#FFD700"
-                        "AGREGAR_TIEMPO" -> "#00E5FF"
-                        "MODIFICACION", "EDICION" -> "#FFB300"
-                        else -> "#DEFF9A"
-                    }
-
-                    val tvAccion = TextView(context).apply {
-                        text = "▶ ${ev.tipoAccion}: ${ev.salaNombre} ${if (ev.categoria.isNotEmpty()) "(${ev.categoria})" else ""}"
-                        setTextColor(Color.parseColor(badgeColor))
-                        textSize = 13f
-                        setTypeface(null, Typeface.BOLD)
-                    }
-
-                    val tvUsuario = TextView(context).apply {
-                        text = "👤 Responsable: ${ev.usuarioNombre} (${ev.usuarioRol})"
-                        setTextColor(Color.WHITE)
-                        textSize = 12f
-                    }
-
-                    val tvDispositivo = TextView(context).apply {
-                        text = "📱 Dispositivo: ${ev.dispositivoModelo} (ID: ${ev.dispositivoId})"
-                        setTextColor(Color.parseColor("#DEFF9A"))
-                        textSize = 11f
-                        setTypeface(null, Typeface.BOLD)
-                    }
-
-                    val tvFecha = TextView(context).apply {
-                        text = "🕒 Fecha: ${ev.fechaHora} ${if (ev.detalles.isNotEmpty()) "| " + ev.detalles else ""}"
-                        setTextColor(Color.parseColor("#A0A0A0"))
-                        textSize = 11f
-                    }
-
-                    card.addView(tvAccion)
-                    card.addView(tvUsuario)
-                    card.addView(tvDispositivo)
-                    card.addView(tvFecha)
-                    llListaLogs.addView(card)
+                    renderizarEventos(filtrados)
                 }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                tvEstado.text = "Error al cargar la bitácora: ${error.message}"
+            }
         }
 
         database.child("auditoria_salas").limitToLast(150).addValueEventListener(listener)

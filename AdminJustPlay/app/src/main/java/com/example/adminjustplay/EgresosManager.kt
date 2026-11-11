@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
 import android.widget.*
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -215,78 +217,113 @@ class EgresosManager(
     }
 
     fun mostrarDialogoHistorialEgresos(esAdmin: Boolean) {
-        val scrollView = ScrollView(context)
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(28, 28, 28, 28)
-            setBackgroundColor(Color.parseColor("#1A1C29"))
-        }
-        scrollView.addView(container)
+        val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_historial_auditoria, null)
+        val tvTitulo = dialogView.findViewById<TextView>(R.id.tvDialogAuditTitulo)
+        val tvContador = dialogView.findViewById<TextView>(R.id.tvDialogAuditContador)
+        val tvSub = dialogView.findViewById<TextView>(R.id.tvDialogAuditSubtitulo)
+        val tvResumen = dialogView.findViewById<TextView>(R.id.tvDialogAuditResumen)
+        val btnCerrar = dialogView.findViewById<TextView>(R.id.btnDialogAuditCerrar)
+        val etBuscar = dialogView.findViewById<EditText>(R.id.etDialogAuditBuscar)
+        val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llDialogAuditContenedor)
+        val tvEstado = dialogView.findViewById<TextView>(R.id.tvDialogAuditEstado)
+
+        tvTitulo.text = "💸 Control de Egresos & Gastos"
+        tvSub.text = "Registro contable y trazabilidad de salidas de caja: insumos, compras operativas y nómina."
+        tvResumen.visibility = View.VISIBLE
 
         val dialog = AlertDialog.Builder(context)
-            .setView(scrollView)
+            .setView(dialogView)
             .create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        val header = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val tvTitulo = TextView(context).apply {
-            text = "💸 Control de Egresos y Gastos"
-            setTextColor(Color.WHITE)
-            textSize = 17f
-            setTypeface(null, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val btnCerrar = TextView(context).apply {
-            text = "✕"
-            setTextColor(Color.parseColor("#A0A0A0"))
-            textSize = 20f
-            setPadding(12, 0, 12, 0)
-            setOnClickListener { dialog.dismiss() }
-        }
-        header.addView(tvTitulo)
-        header.addView(btnCerrar)
-        container.addView(header)
+        btnCerrar.setOnClickListener { dialog.dismiss() }
 
-        val tvSub = TextView(context).apply {
-            text = "Registro contable de salidas de caja: Gastos operativos, insumos y nómina."
-            setTextColor(Color.parseColor("#A0A0A0"))
-            textSize = 12f
-            setPadding(0, 6, 0, 16)
-        }
-        container.addView(tvSub)
+        val todosLosItems = mutableListOf<Egreso>()
 
-        val tvResumenTotal = TextView(context).apply {
-            text = "Total Egresos: Calculando..."
-            setTextColor(Color.parseColor("#FF5252"))
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 12)
-        }
-        container.addView(tvResumenTotal)
+        fun renderizarEgresos(lista: List<Egreso>) {
+            llContenedor.removeAllViews()
+            tvContador.text = "${lista.size} registros"
 
-        val llLista = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
+            val total = lista.sumOf { it.monto }
+            val totalEfec = lista.filter { it.metodoPago.equals("Efectivo", true) }.sumOf { it.monto }
+            val totalQR = lista.filter { it.metodoPago.equals("QR", true) }.sumOf { it.monto }
+            tvResumen.text = "💰 Total: -$total Bs (💵 Efectivo: -$totalEfec Bs | 📱 QR: -$totalQR Bs)"
+
+            if (lista.isEmpty()) {
+                val tvVacio = TextView(context).apply {
+                    text = "No se encontraron egresos para el criterio de búsqueda."
+                    setTextColor(Color.parseColor("#888888"))
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    setPadding(0, 24, 0, 24)
+                }
+                llContenedor.addView(tvVacio)
+                return
+            }
+
+            for (eg in lista) {
+                val itemView = LayoutInflater.from(context).inflate(R.layout.item_auditoria, llContenedor, false)
+
+                val tvFecha = itemView.findViewById<TextView>(R.id.tvAuditFechaHora)
+                val tvBadge = itemView.findViewById<TextView>(R.id.tvAuditBadgeAccion)
+                val tvTituloItem = itemView.findViewById<TextView>(R.id.tvAuditTitulo)
+                val tvResp = itemView.findViewById<TextView>(R.id.tvAuditResponsable)
+                val tvDisp = itemView.findViewById<TextView>(R.id.tvAuditDispositivo)
+                val tvDet = itemView.findViewById<TextView>(R.id.tvAuditDetalles)
+                val tvHighlight = itemView.findViewById<TextView>(R.id.tvAuditHighlight)
+
+                tvFecha.text = eg.fechaHora
+
+                val metodoIcon = if (eg.metodoPago.equals("QR", true)) "📱" else "💵"
+                tvBadge.text = "$metodoIcon ${eg.metodoPago}"
+                tvBadge.setTextColor(Color.WHITE)
+
+                tvTituloItem.text = "💸 [${eg.categoria}]"
+
+                tvResp.text = "👤 Registrado por: ${eg.usuarioNombre} (${eg.usuarioRol})"
+                val dispStr = if (eg.dispositivoModelo.isNotBlank()) eg.dispositivoModelo else "Terminal POS / Móvil"
+                tvDisp.text = "📱 Dispositivo: $dispStr"
+
+                tvDet.text = "📝 ${eg.descripcion}"
+
+                tvHighlight.text = "Egreso: -${eg.monto} Bs"
+                tvHighlight.setTextColor(Color.parseColor("#FF5252"))
+
+                llContenedor.addView(itemView)
+            }
         }
-        container.addView(llLista)
+
+        etBuscar.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val q = s?.toString()?.trim()?.lowercase() ?: ""
+                if (q.isEmpty()) {
+                    renderizarEgresos(todosLosItems)
+                } else {
+                    val filtrados = todosLosItems.filter {
+                        it.categoria.lowercase().contains(q) ||
+                                it.descripcion.lowercase().contains(q) ||
+                                it.usuarioNombre.lowercase().contains(q) ||
+                                it.metodoPago.lowercase().contains(q) ||
+                                it.fechaHora.lowercase().contains(q) ||
+                                it.monto.toString().contains(q)
+                    }
+                    renderizarEgresos(filtrados)
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
 
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                llLista.removeAllViews()
+                todosLosItems.clear()
                 if (!snapshot.exists() || !snapshot.hasChildren()) {
-                    val tvVacio = TextView(context).apply {
-                        text = "No se han registrado egresos."
-                        setTextColor(Color.parseColor("#888888"))
-                        textSize = 13f
-                    }
-                    llLista.addView(tvVacio)
-                    tvResumenTotal.text = "Total Egresos: 0.0 Bs"
+                    tvEstado.text = "No se han registrado egresos."
+                    tvContador.text = "0 registros"
+                    tvResumen.text = "Total Egresos: 0.0 Bs"
                     return
                 }
 
-                val items = mutableListOf<Egreso>()
                 for (snap in snapshot.children) {
                     val cat = snap.child("categoria").getValue(String::class.java) ?: "Gastos Operativos / Insumos"
                     if (!esAdmin && cat.contains("Nómina", ignoreCase = true)) {
@@ -305,60 +342,30 @@ class EgresosManager(
                         fechaHora = snap.child("fechaHora").getValue(String::class.java) ?: "",
                         timestamp = snap.child("timestamp").getValue(Long::class.java) ?: 0L
                     )
-                    items.add(eg)
+                    todosLosItems.add(eg)
                 }
 
-                items.sortByDescending { it.timestamp }
+                todosLosItems.sortByDescending { it.timestamp }
 
-                val total = items.sumOf { it.monto }
-                val totalEfec = items.filter { it.metodoPago.equals("Efectivo", true) }.sumOf { it.monto }
-                val totalQR = items.filter { it.metodoPago.equals("QR", true) }.sumOf { it.monto }
-                tvResumenTotal.text = "Total Egresos: ${total} Bs (Efec: ${totalEfec} Bs | QR: ${totalQR} Bs)"
-
-                for (eg in items) {
-                    val card = LinearLayout(context).apply {
-                        orientation = LinearLayout.VERTICAL
-                        setPadding(16, 12, 16, 12)
-                        setBackgroundColor(Color.parseColor("#24283B"))
-                        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                        lp.setMargins(0, 0, 0, 8)
-                        layoutParams = lp
+                val q = etBuscar.text?.toString()?.trim()?.lowercase() ?: ""
+                if (q.isEmpty()) {
+                    renderizarEgresos(todosLosItems)
+                } else {
+                    val filtrados = todosLosItems.filter {
+                        it.categoria.lowercase().contains(q) ||
+                                it.descripcion.lowercase().contains(q) ||
+                                it.usuarioNombre.lowercase().contains(q) ||
+                                it.metodoPago.lowercase().contains(q) ||
+                                it.fechaHora.lowercase().contains(q) ||
+                                it.monto.toString().contains(q)
                     }
-
-                    val tvCatMonto = TextView(context).apply {
-                        text = "🔻 [${eg.categoria}] - ${eg.monto} Bs (${eg.metodoPago})"
-                        setTextColor(Color.parseColor("#FF5252"))
-                        textSize = 13f
-                        setTypeface(null, Typeface.BOLD)
-                    }
-
-                    val tvDesc = TextView(context).apply {
-                        text = "📝 ${eg.descripcion}"
-                        setTextColor(Color.WHITE)
-                        textSize = 12f
-                    }
-
-                    val tvUser = TextView(context).apply {
-                        text = "👤 ${eg.usuarioNombre} (${eg.usuarioRol}) | 📱 ${eg.dispositivoModelo}"
-                        setTextColor(Color.parseColor("#DEFF9A"))
-                        textSize = 11f
-                    }
-
-                    val tvFecha = TextView(context).apply {
-                        text = "🕒 ${eg.fechaHora}"
-                        setTextColor(Color.parseColor("#A0A0A0"))
-                        textSize = 11f
-                    }
-
-                    card.addView(tvCatMonto)
-                    card.addView(tvDesc)
-                    card.addView(tvUser)
-                    card.addView(tvFecha)
-                    llLista.addView(card)
+                    renderizarEgresos(filtrados)
                 }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                tvEstado.text = "Error al cargar egresos: ${error.message}"
+            }
         }
 
         database.child("egresos").limitToLast(100).addValueEventListener(listener)

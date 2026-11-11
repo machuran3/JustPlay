@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="12dp"
+    app:cardBackgroundColor="#1A1C29"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="6dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <!-- CABECERA -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvDialogAuditTitulo"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🛡️ Auditoría &amp; Trazabilidad"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDialogAuditContador"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0 eventos"
+                android:textColor="#000000"
+                android:background="#DEFF9A"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp"
+                android:layout_marginEnd="10dp" />
+
+            <TextView
+                android:id="@+id/btnDialogAuditCerrar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✕"
+                android:textColor="#A0A0A0"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:padding="4dp"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvDialogAuditSubtitulo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Registro histórico inmutable: quién, cuándo y desde qué dispositivo se operó."
+            android:textColor="#A0A0A0"
+            android:textSize="12sp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="12dp" />
+
+        <!-- RESUMEN / BADGES DE FILTRO O TOTALES (OPCIONAL) -->
+        <TextView
+            android:id="@+id/tvDialogAuditResumen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#DEFF9A"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone" />
+
+        <!-- BUSCADOR RÁPIDO EN TIEMPO REAL -->
+        <EditText
+            android:id="@+id/etDialogAuditBuscar"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:hint="🔍 Filtrar por sala, producto, usuario o detalle..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="#666666"
+            android:textSize="13sp"
+            android:background="#24283B"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="10dp"
+            android:singleLine="true" />
+
+        <!-- CONTENEDOR CON SCROLL -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/llDialogAuditContenedor"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvDialogAuditEstado"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Cargando bitácora de auditoría..."
+                    android:textColor="#DEFF9A"
+                    android:textSize="13sp"
+                    android:gravity="center"
+                    android:paddingVertical="24dp" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

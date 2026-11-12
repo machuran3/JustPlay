@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.font.FontWeight
@@ -96,6 +97,22 @@ fun RoomDetailDialog(
     var customExtraTimeText by remember { mutableStateOf("") }
     var showQrVerificationPromptDialog by remember { mutableStateOf(false) }
     var isSubmittingAction by remember { mutableStateOf(false) }
+    var showMinicineTarifaDialog by remember { mutableStateOf(false) }
+
+    if (showMinicineTarifaDialog) {
+        MinicineTarifaDialog(
+            onDismiss = { showMinicineTarifaDialog = false },
+            onSelectTarifa = { mins, precio ->
+                manualTimeText = when {
+                    mins % 60 == 0 -> "${mins / 60}:00"
+                    else -> "${mins / 60}:${(mins % 60).toString().padStart(2, '0')}"
+                }
+                priceText = (if (precio % 1.0 == 0.0) precio.toInt().toString() else precio.toString())
+                selectedDurationPreset = mins
+                showMinicineTarifaDialog = false
+            }
+        )
+    }
 
     // Limpieza automática de cualquier dígito o código de barras que se filtre al escanear productos en la sala
     LaunchedEffect(lastScannedBarcode, pendingOrders.size, room.pedidos.size) {
@@ -373,7 +390,29 @@ fun RoomDetailDialog(
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                Text("⏱️ Tiempo de Alquiler:", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("⏱️ Tiempo de Alquiler:", color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    if (room.categoria == "Minicine" || room.id < 100) {
+                                        Surface(
+                                            color = AccentLime.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(4.dp),
+                                            border = androidx.compose.foundation.BorderStroke(1.dp, AccentLime.copy(alpha = 0.5f)),
+                                            modifier = Modifier.clickable { showMinicineTarifaDialog = true }
+                                        ) {
+                                            Text(
+                                                text = "⏱️ Ver Tabla de Tarifas",
+                                                color = AccentLime,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(4.dp))
 
                                 // Campo Manual de Tiempo
@@ -382,6 +421,13 @@ fun RoomDetailDialog(
                                     onValueChange = {
                                         manualTimeText = it
                                         selectedDurationPreset = null
+                                        if (room.categoria == "Minicine" || room.id < 100) {
+                                            val mins = com.justplay.pos.core.utils.MinicineTarifaCalculator.parsearTextoAMinutos(it)
+                                            if (mins > 0) {
+                                                val calc = com.justplay.pos.core.utils.MinicineTarifaCalculator.calcular(mins)
+                                                priceText = if (calc % 1.0 == 0.0) calc.toInt().toString() else calc.toString()
+                                            }
+                                        }
                                     },
                                     label = { Text("Tiempo (Ej: 1:20 o minutos)", fontSize = 11.sp) },
                                     placeholder = { Text("Ej: 1:20", fontSize = 11.sp) },
@@ -399,9 +445,15 @@ fun RoomDetailDialog(
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                // Fila 1 de Atajos de Duración (Ninguno seleccionado por defecto)
+                                val isMinicine = room.categoria == "Minicine" || room.id < 100
+
+                                // Fila 1 de Atajos de Duración
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    val row1 = listOf(30 to "30 min", 60 to "1h (Base)", 90 to "1h 30 min")
+                                    val row1 = if (isMinicine) {
+                                        listOf(60 to "1 hora", 90 to "1h 30m", 120 to "2h (40 Bs)")
+                                    } else {
+                                        listOf(30 to "30 min", 60 to "1h (Base)", 90 to "1h 30 min")
+                                    }
                                     for ((mins, label) in row1) {
                                         val isSelected = selectedDurationPreset == mins
                                         Button(
@@ -411,14 +463,20 @@ fun RoomDetailDialog(
                                                     30 -> "0:30"
                                                     60 -> "1:00"
                                                     90 -> "1:30"
+                                                    120 -> "2:00"
                                                     else -> "$mins"
                                                 }
-                                                if (mins == 60) {
-                                                    priceText = room.precioBaseSugerido.toString()
-                                                } else if (mins == 30) {
-                                                    priceText = (room.precioBaseSugerido / 2).toString()
-                                                } else if (mins == 90) {
-                                                    priceText = (room.precioBaseSugerido * 1.5).toString()
+                                                if (isMinicine) {
+                                                    val calc = com.justplay.pos.core.utils.MinicineTarifaCalculator.calcular(mins)
+                                                    priceText = if (calc % 1.0 == 0.0) calc.toInt().toString() else calc.toString()
+                                                } else {
+                                                    if (mins == 60) {
+                                                        priceText = room.precioBaseSugerido.toString()
+                                                    } else if (mins == 30) {
+                                                        priceText = (room.precioBaseSugerido / 2).toString()
+                                                    } else if (mins == 90) {
+                                                        priceText = (room.precioBaseSugerido * 1.5).toString()
+                                                    }
                                                 }
                                             },
                                             colors = ButtonDefaults.buttonColors(
@@ -438,7 +496,11 @@ fun RoomDetailDialog(
                                 
                                 // Fila 2 de Atajos de Duración
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    val row2 = listOf(120 to "2 horas", 0 to "Tiempo Libre")
+                                    val row2 = if (isMinicine) {
+                                        listOf(180 to "3h (70 Bs)", 240 to "4h (100 Bs)", 0 to "Libre")
+                                    } else {
+                                        listOf(120 to "2 horas", 0 to "Tiempo Libre")
+                                    }
                                     for ((mins, label) in row2) {
                                         val isSelected = selectedDurationPreset == mins
                                         Button(
@@ -446,13 +508,20 @@ fun RoomDetailDialog(
                                                 selectedDurationPreset = mins
                                                 manualTimeText = when(mins) {
                                                     120 -> "2:00"
+                                                    180 -> "3:00"
+                                                    240 -> "4:00"
                                                     0 -> "Libre"
                                                     else -> "$mins"
                                                 }
-                                                if (mins == 120) {
-                                                    priceText = (room.precioBaseSugerido * 2).toString()
-                                                } else if (mins == 0) {
-                                                    priceText = room.precioBaseSugerido.toString()
+                                                if (isMinicine) {
+                                                    val calc = com.justplay.pos.core.utils.MinicineTarifaCalculator.calcular(mins)
+                                                    priceText = if (calc % 1.0 == 0.0) calc.toInt().toString() else calc.toString()
+                                                } else {
+                                                    if (mins == 120) {
+                                                        priceText = (room.precioBaseSugerido * 2).toString()
+                                                    } else if (mins == 0) {
+                                                        priceText = room.precioBaseSugerido.toString()
+                                                    }
                                                 }
                                             },
                                             colors = ButtonDefaults.buttonColors(
@@ -1069,21 +1138,30 @@ fun RoomDetailDialog(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    OutlinedTextField(
-                                        value = customExtraTimeText,
-                                        onValueChange = { customExtraTimeText = it },
-                                        placeholder = { Text("Ej: 20 min o 1:15", fontSize = 11.sp) },
-                                        singleLine = true,
-                                        modifier = Modifier.weight(1f).height(46.dp),
-                                        colors = OutlinedTextFieldDefaults.colors(
-                                            focusedContainerColor = CardDark,
-                                            unfocusedContainerColor = CardDark,
-                                            focusedBorderColor = AccentLime,
-                                            unfocusedBorderColor = BorderDark,
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(48.dp)
+                                            .background(CardDark, RoundedCornerShape(6.dp))
+                                            .border(1.dp, BorderDark, RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 12.dp),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        if (customExtraTimeText.isEmpty()) {
+                                            Text("Ej: 20 min o 1:15", color = TextMuted, fontSize = 12.sp)
+                                        }
+                                        androidx.compose.foundation.text.BasicTextField(
+                                            value = customExtraTimeText,
+                                            onValueChange = { customExtraTimeText = it },
+                                            singleLine = true,
+                                            textStyle = androidx.compose.ui.text.TextStyle(
+                                                color = TextPrimary,
+                                                fontSize = 12.sp
+                                            ),
+                                            cursorBrush = androidx.compose.ui.graphics.SolidColor(AccentLime),
+                                            modifier = Modifier.fillMaxWidth()
                                         )
-                                    )
+                                    }
                                     Button(
                                         onClick = {
                                             val mins = parseDurationMinutes(customExtraTimeText)
@@ -1094,10 +1172,11 @@ fun RoomDetailDialog(
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = AccentLime, contentColor = Color.Black),
                                         shape = RoundedCornerShape(6.dp),
-                                        modifier = Modifier.height(46.dp),
-                                        enabled = !isActionInProgress && customExtraTimeText.isNotBlank()
+                                        modifier = Modifier.height(48.dp),
+                                        enabled = !isActionInProgress && customExtraTimeText.isNotBlank(),
+                                        contentPadding = PaddingValues(horizontal = 14.dp)
                                     ) {
-                                        Text("⏱️ Extender", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                        Text("⏱️ Extender", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     }
                                 }
 
@@ -1210,13 +1289,15 @@ fun RoomDetailDialog(
                                     val pair = filteredCatalog.chunked(2)[rowIndex]
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         for (prod in pair) {
+                                            val isProdOut = prod.currentStock <= 0
                                             Surface(
                                                 shape = RoundedCornerShape(6.dp),
-                                                color = CardDark,
-                                                border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
+                                                color = if (isProdOut) Color(0xFF181B24) else CardDark,
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isProdOut) AlertRed.copy(alpha = 0.3f) else BorderDark),
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .clickable { onAddProduct(prod) }
+                                                    .then(if (isProdOut) Modifier.alpha(0.5f) else Modifier)
+                                                    .clickable(enabled = !isProdOut) { onAddProduct(prod) }
                                             ) {
                                                 Row(
                                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
@@ -1224,10 +1305,12 @@ fun RoomDetailDialog(
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Column(modifier = Modifier.weight(1f)) {
-                                                        Text(prod.name, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                        Text("${prod.unitPrice} Bs", color = AccentLime, fontSize = 10.sp)
+                                                        Text(prod.name, color = if (isProdOut) TextMuted else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Text(if (isProdOut) "🚫 Agotado (0)" else "${prod.unitPrice} Bs (${prod.currentStock} disp.)", color = if (isProdOut) AlertRed else AccentLime, fontSize = 10.sp)
                                                     }
-                                                    Icon(Icons.Default.Add, contentDescription = "Agregar", tint = AccentGreen, modifier = Modifier.size(16.dp))
+                                                    if (!isProdOut) {
+                                                        Icon(Icons.Default.Add, contentDescription = "Agregar", tint = AccentGreen, modifier = Modifier.size(16.dp))
+                                                    }
                                                 }
                                             }
                                         }

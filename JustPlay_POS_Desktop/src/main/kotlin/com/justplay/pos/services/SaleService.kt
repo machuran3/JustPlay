@@ -37,14 +37,21 @@ class SaleService(
     }.stateIn(scope, SharingStarted.Eagerly, 0.0)
 
     override fun addProductByBarcode(product: Product, quantity: Int) {
+        if (product.currentStock <= 0) return
+
         val current = _cartItemsFlow.value.toMutableList()
         val index = current.indexOfFirst { it.product.barcode == product.barcode }
 
         if (index >= 0) {
             val existing = current[index]
-            current[index] = existing.withQuantity(existing.quantity + quantity)
+            val maxAllowed = product.currentStock
+            val newQty = (existing.quantity + quantity).coerceAtMost(maxAllowed)
+            current[index] = existing.withQuantity(newQty)
         } else {
-            current.add(CartItem(product = product, quantity = quantity))
+            val initialQty = quantity.coerceAtMost(product.currentStock)
+            if (initialQty > 0) {
+                current.add(CartItem(product = product, quantity = initialQty))
+            }
         }
 
         _cartItemsFlow.value = current
@@ -58,7 +65,9 @@ class SaleService(
         val current = _cartItemsFlow.value.toMutableList()
         val index = current.indexOfFirst { it.product.barcode == barcode }
         if (index >= 0) {
-            current[index] = current[index].withQuantity(quantity)
+            val maxStock = current[index].product.currentStock
+            val clampedQty = if (maxStock > 0) quantity.coerceAtMost(maxStock) else quantity
+            current[index] = current[index].withQuantity(clampedQty)
             _cartItemsFlow.value = current
         }
     }
@@ -86,6 +95,11 @@ class SaleService(
             val current = _cartItemsFlow.value
             if (current.isEmpty()) {
                 return Result.failure(IllegalStateException("El carrito de compras está vacío o la venta ya fue cobrada."))
+            }
+            val outOfStockItems = current.filter { it.product.currentStock <= 0 || it.quantity > it.product.currentStock }
+            if (outOfStockItems.isNotEmpty()) {
+                val names = outOfStockItems.joinToString(", ") { "${it.product.name} (Stock: ${it.product.currentStock})" }
+                return Result.failure(IllegalStateException("No se puede cobrar: productos sin stock suficiente: $names (evita venta fantasma)"))
             }
             items = current.toList()
             clearCart()

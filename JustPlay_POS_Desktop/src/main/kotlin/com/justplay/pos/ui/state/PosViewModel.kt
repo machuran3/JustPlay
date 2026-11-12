@@ -259,11 +259,39 @@ class PosViewModel(
             }
 
             if (product != null && product.active) {
+                if (product.currentStock <= 0) {
+                    _uiState.update {
+                        it.copy(
+                            lastScannedBarcode = barcode,
+                            lastScannedProduct = product,
+                            scanErrorMessage = "⚠️ PRODUCTO AGOTADO: '${product.name}' (Stock: 0). No se puede vender sin stock (evita venta fantasma).",
+                            manualBarcodeText = "",
+                            searchQuery = cleanSearchQuery
+                        )
+                    }
+                    return@launch
+                }
+
+                val inCart = saleService.cartItemsFlow.value.find { it.product.barcode == product.barcode }?.quantity ?: 0
+                val openRoom = currentState.selectedRoomForDetail
+
+                if (openRoom == null && inCart >= product.currentStock) {
+                    _uiState.update {
+                        it.copy(
+                            lastScannedBarcode = barcode,
+                            lastScannedProduct = product,
+                            scanErrorMessage = "⚠️ Stock máximo alcanzado para '${product.name}' (${product.currentStock} disponibles en inventario).",
+                            manualBarcodeText = "",
+                            searchQuery = cleanSearchQuery
+                        )
+                    }
+                    return@launch
+                }
+
                 try {
                     Toolkit.getDefaultToolkit().beep()
                 } catch (_: Exception) {}
 
-                val openRoom = currentState.selectedRoomForDetail
                 if (openRoom != null) {
                     // Agregar producto directamente a la sala abierta
                     addProductToOpenRoom(product, 1)
@@ -327,6 +355,23 @@ class PosViewModel(
     }
 
     fun onProductCardClicked(product: Product) {
+        if (product.currentStock <= 0) {
+            _uiState.update {
+                it.copy(
+                    scanErrorMessage = "⚠️ PRODUCTO AGOTADO: '${product.name}' (Stock: 0). No se puede vender sin inventario (evita venta fantasma)."
+                )
+            }
+            return
+        }
+        val inCart = saleService.cartItemsFlow.value.find { it.product.barcode == product.barcode }?.quantity ?: 0
+        if (inCart >= product.currentStock) {
+            _uiState.update {
+                it.copy(
+                    scanErrorMessage = "⚠️ Stock máximo alcanzado para '${product.name}' (${product.currentStock} disponibles en inventario)."
+                )
+            }
+            return
+        }
         saleService.addProductByBarcode(product, 1)
     }
 
@@ -734,6 +779,26 @@ class PosViewModel(
 
     fun addProductToOpenRoom(product: Product, quantity: Int = 1) {
         val currentRoom = _uiState.value.selectedRoomForDetail ?: return
+        if (product.currentStock <= 0) {
+            _uiState.update {
+                it.copy(roomActionMessage = "⚠️ PRODUCTO AGOTADO: '${product.name}' (Stock: 0). No se puede vender.")
+            }
+            return
+        }
+
+        val existingInRoom = if (currentRoom.estado == com.justplay.pos.core.models.RoomState.OCUPADA) {
+            currentRoom.pedidos.filter { it.nombre.equals(product.name, ignoreCase = true) }.sumOf { it.cantidad }
+        } else {
+            _uiState.value.roomPendingOrders.filter { it.nombre.equals(product.name, ignoreCase = true) }.sumOf { it.cantidad }
+        }
+
+        if (existingInRoom + quantity > product.currentStock) {
+            _uiState.update {
+                it.copy(roomActionMessage = "⚠️ Stock insuficiente de '${product.name}' (Stock: ${product.currentStock}, ya agregados: $existingInRoom).")
+            }
+            return
+        }
+
         val newOrder = com.justplay.pos.core.models.RoomOrder(
             idFirebase = "ORD_${System.currentTimeMillis()}",
             cantidad = quantity,

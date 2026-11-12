@@ -34,13 +34,14 @@ fun TopStatusBar(
         color = CardDark,
         shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
             // Logo & Título
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -224,4 +225,5 @@ fun TopStatusBar(
             }
         }
     }
+}
 }

@@ -168,7 +168,7 @@ data class Room(
 }
 
 object BasePriceConfig {
-    var precioMinicine: Double = 35.0
+    var precioMinicine: Double = 40.0
     var precioVolantes: Double = 15.0
     var precioJustDance: Double = 15.0
 

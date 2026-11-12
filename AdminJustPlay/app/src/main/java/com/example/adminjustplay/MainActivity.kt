@@ -121,6 +121,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var qrValidationHelper: QrPaymentValidationHelper
     private lateinit var otgScanner: OtgBarcodeScannerHelper
 
+    // CACHE DE PRODUCTOS PARA CONTROL DE STOCK / EVITAR VENTA FANTASMA
+    private val catalogoProductosCache = mutableMapOf<String, Pair<Double, Int>>() // barcode -> (precio, stock)
+    private val nombreAProductoCache = mutableMapOf<String, Pair<String, Int>>() // lowercaseName -> (barcode, stock)
+
     // USUARIOS EN LINEA
     private val listaUsuariosOnline = mutableListOf<UsuarioPresencia>()
     private lateinit var usuariosOnlineAdapter: UsuariosOnlineAdapter
@@ -254,6 +258,7 @@ class MainActivity : AppCompatActivity() {
 
         // INICIALIZAR FIREBASE Y GESTORES SOLID
         database = FirebaseDatabase.getInstance().reference
+        iniciarListenerCatalogoProductos()
         posManager = PosManagementManager(this, database)
         roomAuditManager = RoomAuditManager(this, database)
         productAuditManager = ProductAuditManager(this, database)
@@ -372,6 +377,7 @@ class MainActivity : AppCompatActivity() {
         navigationView.menu.add(0, 13, 12, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
         navigationView.menu.add(0, 14, 13, "🛡️ Historial Global de Salas").setIcon(android.R.drawable.ic_menu_info_details)
         navigationView.menu.add(0, 15, 14, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
+        navigationView.menu.add(0, 16, 15, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
 
         navigationView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
@@ -385,6 +391,7 @@ class MainActivity : AppCompatActivity() {
                 13 -> egresosManager.mostrarDialogoGestionEgresos()
                 14 -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
                 15 -> posManager.mostrarDialogoPreciosBase()
+                16 -> mostrarDialogoTablaTarifasMinicine()
                 else -> {
                     val title = item.title.toString()
                     when {
@@ -398,6 +405,7 @@ class MainActivity : AppCompatActivity() {
                         title.contains("Egresos") -> egresosManager.mostrarDialogoGestionEgresos()
                         title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
                         title.contains("Precios Base") -> posManager.mostrarDialogoPreciosBase()
+                        title.contains("Tabla de Tarifas") -> mostrarDialogoTablaTarifasMinicine()
                         else -> navegarAPantalla(title)
                     }
                 }
@@ -1353,6 +1361,18 @@ class MainActivity : AppCompatActivity() {
             val pre = etPedPrecio.text.toString().toDoubleOrNull() ?: 0.0
 
             if (nom.isNotEmpty() && pre > 0) {
+                val itemCat = nombreAProductoCache[nom.lowercase()]
+                if (itemCat != null) {
+                    val (_, stock) = itemCat
+                    if (stock <= 0) {
+                        Toast.makeText(this, "⚠️ PRODUCTO AGOTADO: '$nom' no tiene stock disponible (evita venta fantasma).", Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                    if (cant > stock) {
+                        Toast.makeText(this, "⚠️ STOCK INSUFICIENTE: '$nom' solo tiene $stock disponibles.", Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                }
                 val nuevoP = Pedido(database.child("registros").push().key ?: "", cant, nom, pre, true)
                 pedidosVenta.add(nuevoP)
                 etPedCantidad.text.clear()
@@ -2246,6 +2266,19 @@ class MainActivity : AppCompatActivity() {
             val pre = etPedPrecio.text.toString().toDoubleOrNull() ?: 0.0
 
             if (nom.isNotEmpty() && pre > 0) {
+                val itemCat = nombreAProductoCache[nom.lowercase()]
+                if (itemCat != null) {
+                    val (_, stock) = itemCat
+                    if (stock <= 0) {
+                        Toast.makeText(this, "⚠️ PRODUCTO AGOTADO: '$nom' no tiene stock disponible (evita venta fantasma).", Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                    if (cant > stock) {
+                        Toast.makeText(this, "⚠️ STOCK INSUFICIENTE: '$nom' solo tiene $stock disponibles.", Toast.LENGTH_LONG).show()
+                        return@setOnClickListener
+                    }
+                }
+
                 val nuevoId = database.child("registros").push().key ?: ""
                 val nuevoP = Pedido(nuevoId, cant, nom, pre, true)
                 sala.pedidos.add(nuevoP)
@@ -2256,6 +2289,11 @@ class MainActivity : AppCompatActivity() {
                 refrescarTotalUI()
 
                 if (!esNueva) {
+                    if (itemCat != null) {
+                        val (barcode, stock) = itemCat
+                        val nuevoStock = maxOf(0, stock - cant)
+                        database.child("productos_catalogo").child(barcode).child("stock_actual").setValue(nuevoStock)
+                    }
                     database.child("salas").child(sala.id.toString()).setValue(sala)
                     val fechaHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
                     val usuarioActual = PresenciaManager.obtenerNombreUsuario(this)
@@ -2284,11 +2322,42 @@ class MainActivity : AppCompatActivity() {
 
         val btnGuardarCambios = dialogView.findViewById<Button>(R.id.btnGuardarCambios)
 
+        val btnVerTablaTarifas = dialogView.findViewById<Button>(R.id.btnVerTablaTarifas)
+        val esMinicine = sala.esMinicine()
+        btnVerTablaTarifas?.visibility = if (esMinicine) View.VISIBLE else View.GONE
+        btnVerTablaTarifas?.setOnClickListener {
+            mostrarDialogoTablaTarifasMinicine { mins, precio ->
+                val timeFormatted = if (mins % 60 == 0) "${mins / 60}:00" else "${mins / 60}:${(mins % 60).toString().padStart(2, '0')}"
+                etTiempo.setText(timeFormatted)
+                etPrecioSala.setText(if (precio % 1.0 == 0.0) precio.toInt().toString() else precio.toString())
+            }
+        }
+
+        if (esMinicine) {
+            etTiempo.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    if (esNueva) {
+                        val mins = MinicineTarifaCalculator.parsearTextoAMinutos(s.toString())
+                        if (mins > 0) {
+                            val calc = MinicineTarifaCalculator.calcular(mins)
+                            etPrecioSala.setText(if (calc % 1.0 == 0.0) calc.toInt().toString() else calc.toString())
+                        }
+                    }
+                }
+                override fun afterTextChanged(s: Editable?) {}
+            })
+        }
+
         if (esNueva) {
             tvTituloDialog.text = "🎬 Iniciar en ${sala.nombre}"
             btnConfirmar.text = "Iniciar Función"
             btnGuardarCambios?.visibility = View.GONE
             sala.pedidos.clear()
+            if (esMinicine) {
+                etTiempo.setText("2:00")
+                etPrecioSala.setText("40")
+            }
             redibujarPedidos()
             refrescarTotalUI()
         } else {
@@ -2945,6 +3014,10 @@ class MainActivity : AppCompatActivity() {
                 val nombre = snapshot.child("nombre").getValue(String::class.java) ?: "Producto $barcode"
                 val precio = snapshot.child("precio_unitario").getValue(Double::class.java) ?: 0.0
                 val stockActual = snapshot.child("stock_actual").getValue(Int::class.java) ?: 0
+                if (stockActual <= 0) {
+                    Toast.makeText(this@MainActivity, "⚠️ PRODUCTO AGOTADO: $nombre no tiene stock disponible (0 unidades). Evita venta fantasma.", Toast.LENGTH_LONG).show()
+                    return
+                }
                 val categoria = snapshot.child("categoria").getValue(String::class.java) ?: "General"
 
                 val container = LinearLayout(this@MainActivity).apply {
@@ -3051,5 +3124,106 @@ class MainActivity : AppCompatActivity() {
 
             override fun onCancelled(error: DatabaseError) {}
         })
+    }
+
+    private fun iniciarListenerCatalogoProductos() {
+        database.child("productos_catalogo").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                catalogoProductosCache.clear()
+                nombreAProductoCache.clear()
+                for (child in snapshot.children) {
+                    val barcode = child.key ?: continue
+                    val nombre = child.child("nombre").getValue(String::class.java) ?: continue
+                    val precio = child.child("precio_unitario").getValue(Double::class.java)
+                        ?: child.child("precio_unitario").getValue(Long::class.java)?.toDouble() ?: 0.0
+                    val stock = child.child("stock_actual").getValue(Int::class.java)
+                        ?: child.child("stock_actual").getValue(Long::class.java)?.toInt() ?: 0
+                    catalogoProductosCache[barcode] = Pair(precio, stock)
+                    nombreAProductoCache[nombre.trim().lowercase()] = Pair(barcode, stock)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    private fun mostrarDialogoTablaTarifasMinicine(onSelect: ((Int, Double) -> Unit)? = null) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_tabla_tarifas_minicine, null)
+        val dialog = AlertDialog.Builder(this).setView(dialogView).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val tlTarifas = dialogView.findViewById<android.widget.TableLayout>(R.id.tlTarifas)
+        val etSimuladorMinutos = dialogView.findViewById<EditText>(R.id.etSimuladorMinutos)
+        val btnCalcularSimulador = dialogView.findViewById<Button>(R.id.btnCalcularSimulador)
+        val tvResultadoSimulador = dialogView.findViewById<TextView>(R.id.tvResultadoSimulador)
+        val btnCerrarTabla = dialogView.findViewById<Button>(R.id.btnCerrarTabla)
+        val btnCerrarTablaHeader = dialogView.findViewById<TextView>(R.id.btnCerrarTablaHeader)
+
+        btnCerrarTabla.setOnClickListener { dialog.dismiss() }
+        btnCerrarTablaHeader?.setOnClickListener { dialog.dismiss() }
+
+        for ((index, item) in MinicineTarifaCalculator.TABLA_OFICIAL.withIndex()) {
+            val row = android.widget.TableRow(this).apply {
+                setPadding(6, 12, 6, 12)
+                setBackgroundColor(if (index % 2 == 0) Color.TRANSPARENT else Color.parseColor("#171B2B"))
+                if (onSelect != null) {
+                    setOnClickListener {
+                        onSelect(item.minutos, item.totalBs)
+                        dialog.dismiss()
+                    }
+                }
+            }
+
+            val tvDur = TextView(this).apply {
+                text = item.duracionTexto
+                setTextColor(Color.WHITE)
+                textSize = 11f
+                setTypeface(null, Typeface.BOLD)
+            }
+            val tvMin = TextView(this).apply {
+                text = item.tiempoMinutosTexto
+                setTextColor(Color.parseColor("#CCCCCC"))
+                textSize = 11f
+            }
+            val tvExtra = TextView(this).apply {
+                text = item.tiempoExtraTexto
+                setTextColor(if (item.tiempoExtraTexto == "Ninguno") Color.parseColor("#888888") else Color.parseColor("#FFC107"))
+                textSize = 11f
+            }
+            val tvCalc = TextView(this).apply {
+                text = item.calculoTexto
+                setTextColor(Color.parseColor("#AAAAAA"))
+                textSize = 11f
+            }
+            val tvTotal = TextView(this).apply {
+                text = "${item.totalBs.toInt()} Bs"
+                setTextColor(Color.parseColor("#00E676"))
+                textSize = 12f
+                setTypeface(null, Typeface.BOLD)
+                gravity = android.view.Gravity.END
+            }
+
+            row.addView(tvDur)
+            row.addView(tvMin)
+            row.addView(tvExtra)
+            row.addView(tvCalc)
+            row.addView(tvTotal)
+            tlTarifas.addView(row)
+        }
+
+        fun simular() {
+            val txt = etSimuladorMinutos.text.toString().trim()
+            val mins = MinicineTarifaCalculator.parsearTextoAMinutos(txt)
+            val tarifa = MinicineTarifaCalculator.calcular(mins)
+            tvResultadoSimulador.text = "Tarifa: Bs. ${tarifa.toInt()} ($mins min calculados)"
+        }
+
+        btnCalcularSimulador.setOnClickListener { simular() }
+        etSimuladorMinutos.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { simular() }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        dialog.show()
     }
 }

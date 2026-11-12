@@ -94,6 +94,14 @@ data class Sala(
             else -> BasePriceConfig.precioMinicine
         }
     }
+
+    fun esMinicine(): Boolean {
+        return !nombre.contains("Dance", ignoreCase = true) &&
+                !nombre.contains("Car", ignoreCase = true) &&
+                !nombre.contains("Auto", ignoreCase = true) &&
+                !nombre.contains("Volante", ignoreCase = true) &&
+                id < 100
+    }
 }
 
 data class RegistroEntry(
@@ -180,7 +188,7 @@ data class ClienteVetado(
 )
 
 object BasePriceConfig {
-    var precioMinicine: Double = 35.0
+    var precioMinicine: Double = 40.0
     var precioVolantes: Double = 15.0
     var precioJustDance: Double = 15.0
 

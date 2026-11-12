@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="12dp"
+    app:cardBackgroundColor="#1A1C29"
+    app:cardCornerRadius="16dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Encabezado -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="⏱️ Tabla de Cálculo (Minicine)"
+                    android:textColor="#DEFF9A"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btnCerrarTablaHeader"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✖"
+                    android:textColor="#A0A0A0"
+                    android:textSize="18sp"
+                    android:padding="6dp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tarifa base Bs. 40 (0 a 120 min) y desglose de horas extra"
+                android:textColor="#A0A0A0"
+                android:textSize="12sp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Contenedor Tabla -->
+            <TableLayout
+                android:id="@+id/tlTarifas"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:stretchColumns="*"
+                android:background="#12141F"
+                android:padding="8dp">
+
+                <!-- Header Fila -->
+                <TableRow
+                    android:background="#252A3D"
+                    android:paddingVertical="8dp"
+                    android:paddingHorizontal="4dp">
+                    <TextView
+                        android:text="Duración"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="11sp" />
+                    <TextView
+                        android:text="Minutos"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="11sp" />
+                    <TextView
+                        android:text="Extra"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="11sp" />
+                    <TextView
+                        android:text="Cálculo"
+                        android:textColor="#FFFFFF"
+                        android:textStyle="bold"
+                        android:textSize="11sp" />
+                    <TextView
+                        android:text="Total"
+                        android:textColor="#DEFF9A"
+                        android:textStyle="bold"
+                        android:gravity="end"
+                        android:textSize="11sp" />
+                </TableRow>
+            </TableLayout>
+
+            <!-- Simulador Rápido -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#22283A"
+                android:padding="12dp"
+                android:layout_marginTop="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💡 Calculador Rápido de Tarifa"
+                    android:textColor="#DEFF9A"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="6dp">
+
+                    <EditText
+                        android:id="@+id/etSimuladorMinutos"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="Ej: 2:30 o 150 min"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#777777"
+                        android:textSize="13sp"
+                        android:backgroundTint="#DEFF9A" />
+
+                    <Button
+                        android:id="@+id/btnCalcularSimulador"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Calcular"
+                        android:textColor="#000000"
+                        android:backgroundTint="#DEFF9A"
+                        android:layout_marginStart="8dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvResultadoSimulador"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tarifa: Bs. 40"
+                    android:textColor="#00E676"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+
+            <!-- Botón Cerrar -->
+            <Button
+                android:id="@+id/btnCerrarTabla"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Entendido / Cerrar"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#2D3349"
+                android:layout_marginTop="12dp" />
+
+        </LinearLayout>
+    </ScrollView>
+</androidx.cardview.widget.CardView>

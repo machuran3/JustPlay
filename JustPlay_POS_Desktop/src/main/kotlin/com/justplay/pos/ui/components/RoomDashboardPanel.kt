@@ -51,6 +51,12 @@ fun RoomDashboardPanel(
         baseList.sortedWith(compareBy({ extractRoomNumber(it.nombre, it.id) }, { it.id }))
     }
 
+    var showTarifaDialog by remember { mutableStateOf(false) }
+
+    if (showTarifaDialog) {
+        MinicineTarifaDialog(onDismiss = { showTarifaDialog = false })
+    }
+
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
         // Cabecera de la sección
         Row(
@@ -71,16 +77,30 @@ fun RoomDashboardPanel(
                 fontWeight = FontWeight.Bold
             )
 
-            Button(
-                onClick = onRefreshRooms,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SurfaceDark,
-                    contentColor = TextPrimary
-                ),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.height(38.dp)
-            ) {
-                Text("🔄 Sincronizar", fontSize = 12.sp)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (category == "Minicine") {
+                    OutlinedButton(
+                        onClick = { showTarifaDialog = true },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentLime),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentLime),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(38.dp)
+                    ) {
+                        Text("⏱️ Tabla de Tarifas", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Button(
+                    onClick = onRefreshRooms,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SurfaceDark,
+                        contentColor = TextPrimary
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.height(38.dp)
+                ) {
+                    Text("🔄 Sincronizar", fontSize = 12.sp)
+                }
             }
         }
 
@@ -260,7 +280,7 @@ fun RoomCard(
             } else {
                 // Sala Disponible
                 Text(
-                    text = "Tarifa base: ${room.precioBaseSugerido} Bs (1 hora)",
+                    text = "Tarifa base: ${room.precioBaseSugerido} Bs",
                     color = TextSecondary,
                     fontSize = 13.sp
                 )

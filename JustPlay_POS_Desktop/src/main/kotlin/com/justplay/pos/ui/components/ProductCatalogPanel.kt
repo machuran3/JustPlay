@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.alpha
 import com.justplay.pos.core.models.Product
 import com.justplay.pos.ui.state.PosUiState
 import com.justplay.pos.ui.theme.*
@@ -133,13 +134,15 @@ fun ProductCard(
     onClick: () -> Unit,
     onEditClick: () -> Unit
 ) {
+    val isOutOfStock = product.currentStock <= 0
     Surface(
-        color = SurfaceDark,
+        color = if (isOutOfStock) Color(0xFF181B24) else SurfaceDark,
         shape = RoundedCornerShape(10.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isOutOfStock) AlertRed.copy(alpha = 0.4f) else BorderDark),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .then(if (isOutOfStock) Modifier.alpha(0.6f) else Modifier)
+            .clickable(enabled = !isOutOfStock) { onClick() }
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -178,7 +181,7 @@ fun ProductCard(
             ) {
                 Text(
                     text = product.name,
-                    color = TextPrimary,
+                    color = if (isOutOfStock) TextMuted else TextPrimary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -218,20 +221,21 @@ fun ProductCard(
             ) {
                 Text(
                     text = "${product.unitPrice} Bs",
-                    color = AccentGreen,
+                    color = if (isOutOfStock) TextMuted else AccentGreen,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
 
                 Surface(
-                    color = if (product.isLowStock) Color(0xFF331418) else BgDark,
+                    color = if (isOutOfStock) AlertRed.copy(alpha = 0.25f) else if (product.isLowStock) Color(0xFF331418) else BgDark,
+                    border = if (isOutOfStock) androidx.compose.foundation.BorderStroke(1.dp, AlertRed) else null,
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = "Stock: ${product.currentStock}",
-                        color = if (product.isLowStock) AlertRed else TextSecondary,
+                        text = if (isOutOfStock) "🚫 AGOTADO (0)" else "Stock: ${product.currentStock}",
+                        color = if (isOutOfStock || product.isLowStock) AlertRed else TextSecondary,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }

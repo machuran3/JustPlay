@@ -94,6 +94,7 @@ class MainActivity : AppCompatActivity() {
     private var salasAutitos: List<Sala> = emptyList()
     private var salasJustDance: List<Sala> = emptyList()
     private val listaSecciones = mutableListOf<SeccionSala>()
+    private val filtrosSeccionesDinamicasEstado = mutableMapOf<String, Boolean>()
 
     // REGISTRO Y AUDITORIA
     private val historialCompleto = mutableListOf<RegistroEntry>()
@@ -1208,6 +1209,7 @@ class MainActivity : AppCompatActivity() {
                         BasePriceConfig.preciosDinamicos[sec.nombre] = sec.precioBaseDefault
                     }
                 }
+                actualizarFiltrosSeccionesDinamicas()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1698,7 +1700,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Registrar en Auditoría de Salas con Trazabilidad de Dispositivo
-        val catSala = if (sala.id < 100) "Minicine" else if (sala.id in 101..199) "Autitos" else "Just Dance"
+        val catSala = when {
+            sala.seccionNombre.isNotBlank() -> sala.seccionNombre
+            sala.id < 100 -> "Minicine"
+            sala.id in 101..199 -> "Autitos"
+            else -> "Just Dance"
+        }
         roomAuditManager.registrarAccionSala(
             tipoAccion = "ELIMINACION_SALA",
             salaId = sala.id.toString(),
@@ -1857,6 +1864,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val icono = when {
+                        sala.seccionNombre.isNotBlank() -> listaSecciones.find { it.nombre.equals(sala.seccionNombre, ignoreCase = true) }?.icono ?: "🎮"
                         sala.id >= 200 || sala.nombre.contains("Dance", ignoreCase = true) -> "💃"
                         sala.id in 101..199 || sala.nombre.contains("Car", ignoreCase = true) || sala.nombre.contains("Auto", ignoreCase = true) -> "🏎️"
                         else -> "🎬"
@@ -2029,6 +2037,7 @@ class MainActivity : AppCompatActivity() {
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
         val btnCerrar = dialogView.findViewById<TextView>(R.id.btnCerrarGestionSecciones)
+        val tvTituloForm = dialogView.findViewById<TextView>(R.id.tvTituloFormSeccion)
         val etIcono = dialogView.findViewById<EditText>(R.id.etIconoSeccion)
         val etNombre = dialogView.findViewById<EditText>(R.id.etNombreSeccion)
         val etPrefijo = dialogView.findViewById<EditText>(R.id.etPrefijoSalaSeccion)
@@ -2038,10 +2047,24 @@ class MainActivity : AppCompatActivity() {
         val btnGuardar = dialogView.findViewById<Button>(R.id.btnGuardarNuevaSeccion)
         val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llContenedorListaSecciones)
 
+        var seccionEnEdicion: SeccionSala? = null
+
         btnCerrar.setOnClickListener { dialog.dismiss() }
 
         val tiposCobro = listOf("TIEMPO_LIBRE (Cobro por tiempo jugado)", "POR_HORA (Cobro por bloque de 1 hora)", "POR_TARIFA (Tarifa plana tipo cine)")
         spTipoCobro.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, tiposCobro)
+
+        fun resetearFormulario() {
+            seccionEnEdicion = null
+            tvTituloForm?.text = "➕ Nueva Sección"
+            btnGuardar.text = "💾 Crear y Publicar Sección"
+            etNombre.text.clear()
+            etPrefijo.text.clear()
+            etPrecioBase.text.clear()
+            etIcono.setText("🎮")
+            spTipoCobro.setSelection(0)
+            cbPermitePelicula.isChecked = false
+        }
 
         fun redibujarListaSecciones() {
             llContenedor.removeAllViews()
@@ -2104,19 +2127,48 @@ class MainActivity : AppCompatActivity() {
                         textSize = 12f
                         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     }
+
+                    val btnEditar = TextView(this).apply {
+                        text = "✏️ Editar"
+                        setTextColor(Color.parseColor("#DEFF9A"))
+                        textSize = 11f
+                        setTypeface(null, Typeface.BOLD)
+                        setPadding(12, 8, 12, 8)
+                        setOnClickListener {
+                            seccionEnEdicion = sec
+                            tvTituloForm?.text = "✏️ Editar Sección: ${sec.nombre}"
+                            etNombre.setText(sec.nombre)
+                            etIcono.setText(sec.icono)
+                            etPrefijo.setText(sec.prefijoSala)
+                            etPrecioBase.setText(sec.precioBaseDefault.toString())
+                            spTipoCobro.setSelection(when (sec.tipoCobro) {
+                                "POR_HORA" -> 1
+                                "POR_TARIFA" -> 2
+                                else -> 0
+                            })
+                            cbPermitePelicula.isChecked = sec.permitePelicula
+                            btnGuardar.text = "💾 Actualizar '${sec.nombre}'"
+                            Toast.makeText(this@MainActivity, "Modo edición activo para '${sec.nombre}'", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
                     val btnEliminar = TextView(this).apply {
                         text = "🗑️ Borrar"
                         setTextColor(Color.parseColor("#FF5252"))
                         textSize = 11f
                         setTypeface(null, Typeface.BOLD)
-                        setPadding(16, 8, 16, 8)
+                        setPadding(12, 8, 12, 8)
                         setOnClickListener {
                             AlertDialog.Builder(this@MainActivity)
                                 .setTitle("Eliminar Sección")
                                 .setMessage("¿Estás seguro de que deseas eliminar permanentemente la sección '${sec.nombre}'?")
                                 .setPositiveButton("Sí, eliminar") { _, _ ->
+                                    if (seccionEnEdicion?.id == sec.id) {
+                                        resetearFormulario()
+                                    }
                                     database.child("secciones_salas").child(sec.id).removeValue()
                                         .addOnSuccessListener {
+                                            database.child("config_precios").child("precio_${sec.id}").removeValue()
                                             Toast.makeText(this@MainActivity, "Sección '${sec.nombre}' eliminada", Toast.LENGTH_SHORT).show()
                                             redibujarListaSecciones()
                                         }
@@ -2126,6 +2178,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     row.addView(tvInfo)
+                    row.addView(btnEditar)
                     row.addView(btnEliminar)
                     llContenedor.addView(row)
                 }
@@ -2150,33 +2203,66 @@ class MainActivity : AppCompatActivity() {
             }
             val permitePelicula = cbPermitePelicula.isChecked
 
-            val secId = nombre.lowercase().replace(" ", "_").filter { it.isLetterOrDigit() || it == '_' }
-            val baseId = 300 + (listaSecciones.size * 100)
+            val secActual = seccionEnEdicion
+            if (secActual != null) {
+                // Modo Edición
+                val secId = secActual.id
+                val seccionActualizada = SeccionSala(
+                    id = secId,
+                    nombre = nombre,
+                    icono = icono,
+                    orden = secActual.orden,
+                    precioBaseDefault = precio,
+                    tipoCobro = tipoCobroStr,
+                    permitePelicula = permitePelicula,
+                    prefijoSala = prefijo,
+                    baseIdRango = secActual.baseIdRango,
+                    activa = true
+                )
 
-            val nuevaSeccion = SeccionSala(
-                id = secId,
-                nombre = nombre,
-                icono = icono,
-                orden = listaSecciones.size + 4,
-                precioBaseDefault = precio,
-                tipoCobro = tipoCobroStr,
-                permitePelicula = permitePelicula,
-                prefijoSala = prefijo,
-                baseIdRango = baseId,
-                activa = true
-            )
+                database.child("secciones_salas").child(secId).setValue(seccionActualizada)
+                    .addOnSuccessListener {
+                        database.child("config_precios").child("precio_$secId").setValue(precio)
+                        BasePriceConfig.preciosDinamicos[secId] = precio
+                        BasePriceConfig.preciosDinamicos[nombre] = precio
+                        Toast.makeText(this, "✅ Sección '$nombre' actualizada con éxito", Toast.LENGTH_SHORT).show()
+                        resetearFormulario()
+                        redibujarListaSecciones()
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "Error al actualizar la sección: ${it.message}", Toast.LENGTH_SHORT).show()
+                    }
+            } else {
+                // Modo Creación
+                val secId = nombre.lowercase().replace(" ", "_").filter { it.isLetterOrDigit() || it == '_' }
+                val baseId = 300 + (listaSecciones.size * 100)
 
-            database.child("secciones_salas").child(secId).setValue(nuevaSeccion)
-                .addOnSuccessListener {
-                    Toast.makeText(this, "✅ Sección '$nombre' creada y sincronizada con éxito", Toast.LENGTH_SHORT).show()
-                    etNombre.text.clear()
-                    etPrefijo.text.clear()
-                    etPrecioBase.text.clear()
-                    redibujarListaSecciones()
-                }
-                .addOnFailureListener {
-                    Toast.makeText(this, "Error al guardar la sección", Toast.LENGTH_SHORT).show()
-                }
+                val nuevaSeccion = SeccionSala(
+                    id = secId,
+                    nombre = nombre,
+                    icono = icono,
+                    orden = listaSecciones.size + 4,
+                    precioBaseDefault = precio,
+                    tipoCobro = tipoCobroStr,
+                    permitePelicula = permitePelicula,
+                    prefijoSala = prefijo,
+                    baseIdRango = baseId,
+                    activa = true
+                )
+
+                database.child("secciones_salas").child(secId).setValue(nuevaSeccion)
+                    .addOnSuccessListener {
+                        database.child("config_precios").child("precio_$secId").setValue(precio)
+                        BasePriceConfig.preciosDinamicos[secId] = precio
+                        BasePriceConfig.preciosDinamicos[nombre] = precio
+                        Toast.makeText(this, "✅ Sección '$nombre' creada y sincronizada con éxito", Toast.LENGTH_SHORT).show()
+                        resetearFormulario()
+                        redibujarListaSecciones()
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "Error al guardar la sección", Toast.LENGTH_SHORT).show()
+                    }
+            }
         }
 
         dialog.show()
@@ -2236,6 +2322,10 @@ class MainActivity : AppCompatActivity() {
         val btnVerComprobante = dialogView.findViewById<Button>(R.id.btnVerComprobanteDetalleSoloLectura)
 
         val tipoNombre = when {
+            sala.seccionNombre.isNotBlank() -> {
+                val sec = listaSecciones.find { it.nombre.equals(sala.seccionNombre, ignoreCase = true) }
+                "${sec?.icono ?: "🎮"} ${sala.seccionNombre} - ${sala.nombre}"
+            }
             sala.id < 100 -> "🎬 Minicine - ${sala.nombre}"
             sala.id in 101..199 -> "🏎️ Simulador - ${sala.nombre}"
             else -> "💃 ${sala.nombre}"
@@ -2344,6 +2434,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun actualizarFiltrosSeccionesDinamicas() {
+        val contenedor = findViewById<LinearLayout>(R.id.llFiltrosSeccionesDinamicas) ?: return
+        contenedor.removeAllViews()
+
+        val seccionesCustom = listaSecciones.filter { it.activa && it.id.lowercase() !in listOf("minicine", "autitos", "just_dance") }
+        for (sec in seccionesCustom) {
+            val isChecked = filtrosSeccionesDinamicasEstado.getOrPut(sec.id) { true }
+            val cb = CheckBox(this).apply {
+                text = "${sec.icono} ${sec.nombre}"
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                this.isChecked = isChecked
+                val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.setMargins((8 * resources.displayMetrics.density).toInt(), 0, 0, 0)
+                layoutParams = lp
+                setOnCheckedChangeListener { _, checked ->
+                    filtrosSeccionesDinamicasEstado[sec.id] = checked
+                    aplicarFiltrosRegistro()
+                }
+            }
+            contenedor.addView(cb)
+        }
+        aplicarFiltrosRegistro()
+    }
+
     private fun aplicarFiltrosRegistro() {
         val cbCine = findViewById<CheckBox>(R.id.cbFiltroCine)?.isChecked ?: true
         val cbAutitos = findViewById<CheckBox>(R.id.cbFiltroAutitos)?.isChecked ?: true
@@ -2377,8 +2492,19 @@ class MainActivity : AppCompatActivity() {
             val tipo = reg.tipo.lowercase()
             val nombreEl = reg.nombreElemento.lowercase()
             val esEgreso = tipo.contains("egreso") || nombreEl.contains("egreso")
+
+            val seccionCoincidente = listaSecciones.find { sec ->
+                if (sec.id.lowercase() in listOf("minicine", "autitos", "just_dance")) return@find false
+                val secNom = sec.nombre.lowercase()
+                val secPref = sec.prefijoSala.lowercase()
+                tipo.equals(secNom, ignoreCase = true) ||
+                (secNom.isNotBlank() && (tipo.contains(secNom) || nombreEl.contains(secNom))) ||
+                (secPref.isNotBlank() && nombreEl.contains(secPref))
+            }
+
             val pasaTipo = when {
                 esEgreso -> cbEgresos
+                seccionCoincidente != null -> filtrosSeccionesDinamicasEstado.getOrDefault(seccionCoincidente.id, true)
                 tipo.contains("consumo") || tipo.contains("mostrador") || tipo.contains("venta directa") || tipo.contains("producto") || tipo.contains("snack") || tipo.contains("bebida") || tipo.contains("golosina") -> cbMostrador
                 tipo.contains("cine") || nombreEl.contains("cine") || (nombreEl.contains("sala") && !tipo.contains("consumo") && !nombreEl.contains("consumo")) -> cbCine
                 tipo.contains("auto") || nombreEl.contains("car") || nombreEl.contains("auto") || nombreEl.contains("volante") -> cbAutitos
@@ -2815,7 +2941,12 @@ class MainActivity : AppCompatActivity() {
             database.child("salas").child(sala.id.toString()).setValue(sala)
             actualizarRegistroDeSala(sala)
 
-            val catSala = if (sala.id < 100) "Minicine" else if (sala.id in 101..199) "Autitos" else "Just Dance"
+            val catSala = when {
+                sala.seccionNombre.isNotBlank() -> sala.seccionNombre
+                sala.id < 100 -> "Minicine"
+                sala.id in 101..199 -> "Autitos"
+                else -> "Just Dance"
+            }
             roomAuditManager.registrarAccionSala(
                 tipoAccion = "EDICION_PARAMETROS",
                 salaId = sala.id.toString(),
@@ -2889,7 +3020,12 @@ class MainActivity : AppCompatActivity() {
                     AlarmUtils.programarAlarmaSala(this, sala.id, sala.nombre, sala.cliente, sala.endTimeMillis!!)
 
                     // Registrar en Auditoría de Salas con Trazabilidad de Dispositivo
-                    val catSala = if (sala.id < 100) "Minicine" else if (sala.id in 101..199) "Autitos" else "Just Dance"
+                    val catSala = when {
+                        sala.seccionNombre.isNotBlank() -> sala.seccionNombre
+                        sala.id < 100 -> "Minicine"
+                        sala.id in 101..199 -> "Autitos"
+                        else -> "Just Dance"
+                    }
                     roomAuditManager.registrarAccionSala(
                         tipoAccion = "INICIO_TIEMPO",
                         salaId = sala.id.toString(),
@@ -2905,7 +3041,12 @@ class MainActivity : AppCompatActivity() {
                     val key = database.child("registros").push().key ?: ""
                     val nuevaEntrada = RegistroEntry(
                         idFirebase = key,
-                        tipo = if (sala.id < 100) "Minicine" else if (sala.id in 101..199) "Autitos" else "Just Dance",
+                        tipo = when {
+                            sala.seccionNombre.isNotBlank() -> sala.seccionNombre
+                            sala.id < 100 -> "Minicine"
+                            sala.id in 101..199 -> "Autitos"
+                            else -> "Just Dance"
+                        },
                         nombreElemento = sala.nombre,
                         cliente = cliente,
                         celular = celular,
@@ -3030,7 +3171,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun actualizarRegistroDeSala(sala: Sala) {
         val ultimoRegistro = historialCompleto.lastOrNull {
-            it.nombreElemento == sala.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance"))
+            it.nombreElemento == sala.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance") || (sala.seccionNombre.isNotBlank() && it.tipo == sala.seccionNombre))
         }
 
         fun aplicarActualizacion(regId: String, entradaActual: RegistroEntry?) {

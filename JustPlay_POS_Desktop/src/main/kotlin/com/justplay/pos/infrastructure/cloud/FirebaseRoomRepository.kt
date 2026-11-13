@@ -681,7 +681,7 @@ class FirebaseRoomRepository(
             // 1. Obtener registros existentes para encontrar la sesión activa de esta sala
             val allRecords = fetchRecords()
             val targetRecord = allRecords.lastOrNull {
-                it.nombreElemento == room.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance"))
+                it.nombreElemento == room.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance") || (room.seccionNombre.isNotBlank() && it.tipo == room.seccionNombre))
             }
 
             val regId = targetRecord?.idFirebase

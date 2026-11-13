@@ -95,6 +95,7 @@ class MainActivity : AppCompatActivity() {
     private var salasAutitos: List<Sala> = emptyList()
     private var salasJustDance: List<Sala> = emptyList()
     private val listaSecciones = mutableListOf<SeccionSala>()
+    private val filtrosSeccionesDinamicasEstado = mutableMapOf<String, Boolean>()
 
     private val historialCompleto = mutableListOf<RegistroEntry>()
     private val historialFiltrado = mutableListOf<RegistroEntry>()
@@ -813,6 +814,7 @@ class MainActivity : AppCompatActivity() {
                         BasePriceConfig.preciosDinamicos[sec.nombre] = sec.precioBaseDefault
                     }
                 }
+                actualizarFiltrosSeccionesDinamicas()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1319,7 +1321,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun actualizarRegistroDeSala(sala: Sala) {
         val ultimoRegistro = historialCompleto.lastOrNull {
-            it.nombreElemento == sala.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance"))
+            it.nombreElemento == sala.nombre && (it.pedidos == "Alquiler de Sala" || it.tipo in listOf("Minicine", "Autitos", "Just Dance") || (sala.seccionNombre.isNotBlank() && it.tipo == sala.seccionNombre))
         }
 
         fun aplicarActualizacion(regId: String, entradaActual: RegistroEntry?) {
@@ -1953,6 +1955,31 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) { null }
     }
 
+    private fun actualizarFiltrosSeccionesDinamicas() {
+        val contenedor = findViewById<LinearLayout>(R.id.llFiltrosSeccionesDinamicas) ?: return
+        contenedor.removeAllViews()
+
+        val seccionesCustom = listaSecciones.filter { it.activa && it.id.lowercase() !in listOf("minicine", "autitos", "just_dance") }
+        for (sec in seccionesCustom) {
+            val isChecked = filtrosSeccionesDinamicasEstado.getOrPut(sec.id) { true }
+            val cb = CheckBox(this).apply {
+                text = "${sec.icono} ${sec.nombre}"
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                this.isChecked = isChecked
+                val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.setMargins((8 * resources.displayMetrics.density).toInt(), 0, 0, 0)
+                layoutParams = lp
+                setOnCheckedChangeListener { _, checked ->
+                    filtrosSeccionesDinamicasEstado[sec.id] = checked
+                    aplicarFiltrosRegistro()
+                }
+            }
+            contenedor.addView(cb)
+        }
+        aplicarFiltrosRegistro()
+    }
+
     private fun aplicarFiltrosRegistro() {
         val hoyStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         if (fechaFiltroSeleccionada.isEmpty()) {
@@ -2002,8 +2029,19 @@ class MainActivity : AppCompatActivity() {
             val tipo = reg.tipo.lowercase()
             val nombreEl = reg.nombreElemento.lowercase()
             val esEgreso = tipo.contains("egreso") || nombreEl.contains("egreso")
+
+            val seccionCoincidente = listaSecciones.find { sec ->
+                if (sec.id.lowercase() in listOf("minicine", "autitos", "just_dance")) return@find false
+                val secNom = sec.nombre.lowercase()
+                val secPref = sec.prefijoSala.lowercase()
+                tipo.equals(secNom, ignoreCase = true) ||
+                (secNom.isNotBlank() && (tipo.contains(secNom) || nombreEl.contains(secNom))) ||
+                (secPref.isNotBlank() && nombreEl.contains(secPref))
+            }
+
             val coincideTipo = when {
                 esEgreso -> incluirEgresos
+                seccionCoincidente != null -> filtrosSeccionesDinamicasEstado.getOrDefault(seccionCoincidente.id, true)
                 tipo.contains("consumo") || tipo.contains("mostrador") || tipo.contains("venta directa") || tipo.contains("producto") || tipo.contains("snack") || tipo.contains("bebida") || tipo.contains("golosina") -> incluirMostrador
                 tipo.contains("cine") || nombreEl.contains("cine") || (nombreEl.contains("sala") && !tipo.contains("consumo") && !nombreEl.contains("consumo")) -> incluirCine
                 tipo.contains("auto") || nombreEl.contains("car") || nombreEl.contains("auto") || nombreEl.contains("volante") -> incluirAutitos

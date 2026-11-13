@@ -637,11 +637,13 @@ class PosManagementManager(
     }
 
     fun mostrarDialogoPreciosBase() {
+        val scrollView = ScrollView(context)
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 20, 24, 20)
             setBackgroundColor(Color.parseColor("#1A1C29"))
         }
+        scrollView.addView(container)
 
         val tvIntro = TextView(context).apply {
             text = "Configura la tarifa base sugerida (por 1 hora) para cada sección. Se sincroniza con terminales de escritorio y aplicaciones de empleados."
@@ -704,36 +706,87 @@ class PosManagementManager(
         container.addView(tvJustDance)
         container.addView(etJustDance)
 
-        // Cargar valores actuales de Firebase
-        database.child("config_precios").get().addOnSuccessListener { snap ->
-            val pMinicine = snap.child("precio_minicine").getValue(Double::class.java)
-                ?: snap.child("precio_minicine").getValue(Long::class.java)?.toDouble() ?: 35.0
-            val pVolantes = snap.child("precio_volantes").getValue(Double::class.java)
-                ?: snap.child("precio_volantes").getValue(Long::class.java)?.toDouble() ?: 15.0
-            val pJustDance = snap.child("precio_just_dance").getValue(Double::class.java)
-                ?: snap.child("precio_just_dance").getValue(Long::class.java)?.toDouble() ?: 15.0
+        // Contenedor dinámico para secciones personalizadas
+        val llSeccionesDinamicas = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        container.addView(llSeccionesDinamicas)
 
-            etMinicine.setText(pMinicine.toString())
-            etVolantes.setText(pVolantes.toString())
-            etJustDance.setText(pJustDance.toString())
+        val mapaInputsDinamicos = mutableMapOf<String, Pair<SeccionSala, EditText>>()
+
+        // Cargar valores actuales de Firebase (config_precios y secciones_salas)
+        database.child("secciones_salas").get().addOnSuccessListener { snapSec ->
+            database.child("config_precios").get().addOnSuccessListener { snapPrecios ->
+                val pMinicine = snapPrecios.child("precio_minicine").getValue(Double::class.java)
+                    ?: snapPrecios.child("precio_minicine").getValue(Long::class.java)?.toDouble() ?: 35.0
+                val pVolantes = snapPrecios.child("precio_volantes").getValue(Double::class.java)
+                    ?: snapPrecios.child("precio_volantes").getValue(Long::class.java)?.toDouble() ?: 15.0
+                val pJustDance = snapPrecios.child("precio_just_dance").getValue(Double::class.java)
+                    ?: snapPrecios.child("precio_just_dance").getValue(Long::class.java)?.toDouble() ?: 15.0
+
+                etMinicine.setText(pMinicine.toString())
+                etVolantes.setText(pVolantes.toString())
+                etJustDance.setText(pJustDance.toString())
+
+                llSeccionesDinamicas.removeAllViews()
+                mapaInputsDinamicos.clear()
+
+                for (child in snapSec.children) {
+                    val sec = child.getValue(SeccionSala::class.java) ?: continue
+                    if (sec.id.isBlank()) sec.id = child.key ?: ""
+                    if (!sec.activa) continue
+                    if (sec.id.lowercase() in listOf("minicine", "autitos", "just_dance")) continue
+
+                    val precioGuardado = snapPrecios.child("precio_${sec.id}").getValue(Double::class.java)
+                        ?: snapPrecios.child("precio_${sec.id}").getValue(Long::class.java)?.toDouble()
+                        ?: sec.precioBaseDefault
+
+                    val tvSec = TextView(context).apply {
+                        text = "${sec.icono} ${sec.nombre} (Bs / hora):"
+                        setTextColor(Color.parseColor("#DEFF9A"))
+                        textSize = 13f
+                        setTypeface(null, Typeface.BOLD)
+                        setPadding(0, 12, 0, 0)
+                    }
+                    val etSec = EditText(context).apply {
+                        hint = "Tarifa ${sec.nombre} (ej. ${sec.precioBaseDefault})"
+                        setText(precioGuardado.toString())
+                        inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        setTextColor(Color.WHITE)
+                        setHintTextColor(Color.parseColor("#888888"))
+                    }
+                    llSeccionesDinamicas.addView(tvSec)
+                    llSeccionesDinamicas.addView(etSec)
+                    mapaInputsDinamicos[sec.id] = Pair(sec, etSec)
+                }
+            }
         }
 
         AlertDialog.Builder(context)
             .setTitle("💲 Precios Base de Salas")
-            .setView(container)
+            .setView(scrollView)
             .setPositiveButton("Guardar") { _, _ ->
                 val nuevoMinicine = etMinicine.text.toString().toDoubleOrNull() ?: 35.0
                 val nuevoVolantes = etVolantes.text.toString().toDoubleOrNull() ?: 15.0
                 val nuevoJustDance = etJustDance.text.toString().toDoubleOrNull() ?: 15.0
                 val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
 
-                val updateMap = mapOf(
+                val updateMap = mutableMapOf<String, Any>(
                     "precio_minicine" to nuevoMinicine,
                     "precio_volantes" to nuevoVolantes,
                     "precio_just_dance" to nuevoJustDance,
                     "ultima_actualizacion" to fecha,
                     "actualizado_por" to "Admin"
                 )
+
+                for ((secId, pair) in mapaInputsDinamicos) {
+                    val (sec, et) = pair
+                    val precioVal = et.text.toString().toDoubleOrNull() ?: sec.precioBaseDefault
+                    updateMap["precio_$secId"] = precioVal
+                    // Sincronizar también con la sección de sala en Firebase
+                    database.child("secciones_salas").child(secId).child("precioBaseDefault").setValue(precioVal)
+                }
+
                 database.child("config_precios").updateChildren(updateMap).addOnSuccessListener {
                     Toast.makeText(context, "✅ Precios base actualizados correctamente", Toast.LENGTH_SHORT).show()
                 }.addOnFailureListener {

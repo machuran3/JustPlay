@@ -182,5 +182,11 @@ object BasePriceConfig {
         prices["precio_minicine"]?.let { if (it > 0) precioMinicine = it }
         prices["precio_volantes"]?.let { if (it > 0) precioVolantes = it }
         prices["precio_just_dance"]?.let { if (it > 0) precioJustDance = it }
+        for ((k, v) in prices) {
+            if (k.startsWith("precio_") && v > 0) {
+                val secKey = k.removePrefix("precio_")
+                preciosDinamicos[secKey] = v
+            }
+        }
     }
 }

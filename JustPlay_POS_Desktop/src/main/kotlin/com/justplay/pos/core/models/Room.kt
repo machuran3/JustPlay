@@ -42,21 +42,26 @@ data class Room(
     val montoEfectivo: Double = 0.0,
     val montoQR: Double = 0.0,
     val comprobanteUri: String? = null,
-    val pedidos: List<RoomOrder> = emptyList()
+    val pedidos: List<RoomOrder> = emptyList(),
+    val seccionId: String = "",
+    val seccionNombre: String = ""
 ) {
     val categoria: String
-        get() = when {
-            nombre.contains("Dance", ignoreCase = true) || id >= 200 -> "Just Dance"
-            nombre.contains("Car", ignoreCase = true) || nombre.contains("Auto", ignoreCase = true) || nombre.contains("Volante", ignoreCase = true) || id in 101..199 -> "Autitos"
-            else -> "Minicine"
+        get() {
+            if (seccionNombre.isNotBlank()) return seccionNombre
+            return when {
+                nombre.contains("Dance", ignoreCase = true) || id >= 200 -> "Just Dance"
+                nombre.contains("Car", ignoreCase = true) || nombre.contains("Auto", ignoreCase = true) || nombre.contains("Volante", ignoreCase = true) || id in 101..199 -> "Autitos"
+                else -> "Minicine"
+            }
         }
 
     val precioBaseSugerido: Double
-        get() = when (categoria) {
-            "Minicine" -> BasePriceConfig.precioMinicine
-            "Autitos" -> BasePriceConfig.precioVolantes
-            "Just Dance" -> BasePriceConfig.precioJustDance
-            else -> if (id < 100) BasePriceConfig.precioMinicine else BasePriceConfig.precioVolantes
+        get() = when (categoria.lowercase()) {
+            "minicine", "cine", "salas" -> BasePriceConfig.precioMinicine
+            "autitos", "volantes" -> BasePriceConfig.precioVolantes
+            "just dance" -> BasePriceConfig.precioJustDance
+            else -> BasePriceConfig.preciosDinamicos[seccionId] ?: BasePriceConfig.preciosDinamicos[categoria] ?: 15.0
         }
 
     val totalPedidos: Double get() = pedidos.sumOf { it.subtotal }
@@ -171,6 +176,7 @@ object BasePriceConfig {
     var precioMinicine: Double = 40.0
     var precioVolantes: Double = 15.0
     var precioJustDance: Double = 15.0
+    val preciosDinamicos = mutableMapOf<String, Double>()
 
     fun updateFromMap(prices: Map<String, Double>) {
         prices["precio_minicine"]?.let { if (it > 0) precioMinicine = it }

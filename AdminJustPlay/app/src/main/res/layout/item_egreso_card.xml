@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginVertical="5dp"
+    app:cardBackgroundColor="#24283B"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="3dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- FILA SUPERIOR: FECHA Y BADGE DE METODO -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:id="@+id/tvEgresoFechaHora"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="12/11/2026 21:30"
+                android:textColor="#A0A0A0"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvEgresoBadgeMetodo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💵 Efectivo"
+                android:textColor="#DEFF9A"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:background="#1B3E2B"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp" />
+        </LinearLayout>
+
+        <!-- TITULO CON CATEGORIA -->
+        <TextView
+            android:id="@+id/tvEgresoCategoria"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="💸 Gastos Operativos / Insumos"
+            android:textColor="#DEFF9A"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <!-- DETALLE / DESCRIPCION -->
+        <TextView
+            android:id="@+id/tvEgresoDescripcion"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Compra de servilletas y ambientador para salas"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- FILA INFERIOR: USUARIO / DISPOSITIVO Y MONTO -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvEgresoResponsable"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="👤 Admin | 📱 Móvil"
+                android:textColor="#888899"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvEgresoMonto"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-35.00 Bs"
+                android:textColor="#FF5252"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

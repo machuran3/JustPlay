@@ -68,7 +68,7 @@ fun RoomDashboardPanel(
                 "Minicine" -> "🎬 Salas de Minicine"
                 "Autitos" -> "🏎️ Simuladores y Volantes (Autitos)"
                 "Just Dance" -> "💃 Salas Just Dance"
-                else -> "🎮 Todas las Salas"
+                else -> "🎮 Sección: $category"
             }
             Text(
                 text = "$titleIcon (${filteredRooms.size})",
@@ -147,7 +147,8 @@ fun RoomCard(
     val iconPrefix = when (room.categoria) {
         "Minicine" -> "🎬"
         "Autitos" -> "🏎️"
-        else -> "💃"
+        "Just Dance" -> "💃"
+        else -> "🎮"
     }
 
     Card(

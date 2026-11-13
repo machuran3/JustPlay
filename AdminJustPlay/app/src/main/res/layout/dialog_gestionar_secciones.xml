@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        app:cardBackgroundColor="#1A1C29"
+        app:cardCornerRadius="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <!-- HEADER -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="📁 Gestión Dinámica de Secciones"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/btnCerrarGestionSecciones"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✕"
+                    android:textColor="#A0A0A0"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:padding="4dp"
+                    android:clickable="true"
+                    android:focusable="true"/>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Crea nuevas secciones para tu negocio (ej. Volantes, Zona VR, PlayStation, etc.) y se sincronizarán en vivo en Admin, Employ y Desktop POS:"
+                android:textColor="#A0A0A0"
+                android:textSize="13sp"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- CARD FORMULARIO CREAR SECCION -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#24283B"
+                app:cardCornerRadius="12dp"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="➕ Nueva Sección"
+                        android:textColor="#DEFF9A"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="10dp"/>
+
+                    <!-- NOMBRE E ICONO -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="8dp">
+
+                        <EditText
+                            android:id="@+id/etIconoSeccion"
+                            android:layout_width="56dp"
+                            android:layout_height="48dp"
+                            android:hint="🎮"
+                            android:gravity="center"
+                            android:textSize="20sp"
+                            android:textColor="#FFFFFF"
+                            android:background="@drawable/bg_spinner_rounded"
+                            android:layout_marginEnd="8dp"/>
+
+                        <EditText
+                            android:id="@+id/etNombreSeccion"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:hint="Nombre (Ej. Zona VR, PlayStation 5)"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#787C99"
+                            android:background="@drawable/bg_spinner_rounded"
+                            android:paddingHorizontal="12dp"
+                            android:textSize="13sp"/>
+                    </LinearLayout>
+
+                    <!-- PREFIJO Y PRECIO BASE -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginBottom="8dp">
+
+                        <EditText
+                            android:id="@+id/etPrefijoSalaSeccion"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:hint="Prefijo (Ej. VR, PS5)"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#787C99"
+                            android:background="@drawable/bg_spinner_rounded"
+                            android:paddingHorizontal="12dp"
+                            android:textSize="13sp"
+                            android:layout_marginEnd="8dp"/>
+
+                        <EditText
+                            android:id="@+id/etPrecioBaseSeccion"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:hint="Precio Base Bs. (Ej. 20)"
+                            android:textColor="#DEFF9A"
+                            android:textColorHint="#787C99"
+                            android:inputType="numberDecimal"
+                            android:background="@drawable/bg_spinner_rounded"
+                            android:paddingHorizontal="12dp"
+                            android:textSize="13sp"/>
+                    </LinearLayout>
+
+                    <!-- TIPO DE COBRO -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Modalidad de cobro:"
+                        android:textColor="#A0A0A0"
+                        android:textSize="12sp"
+                        android:layout_marginBottom="4dp"/>
+
+                    <Spinner
+                        android:id="@+id/spTipoCobroSeccion"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/bg_spinner_rounded"
+                        android:layout_marginBottom="10dp"/>
+
+                    <!-- CHECKBOX PELICULAS -->
+                    <CheckBox
+                        android:id="@+id/cbPermitePeliculaSeccion"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🎬 Incluye catálogo / selección de película"
+                        android:textColor="#FFFFFF"
+                        android:buttonTint="#DEFF9A"
+                        android:textSize="13sp"
+                        android:layout_marginBottom="14dp"/>
+
+                    <!-- BOTON GUARDAR -->
+                    <Button
+                        android:id="@+id/btnGuardarNuevaSeccion"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:text="💾 Crear y Publicar Sección"
+                        android:backgroundTint="#DEFF9A"
+                        android:textColor="#000000"
+                        android:textStyle="bold"
+                        android:textSize="13sp"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- SECCIONES ACTIVAS -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📋 Secciones Activas:"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"/>
+
+            <LinearLayout
+                android:id="@+id/llContenedorListaSecciones"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"/>
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+</ScrollView>

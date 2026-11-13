@@ -29,7 +29,9 @@ data class Sala(
     var montoEfectivo: Double = 0.0,
     var montoQR: Double = 0.0,
     var comprobanteUri: String? = null,
-    var pedidos: MutableList<Pedido> = mutableListOf()
+    var pedidos: MutableList<Pedido> = mutableListOf(),
+    var seccionId: String = "",
+    var seccionNombre: String = ""
 ) {
     fun calcularTotalPedidos(): Double = pedidos.sumOf { it.subtotal() }
     fun calcularTotalGeneral(): Double = precioCobrado + calcularTotalPedidos()
@@ -88,6 +90,14 @@ data class Sala(
     }
 
     fun getPrecioBaseSugerido(): Double {
+        if (seccionNombre.isNotBlank()) {
+            return when (seccionNombre.lowercase()) {
+                "minicine", "cine", "salas" -> BasePriceConfig.precioMinicine
+                "autitos", "volantes" -> BasePriceConfig.precioVolantes
+                "just dance" -> BasePriceConfig.precioJustDance
+                else -> BasePriceConfig.preciosDinamicos[seccionId] ?: BasePriceConfig.preciosDinamicos[seccionNombre] ?: 15.0
+            }
+        }
         return when {
             nombre.contains("Dance", ignoreCase = true) || id >= 200 -> BasePriceConfig.precioJustDance
             nombre.contains("Car", ignoreCase = true) || nombre.contains("Auto", ignoreCase = true) || nombre.contains("Volante", ignoreCase = true) || id in 101..199 -> BasePriceConfig.precioVolantes
@@ -96,6 +106,9 @@ data class Sala(
     }
 
     fun esMinicine(): Boolean {
+        if (seccionNombre.isNotBlank()) {
+            return seccionNombre.equals("Minicine", ignoreCase = true) || seccionNombre.equals("Cine", ignoreCase = true)
+        }
         return !nombre.contains("Dance", ignoreCase = true) &&
                 !nombre.contains("Car", ignoreCase = true) &&
                 !nombre.contains("Auto", ignoreCase = true) &&
@@ -189,6 +202,7 @@ object BasePriceConfig {
     var precioMinicine: Double = 40.0
     var precioVolantes: Double = 15.0
     var precioJustDance: Double = 15.0
+    val preciosDinamicos = mutableMapOf<String, Double>()
 
     fun updateFromSnapshot(snapshot: com.google.firebase.database.DataSnapshot) {
         val pM = snapshot.child("precio_minicine").getValue(Double::class.java)

@@ -116,91 +116,72 @@ class EgresosManager(
         usuarioRol: String,
         onEgresoRegistrado: () -> Unit = {}
     ) {
-        val layout = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(32, 24, 32, 24)
-            setBackgroundColor(Color.parseColor("#1A1C29"))
-        }
-
-        val tvTitulo = TextView(context).apply {
-            text = "💸 Registrar Salida de Caja / Egreso"
-            setTextColor(Color.WHITE)
-            textSize = 17f
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 16)
-        }
-        layout.addView(tvTitulo)
-
-        val tvCat = TextView(context).apply {
-            text = "Categoría del Gasto:"
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 12f
-        }
-        layout.addView(tvCat)
-
-        val spinnerCat = Spinner(context).apply {
-            val categorias = if (esAdmin) {
-                listOf("Gastos Operativos / Insumos", "Nómina / Salarios")
-            } else {
-                listOf("Gastos Operativos / Insumos")
-            }
-            adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, categorias)
-        }
-        layout.addView(spinnerCat)
-
-        val etMonto = EditText(context).apply {
-            hint = "Monto (Bs)"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.parseColor("#888888"))
-        }
-        layout.addView(etMonto)
-
-        val etDesc = EditText(context).apply {
-            hint = "Descripción (Ej: Ambientadores, servilletas, insumos)"
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.parseColor("#888888"))
-        }
-        layout.addView(etDesc)
-
-        val rgMetodo = RadioGroup(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 8, 0, 8)
-        }
-        val rbEfec = RadioButton(context).apply {
-            text = "💵 Efectivo (Caja)"
-            setTextColor(Color.WHITE)
-            isChecked = true
-        }
-        val rbQR = RadioButton(context).apply {
-            text = "📱 QR"
-            setTextColor(Color.WHITE)
-        }
-        rgMetodo.addView(rbEfec)
-        rgMetodo.addView(rbQR)
-        layout.addView(rgMetodo)
-
+        val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_nuevo_egreso, null)
         val dialog = AlertDialog.Builder(context)
-            .setView(layout)
-            .setPositiveButton("Guardar Egreso", null)
-            .setNegativeButton("Cancelar", null)
+            .setView(dialogView)
             .create()
-
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        dialog.show()
 
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+        val btnCerrar = dialogView.findViewById<TextView>(R.id.btnCerrarNuevoEgreso)
+        val etMonto = dialogView.findViewById<EditText>(R.id.etMontoEgreso)
+        val spCategoria = dialogView.findViewById<Spinner>(R.id.spCategoriaEgreso)
+        val etDescripcion = dialogView.findViewById<EditText>(R.id.etDescripcionEgreso)
+        val rbEfectivo = dialogView.findViewById<RadioButton>(R.id.rbEgresoEfectivo)
+        val btnConfirmar = dialogView.findViewById<Button>(R.id.btnConfirmarEgreso)
+
+        val btnP10 = dialogView.findViewById<Button>(R.id.btnPresetEgreso10)
+        val btnP20 = dialogView.findViewById<Button>(R.id.btnPresetEgreso20)
+        val btnP50 = dialogView.findViewById<Button>(R.id.btnPresetEgreso50)
+        val btnP100 = dialogView.findViewById<Button>(R.id.btnPresetEgreso100)
+
+        fun setMontoPreset(valor: Double) {
+            val actual = etMonto.text.toString().toDoubleOrNull() ?: 0.0
+            val nuevo = if (actual == 0.0) valor else actual + valor
+            etMonto.setText(if (nuevo % 1.0 == 0.0) nuevo.toInt().toString() else nuevo.toString())
+            etMonto.setSelection(etMonto.text.length)
+        }
+
+        btnP10?.setOnClickListener { setMontoPreset(10.0) }
+        btnP20?.setOnClickListener { setMontoPreset(20.0) }
+        btnP50?.setOnClickListener { setMontoPreset(50.0) }
+        btnP100?.setOnClickListener { setMontoPreset(100.0) }
+
+        val categorias = if (esAdmin) {
+            listOf("Gastos Operativos / Insumos", "Nómina / Salarios / Adelantos", "Mantenimiento / Reparación", "Compras / Reposición")
+        } else {
+            listOf("Gastos Operativos / Insumos", "Mantenimiento / Reparación")
+        }
+        val adapterCat = object : ArrayAdapter<String>(context, android.R.layout.simple_spinner_dropdown_item, categorias) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val tv = super.getView(position, convertView, parent) as TextView
+                tv.setTextColor(Color.WHITE)
+                tv.textSize = 13f
+                return tv
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val tv = super.getDropDownView(position, convertView, parent) as TextView
+                tv.setBackgroundColor(Color.parseColor("#24283B"))
+                tv.setTextColor(Color.WHITE)
+                tv.setPadding(24, 20, 24, 20)
+                return tv
+            }
+        }
+        spCategoria.adapter = adapterCat
+
+        btnCerrar?.setOnClickListener { dialog.dismiss() }
+
+        btnConfirmar.setOnClickListener {
             val monto = etMonto.text.toString().trim().toDoubleOrNull()
-            val desc = etDesc.text.toString().trim()
-            val cat = spinnerCat.selectedItem?.toString() ?: "Gastos Operativos / Insumos"
-            val metodo = if (rbEfec.isChecked) "Efectivo" else "QR"
+            val desc = etDescripcion.text.toString().trim()
+            val cat = spCategoria.selectedItem?.toString() ?: "Gastos Operativos / Insumos"
+            val metodo = if (rbEfectivo.isChecked) "Efectivo" else "QR"
 
             if (monto == null || monto <= 0) {
-                Toast.makeText(context, "Ingresa un monto válido.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Ingresa un monto válido para el egreso.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             if (desc.isEmpty()) {
-                Toast.makeText(context, "Ingresa el detalle o motivo del egreso.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Ingresa el motivo o detalle del gasto.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
@@ -214,6 +195,8 @@ class EgresosManager(
                 }
             }
         }
+
+        dialog.show()
     }
 
     fun mostrarDialogoHistorialEgresos(esAdmin: Boolean) {
@@ -227,8 +210,8 @@ class EgresosManager(
         val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llDialogAuditContenedor)
         val tvEstado = dialogView.findViewById<TextView>(R.id.tvDialogAuditEstado)
 
-        tvTitulo.text = "💸 Control de Egresos & Gastos"
-        tvSub.text = "Registro contable y trazabilidad de salidas de caja: insumos, compras operativas y nómina."
+        tvTitulo.text = "💸 Salidas de Caja & Egresos"
+        tvSub.text = "Historial contable y trazabilidad de gastos operativos, insumos y nómina."
         tvResumen.visibility = View.VISIBLE
 
         val dialog = AlertDialog.Builder(context)
@@ -247,7 +230,7 @@ class EgresosManager(
             val total = lista.sumOf { it.monto }
             val totalEfec = lista.filter { it.metodoPago.equals("Efectivo", true) }.sumOf { it.monto }
             val totalQR = lista.filter { it.metodoPago.equals("QR", true) }.sumOf { it.monto }
-            tvResumen.text = "💰 Total: -$total Bs (💵 Efectivo: -$totalEfec Bs | 📱 QR: -$totalQR Bs)"
+            tvResumen.text = "💰 Total Egresos: -$total Bs (💵 Efectivo: -$totalEfec Bs | 📱 QR: -$totalQR Bs)"
 
             if (lista.isEmpty()) {
                 val tvVacio = TextView(context).apply {
@@ -262,32 +245,30 @@ class EgresosManager(
             }
 
             for (eg in lista) {
-                val itemView = LayoutInflater.from(context).inflate(R.layout.item_auditoria, llContenedor, false)
+                val itemView = LayoutInflater.from(context).inflate(R.layout.item_egreso_card, llContenedor, false)
 
-                val tvFecha = itemView.findViewById<TextView>(R.id.tvAuditFechaHora)
-                val tvBadge = itemView.findViewById<TextView>(R.id.tvAuditBadgeAccion)
-                val tvTituloItem = itemView.findViewById<TextView>(R.id.tvAuditTitulo)
-                val tvResp = itemView.findViewById<TextView>(R.id.tvAuditResponsable)
-                val tvDisp = itemView.findViewById<TextView>(R.id.tvAuditDispositivo)
-                val tvDet = itemView.findViewById<TextView>(R.id.tvAuditDetalles)
-                val tvHighlight = itemView.findViewById<TextView>(R.id.tvAuditHighlight)
+                val tvFecha = itemView.findViewById<TextView>(R.id.tvEgresoFechaHora)
+                val tvBadge = itemView.findViewById<TextView>(R.id.tvEgresoBadgeMetodo)
+                val tvCat = itemView.findViewById<TextView>(R.id.tvEgresoCategoria)
+                val tvDesc = itemView.findViewById<TextView>(R.id.tvEgresoDescripcion)
+                val tvResp = itemView.findViewById<TextView>(R.id.tvEgresoResponsable)
+                val tvMonto = itemView.findViewById<TextView>(R.id.tvEgresoMonto)
 
                 tvFecha.text = eg.fechaHora
 
-                val metodoIcon = if (eg.metodoPago.equals("QR", true)) "📱" else "💵"
-                tvBadge.text = "$metodoIcon ${eg.metodoPago}"
-                tvBadge.setTextColor(Color.WHITE)
+                val isQR = eg.metodoPago.equals("QR", true)
+                tvBadge.text = if (isQR) "📱 QR" else "💵 Efectivo"
+                tvBadge.setTextColor(if (isQR) Color.parseColor("#00E5FF") else Color.parseColor("#DEFF9A"))
+                tvBadge.setBackgroundColor(if (isQR) Color.parseColor("#0D3349") else Color.parseColor("#1B3E2B"))
 
-                tvTituloItem.text = "💸 [${eg.categoria}]"
+                tvCat.text = "💸 ${eg.categoria}"
+                tvDesc.text = eg.descripcion
 
-                tvResp.text = "👤 Registrado por: ${eg.usuarioNombre} (${eg.usuarioRol})"
                 val dispStr = if (eg.dispositivoModelo.isNotBlank()) eg.dispositivoModelo else "Terminal POS / Móvil"
-                tvDisp.text = "📱 Dispositivo: $dispStr"
+                tvResp.text = "👤 ${eg.usuarioNombre} (${eg.usuarioRol}) • 📱 $dispStr"
 
-                tvDet.text = "📝 ${eg.descripcion}"
-
-                tvHighlight.text = "Egreso: -${eg.monto} Bs"
-                tvHighlight.setTextColor(Color.parseColor("#FF5252"))
+                val montoFormat = if (eg.monto % 1.0 == 0.0) eg.monto.toInt().toString() else eg.monto.toString()
+                tvMonto.text = "-$montoFormat Bs"
 
                 llContenedor.addView(itemView)
             }

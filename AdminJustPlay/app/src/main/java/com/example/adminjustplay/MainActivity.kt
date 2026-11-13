@@ -28,6 +28,7 @@ import android.os.Vibrator
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ArrayAdapter
@@ -92,6 +93,7 @@ class MainActivity : AppCompatActivity() {
     private var salasMinicine: List<Sala> = emptyList()
     private var salasAutitos: List<Sala> = emptyList()
     private var salasJustDance: List<Sala> = emptyList()
+    private val listaSecciones = mutableListOf<SeccionSala>()
 
     // REGISTRO Y AUDITORIA
     private val historialCompleto = mutableListOf<RegistroEntry>()
@@ -124,10 +126,15 @@ class MainActivity : AppCompatActivity() {
     // CACHE DE PRODUCTOS PARA CONTROL DE STOCK / EVITAR VENTA FANTASMA
     private val catalogoProductosCache = mutableMapOf<String, Pair<Double, Int>>() // barcode -> (precio, stock)
     private val nombreAProductoCache = mutableMapOf<String, Pair<String, Int>>() // lowercaseName -> (barcode, stock)
+    private val listaProductosCatalogo = mutableListOf<ProductoItem>()
 
-    // USUARIOS EN LINEA
+    // USUARIOS EN LINEA Y TERMINALES POS
     private val listaUsuariosOnline = mutableListOf<UsuarioPresencia>()
     private lateinit var usuariosOnlineAdapter: UsuariosOnlineAdapter
+    private val listaTerminalesPos = mutableListOf<TerminalPos>()
+    private lateinit var terminalesPosAdapter: TerminalesPosAdapter
+    private var btnTabTerminalesPosRef: Button? = null
+    private var btnTabUsuariosMovilesRef: Button? = null
 
     // ESTADO FILTROS REGISTRO
     private var fechaFiltroSeleccionada: String = ""
@@ -378,6 +385,7 @@ class MainActivity : AppCompatActivity() {
         navigationView.menu.add(0, 14, 13, "🛡️ Historial Global de Salas").setIcon(android.R.drawable.ic_menu_info_details)
         navigationView.menu.add(0, 15, 14, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
         navigationView.menu.add(0, 16, 15, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
+        navigationView.menu.add(0, 17, 16, "📁 Gestión de Secciones").setIcon(android.R.drawable.ic_menu_manage)
 
         navigationView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
@@ -392,10 +400,12 @@ class MainActivity : AppCompatActivity() {
                 14 -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
                 15 -> posManager.mostrarDialogoPreciosBase()
                 16 -> mostrarDialogoTablaTarifasMinicine()
+                17 -> mostrarDialogoGestionarSecciones()
                 else -> {
                     val title = item.title.toString()
                     when {
                         title.contains("Gestionar Salas") -> mostrarDialogoAdministrarSalas()
+                        title.contains("Gestión de Secciones") || title.contains("Secciones") -> mostrarDialogoGestionarSecciones()
                         title.contains("Actualizaciones") -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
                         title.contains("Terminales POS") -> posManager.mostrarDialogoGestionPOS()
                         title.contains("Auditoría Minicine") -> roomAuditManager.mostrarDialogoHistorialAuditoriaPorArea("CINE", "🍿 Auditoría Minicine")
@@ -487,6 +497,57 @@ class MainActivity : AppCompatActivity() {
         val rvVetados = findViewById<RecyclerView>(R.id.rvVetados)
         rvVetados.layoutManager = LinearLayoutManager(this)
         rvVetados.adapter = vetadosAdapter
+
+        // CONFIGURAR TABS Y VISTAS DE USUARIOS EN LINEA / TERMINALES POS
+        val btnTabTerminalesPos = findViewById<Button>(R.id.btnTabTerminalesPos)
+        val btnTabUsuariosMoviles = findViewById<Button>(R.id.btnTabUsuariosMoviles)
+        val layoutContenedorTerminalesPos = findViewById<LinearLayout>(R.id.layoutContenedorTerminalesPos)
+        val layoutContenedorUsuariosMoviles = findViewById<LinearLayout>(R.id.layoutContenedorUsuariosMoviles)
+        val rvTerminalesPos = findViewById<RecyclerView>(R.id.rvTerminalesPos)
+        btnTabTerminalesPosRef = btnTabTerminalesPos
+        btnTabUsuariosMovilesRef = btnTabUsuariosMoviles
+
+        terminalesPosAdapter = TerminalesPosAdapter(
+            listaTerminalesPos,
+            onRenombrar = { terminal ->
+                mostrarDialogoRenombrarTerminal(terminal)
+            },
+            onToggleAutorizar = { terminal ->
+                val nuevoEstado = !terminal.autorizado
+                val updates = mapOf(
+                    "autorizado" to nuevoEstado,
+                    "sessionToken" to if (!nuevoEstado) "" else terminal.sessionToken
+                )
+                database.child("terminales_pos").child(terminal.deviceId).updateChildren(updates)
+                    .addOnSuccessListener {
+                        val msg = if (nuevoEstado) "✅ Terminal '${terminal.nombre}' autorizada" else "🚫 Terminal '${terminal.nombre}' bloqueada"
+                        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "Error al actualizar estado de terminal", Toast.LENGTH_SHORT).show()
+                    }
+            }
+        )
+        rvTerminalesPos.layoutManager = LinearLayoutManager(this)
+        rvTerminalesPos.adapter = terminalesPosAdapter
+
+        btnTabTerminalesPos.setOnClickListener {
+            layoutContenedorTerminalesPos.visibility = View.VISIBLE
+            layoutContenedorUsuariosMoviles.visibility = View.GONE
+            btnTabTerminalesPos.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#DEFF9A"))
+            btnTabTerminalesPos.setTextColor(Color.parseColor("#000000"))
+            btnTabUsuariosMoviles.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#24283B"))
+            btnTabUsuariosMoviles.setTextColor(Color.parseColor("#FFFFFF"))
+        }
+
+        btnTabUsuariosMoviles.setOnClickListener {
+            layoutContenedorTerminalesPos.visibility = View.GONE
+            layoutContenedorUsuariosMoviles.visibility = View.VISIBLE
+            btnTabUsuariosMoviles.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#DEFF9A"))
+            btnTabUsuariosMoviles.setTextColor(Color.parseColor("#000000"))
+            btnTabTerminalesPos.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#24283B"))
+            btnTabTerminalesPos.setTextColor(Color.parseColor("#FFFFFF"))
+        }
 
         // CONFIGURAR USUARIOS EN LINEA
         val rvUsuariosOnline = findViewById<RecyclerView>(R.id.rvUsuariosOnline)
@@ -609,6 +670,34 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun mostrarDialogoRenombrarTerminal(terminal: TerminalPos) {
+        val etNuevoNombre = EditText(this).apply {
+            setText(terminal.nombre)
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.GRAY)
+            hint = "Ej: Caja Mostrador 1"
+            setPadding(40, 30, 40, 30)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("✏️ Renombrar Terminal POS")
+            .setMessage("Asigna un nombre descriptivo a esta computadora (${terminal.deviceId}):")
+            .setView(etNuevoNombre)
+            .setPositiveButton("Guardar") { _, _ ->
+                val nuevoNombre = etNuevoNombre.text.toString().trim()
+                if (nuevoNombre.isNotBlank()) {
+                    database.child("terminales_pos").child(terminal.deviceId).child("nombre").setValue(nuevoNombre)
+                        .addOnSuccessListener {
+                            Toast.makeText(this, "Nombre actualizado correctamente", Toast.LENGTH_SHORT).show()
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(this, "Error al actualizar nombre", Toast.LENGTH_SHORT).show()
+                        }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun mostrarDialogoGestionarUsuario(usuario: UsuarioPresencia) {
@@ -959,13 +1048,16 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                salasMinicine = tempSalas.filter { it.id < 100 && !it.nombre.contains("Car", ignoreCase = true) && !it.nombre.contains("Dance", ignoreCase = true) }.sortedBy { it.id }
-                salasAutitos = tempSalas.filter { it.id in 101..199 || it.nombre.contains("Car", ignoreCase = true) || it.nombre.contains("Auto", ignoreCase = true) }.sortedBy { it.id }
-                salasJustDance = tempSalas.filter { it.id >= 200 || it.nombre.contains("Dance", ignoreCase = true) }.sortedBy { it.id }
+                salasMinicine = tempSalas.filter { it.esMinicine() }.sortedBy { it.id }
+                salasAutitos = tempSalas.filter { (it.seccionNombre.equals("Autitos", true) || it.seccionNombre.equals("Volantes", true) || (it.seccionNombre.isBlank() && (it.id in 101..199 || it.nombre.contains("Car", true) || it.nombre.contains("Auto", true) || it.nombre.contains("Volante", true)))) && !it.esMinicine() }.sortedBy { it.id }
+                salasJustDance = tempSalas.filter { (it.seccionNombre.equals("Just Dance", true) || (it.seccionNombre.isBlank() && (it.id >= 200 || it.nombre.contains("Dance", true)))) && !it.esMinicine() }.sortedBy { it.id }
+
+                val salasDinamicas = tempSalas.filter { it !in salasMinicine && it !in salasAutitos && it !in salasJustDance }.sortedBy { it.id }
 
                 configurarRecyclerView(findViewById(R.id.rvSalasMinicine), salasMinicine)
                 configurarRecyclerView(findViewById(R.id.rvSalasAutitos), salasAutitos)
                 configurarRecyclerView(findViewById(R.id.rvSalasJustDance), salasJustDance)
+                renderizarSeccionesDinamicas(salasDinamicas)
 
                 actualizarContadorOcupacion()
 
@@ -1067,6 +1159,28 @@ class MainActivity : AppCompatActivity() {
                 tvBadgeUsuariosOnline.setBackgroundColor(
                     if (conectadosContador > 0) Color.parseColor("#1B3E2B") else Color.parseColor("#2A2C39")
                 )
+                btnTabUsuariosMovilesRef?.text = if (conectadosContador > 0) "📱 Personal Móvil ($conectadosContador🟢)" else "📱 Personal Móvil (${listaUsuariosOnline.size})"
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
+        // 5.1 ESCUCHAR TERMINALES POS (ESCRITORIO) EN TIEMPO REAL
+        database.child("terminales_pos").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                listaTerminalesPos.clear()
+                var onlineCount = 0
+                for (snap in snapshot.children) {
+                    val term = snap.getValue(TerminalPos::class.java)
+                    if (term != null) {
+                        listaTerminalesPos.add(term)
+                        if (term.isCurrentlyOnline()) onlineCount++
+                    }
+                }
+                listaTerminalesPos.sortByDescending { it.lastHeartbeat }
+                listaTerminalesPos.sortByDescending { it.isCurrentlyOnline() }
+                terminalesPosAdapter.notifyDataSetChanged()
+
+                btnTabTerminalesPosRef?.text = if (onlineCount > 0) "💻 Terminales POS ($onlineCount🟢)" else "💻 Terminales POS (${listaTerminalesPos.size})"
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1076,6 +1190,23 @@ class MainActivity : AppCompatActivity() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     BasePriceConfig.updateFromSnapshot(snapshot)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
+        // 7. ESCUCHAR SECCIONES DINÁMICAS DE SALAS
+        database.child("secciones_salas").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                listaSecciones.clear()
+                for (snap in snapshot.children) {
+                    val sec = snap.getValue(SeccionSala::class.java)
+                    if (sec != null) {
+                        sec.id = snap.key ?: sec.id
+                        listaSecciones.add(sec)
+                        BasePriceConfig.preciosDinamicos[sec.id] = sec.precioBaseDefault
+                        BasePriceConfig.preciosDinamicos[sec.nombre] = sec.precioBaseDefault
+                    }
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -1238,6 +1369,19 @@ class MainActivity : AppCompatActivity() {
         etPelicula.visibility = View.GONE
         etTiempo.visibility = View.GONE
         etPrecioSala.visibility = View.GONE
+
+        // Limpieza de interfaz: Quitar la opción "Ver tablas de tarifas minicines" de la venta mostrador
+        val btnVerTablaTarifas = dialogView.findViewById<Button>(R.id.btnVerTablaTarifas)
+        btnVerTablaTarifas?.visibility = View.GONE
+
+        val btnSeleccionarProductoCatalogo = dialogView.findViewById<Button>(R.id.btnSeleccionarProductoCatalogo)
+        btnSeleccionarProductoCatalogo?.setOnClickListener {
+            mostrarDialogoSelectorProductos { prod ->
+                etPedNombre.setText(prod.nombre)
+                etPedPrecio.setText(if (prod.precio % 1.0 == 0.0) prod.precio.toInt().toString() else prod.precio.toString())
+                if (etPedCantidad.text.isNullOrBlank()) etPedCantidad.setText("1")
+            }
+        }
 
         val pedidosVenta = mutableListOf<Pedido>()
 
@@ -1823,7 +1967,250 @@ class MainActivity : AppCompatActivity() {
                 }
         }
 
+        // GESTION DINAMICA DE SECCIONES
+        val btnAbrirGestionSecciones = dialogView.findViewById<Button>(R.id.btnAbrirGestionSecciones)
+        val spSeccionParaNuevaSala = dialogView.findViewById<Spinner>(R.id.spSeccionParaNuevaSala)
+        val etNumeroNuevaSalaDinamica = dialogView.findViewById<EditText>(R.id.etNumeroNuevaSalaDinamica)
+        val btnAgregarSalaDinamica = dialogView.findViewById<Button>(R.id.btnAgregarSalaDinamica)
+
+        btnAbrirGestionSecciones?.setOnClickListener {
+            mostrarDialogoGestionarSecciones()
+        }
+
+        val opcionesSecciones = mutableListOf<SeccionSala>()
+        opcionesSecciones.add(SeccionSala(id = "minicine", nombre = "Minicine", icono = "🎬", prefijoSala = "Sala", baseIdRango = 0))
+        opcionesSecciones.add(SeccionSala(id = "autitos", nombre = "Autitos (Simuladores)", icono = "🏎️", prefijoSala = "Car", baseIdRango = 100))
+        opcionesSecciones.add(SeccionSala(id = "just_dance", nombre = "Just Dance", icono = "💃", prefijoSala = "Just Dance", baseIdRango = 200))
+        opcionesSecciones.addAll(listaSecciones)
+
+        val spinnerAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            opcionesSecciones.map { "${it.icono} ${it.nombre} (${it.prefijoSala})" }
+        )
+        spSeccionParaNuevaSala?.adapter = spinnerAdapter
+
+        btnAgregarSalaDinamica?.setOnClickListener {
+            val numStr = etNumeroNuevaSalaDinamica?.text.toString().trim()
+            val num = numStr.toIntOrNull()
+            if (num == null || num <= 0) {
+                Toast.makeText(this, "Ingresa un número de puesto o sala válido", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val pos = spSeccionParaNuevaSala?.selectedItemPosition ?: 0
+            val secSeleccionada = opcionesSecciones.getOrNull(pos) ?: return@setOnClickListener
+
+            val roomId = secSeleccionada.baseIdRango + num
+            val roomName = "${secSeleccionada.prefijoSala} $num"
+
+            val nuevaSala = Sala(
+                id = roomId,
+                nombre = roomName,
+                estado = EstadoSala.DISPONIBLE,
+                seccionId = secSeleccionada.id,
+                seccionNombre = secSeleccionada.nombre
+            )
+            database.child("salas").child(roomId.toString()).setValue(nuevaSala)
+                .addOnSuccessListener {
+                    Toast.makeText(this, "✅ '$roomName' agregada exitosamente a ${secSeleccionada.nombre}", Toast.LENGTH_SHORT).show()
+                    etNumeroNuevaSalaDinamica?.text?.clear()
+                }
+                .addOnFailureListener {
+                    Toast.makeText(this, "Error al guardar sala", Toast.LENGTH_SHORT).show()
+                }
+        }
+
         dialog.show()
+    }
+
+    private fun mostrarDialogoGestionarSecciones() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_gestionar_secciones, null)
+        val dialog = AlertDialog.Builder(this).setView(dialogView).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val btnCerrar = dialogView.findViewById<TextView>(R.id.btnCerrarGestionSecciones)
+        val etIcono = dialogView.findViewById<EditText>(R.id.etIconoSeccion)
+        val etNombre = dialogView.findViewById<EditText>(R.id.etNombreSeccion)
+        val etPrefijo = dialogView.findViewById<EditText>(R.id.etPrefijoSalaSeccion)
+        val etPrecioBase = dialogView.findViewById<EditText>(R.id.etPrecioBaseSeccion)
+        val spTipoCobro = dialogView.findViewById<Spinner>(R.id.spTipoCobroSeccion)
+        val cbPermitePelicula = dialogView.findViewById<CheckBox>(R.id.cbPermitePeliculaSeccion)
+        val btnGuardar = dialogView.findViewById<Button>(R.id.btnGuardarNuevaSeccion)
+        val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llContenedorListaSecciones)
+
+        btnCerrar.setOnClickListener { dialog.dismiss() }
+
+        val tiposCobro = listOf("TIEMPO_LIBRE (Cobro por tiempo jugado)", "POR_HORA (Cobro por bloque de 1 hora)", "POR_TARIFA (Tarifa plana tipo cine)")
+        spTipoCobro.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, tiposCobro)
+
+        fun redibujarListaSecciones() {
+            llContenedor.removeAllViews()
+
+            val baseSections = listOf(
+                Triple("🎬", "Minicine", "Tarifa Plana (Base: ${BasePriceConfig.precioMinicine} Bs)"),
+                Triple("🏎️", "Autitos (Simuladores)", "Tiempo Libre (Base: ${BasePriceConfig.precioVolantes} Bs)"),
+                Triple("💃", "Just Dance", "Por Hora (Base: ${BasePriceConfig.precioJustDance} Bs)")
+            )
+            for ((icon, name, info) in baseSections) {
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(24, 18, 24, 18)
+                    setBackgroundColor(Color.parseColor("#1F2333"))
+                    gravity = Gravity.CENTER_VERTICAL
+                    val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    lp.setMargins(0, 6, 0, 6)
+                    layoutParams = lp
+                }
+                val tvInfo = TextView(this).apply {
+                    text = "$icon $name\n$info"
+                    setTextColor(Color.WHITE)
+                    textSize = 13f
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                val badge = TextView(this).apply {
+                    text = "🌟 Base"
+                    setTextColor(Color.parseColor("#DEFF9A"))
+                    textSize = 11f
+                    setTypeface(null, Typeface.BOLD)
+                }
+                row.addView(tvInfo)
+                row.addView(badge)
+                llContenedor.addView(row)
+            }
+
+            if (listaSecciones.isEmpty()) {
+                val tvEmpty = TextView(this).apply {
+                    text = "No has creado secciones adicionales aún."
+                    setTextColor(Color.parseColor("#787C99"))
+                    textSize = 12f
+                    setPadding(10, 16, 10, 16)
+                }
+                llContenedor.addView(tvEmpty)
+            } else {
+                for (sec in listaSecciones) {
+                    val row = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        setPadding(24, 18, 24, 18)
+                        setBackgroundColor(Color.parseColor("#24283B"))
+                        gravity = Gravity.CENTER_VERTICAL
+                        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                        lp.setMargins(0, 6, 0, 6)
+                        layoutParams = lp
+                    }
+                    val tvInfo = TextView(this).apply {
+                        val peliculaStr = if (sec.permitePelicula) "🎬 Con catálogo" else "⏱️ Sin película"
+                        text = "${sec.icono} ${sec.nombre} (Prefijo: ${sec.prefijoSala})\nBase: ${sec.precioBaseDefault} Bs • ${sec.tipoCobro} • $peliculaStr"
+                        setTextColor(Color.WHITE)
+                        textSize = 12f
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    }
+                    val btnEliminar = TextView(this).apply {
+                        text = "🗑️ Borrar"
+                        setTextColor(Color.parseColor("#FF5252"))
+                        textSize = 11f
+                        setTypeface(null, Typeface.BOLD)
+                        setPadding(16, 8, 16, 8)
+                        setOnClickListener {
+                            AlertDialog.Builder(this@MainActivity)
+                                .setTitle("Eliminar Sección")
+                                .setMessage("¿Estás seguro de que deseas eliminar permanentemente la sección '${sec.nombre}'?")
+                                .setPositiveButton("Sí, eliminar") { _, _ ->
+                                    database.child("secciones_salas").child(sec.id).removeValue()
+                                        .addOnSuccessListener {
+                                            Toast.makeText(this@MainActivity, "Sección '${sec.nombre}' eliminada", Toast.LENGTH_SHORT).show()
+                                            redibujarListaSecciones()
+                                        }
+                                }
+                                .setNegativeButton("Cancelar", null)
+                                .show()
+                        }
+                    }
+                    row.addView(tvInfo)
+                    row.addView(btnEliminar)
+                    llContenedor.addView(row)
+                }
+            }
+        }
+
+        redibujarListaSecciones()
+
+        btnGuardar.setOnClickListener {
+            val nombre = etNombre.text.toString().trim()
+            if (nombre.isBlank()) {
+                Toast.makeText(this, "Ingresa un nombre para la sección", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val icono = etIcono.text.toString().trim().ifBlank { "🎮" }
+            val prefijo = etPrefijo.text.toString().trim().ifBlank { nombre.take(4) }
+            val precio = etPrecioBase.text.toString().toDoubleOrNull() ?: 15.0
+            val tipoCobroStr = when (spTipoCobro.selectedItemPosition) {
+                1 -> "POR_HORA"
+                2 -> "POR_TARIFA"
+                else -> "TIEMPO_LIBRE"
+            }
+            val permitePelicula = cbPermitePelicula.isChecked
+
+            val secId = nombre.lowercase().replace(" ", "_").filter { it.isLetterOrDigit() || it == '_' }
+            val baseId = 300 + (listaSecciones.size * 100)
+
+            val nuevaSeccion = SeccionSala(
+                id = secId,
+                nombre = nombre,
+                icono = icono,
+                orden = listaSecciones.size + 4,
+                precioBaseDefault = precio,
+                tipoCobro = tipoCobroStr,
+                permitePelicula = permitePelicula,
+                prefijoSala = prefijo,
+                baseIdRango = baseId,
+                activa = true
+            )
+
+            database.child("secciones_salas").child(secId).setValue(nuevaSeccion)
+                .addOnSuccessListener {
+                    Toast.makeText(this, "✅ Sección '$nombre' creada y sincronizada con éxito", Toast.LENGTH_SHORT).show()
+                    etNombre.text.clear()
+                    etPrefijo.text.clear()
+                    etPrecioBase.text.clear()
+                    redibujarListaSecciones()
+                }
+                .addOnFailureListener {
+                    Toast.makeText(this, "Error al guardar la sección", Toast.LENGTH_SHORT).show()
+                }
+        }
+
+        dialog.show()
+    }
+
+    private fun renderizarSeccionesDinamicas(salasDinamicas: List<Sala>) {
+        val contenedor = findViewById<LinearLayout>(R.id.llSeccionesSalasDinamicas) ?: return
+        contenedor.removeAllViews()
+
+        if (salasDinamicas.isEmpty()) return
+
+        val agrupadas = salasDinamicas.groupBy { it.seccionNombre.ifBlank { "Otras Salas" } }
+
+        for ((nombreSeccion, salasDeSeccion) in agrupadas) {
+            val secInfo = listaSecciones.find { it.nombre.equals(nombreSeccion, ignoreCase = true) }
+            val icon = secInfo?.icono ?: "🎮"
+
+            val tvHeader = TextView(this).apply {
+                text = "$icon $nombreSeccion"
+                setTextColor(Color.parseColor("#DEFF9A"))
+                textSize = 18f
+                setTypeface(null, Typeface.BOLD)
+                val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.setMargins(0, 32, 0, 16)
+                layoutParams = lp
+            }
+            contenedor.addView(tvHeader)
+
+            val rv = RecyclerView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            }
+            configurarRecyclerView(rv, salasDeSeccion)
+            contenedor.addView(rv)
+        }
     }
 
     private fun mostrarDialogoDetallesSalaSoloLectura(sala: Sala) {
@@ -2330,6 +2717,15 @@ class MainActivity : AppCompatActivity() {
                 val timeFormatted = if (mins % 60 == 0) "${mins / 60}:00" else "${mins / 60}:${(mins % 60).toString().padStart(2, '0')}"
                 etTiempo.setText(timeFormatted)
                 etPrecioSala.setText(if (precio % 1.0 == 0.0) precio.toInt().toString() else precio.toString())
+            }
+        }
+
+        val btnSeleccionarProductoCatalogo = dialogView.findViewById<Button>(R.id.btnSeleccionarProductoCatalogo)
+        btnSeleccionarProductoCatalogo?.setOnClickListener {
+            mostrarDialogoSelectorProductos { prod ->
+                etPedNombre.setText(prod.nombre)
+                etPedPrecio.setText(if (prod.precio % 1.0 == 0.0) prod.precio.toInt().toString() else prod.precio.toString())
+                if (etPedCantidad.text.isNullOrBlank()) etPedCantidad.setText("1")
             }
         }
 
@@ -3131,6 +3527,7 @@ class MainActivity : AppCompatActivity() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 catalogoProductosCache.clear()
                 nombreAProductoCache.clear()
+                listaProductosCatalogo.clear()
                 for (child in snapshot.children) {
                     val barcode = child.key ?: continue
                     val nombre = child.child("nombre").getValue(String::class.java) ?: continue
@@ -3140,10 +3537,124 @@ class MainActivity : AppCompatActivity() {
                         ?: child.child("stock_actual").getValue(Long::class.java)?.toInt() ?: 0
                     catalogoProductosCache[barcode] = Pair(precio, stock)
                     nombreAProductoCache[nombre.trim().lowercase()] = Pair(barcode, stock)
+                    listaProductosCatalogo.add(ProductoItem(barcode, nombre, precio, stock))
                 }
+                listaProductosCatalogo.sortBy { it.nombre.lowercase() }
             }
             override fun onCancelled(error: DatabaseError) {}
         })
+    }
+
+    private fun mostrarDialogoSelectorProductos(onSeleccion: (ProductoItem) -> Unit) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_selector_producto_catalogo, null)
+        val dialog = AlertDialog.Builder(this).setView(dialogView).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val btnCerrar = dialogView.findViewById<TextView>(R.id.btnCerrarSelectorProducto)
+        val etBuscar = dialogView.findViewById<EditText>(R.id.etBuscarProductoSelector)
+        val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llContenedorProductosSelector)
+
+        btnCerrar.setOnClickListener { dialog.dismiss() }
+
+        fun renderizarLista(filtro: String) {
+            llContenedor.removeAllViews()
+            val filtrados = if (filtro.isBlank()) {
+                listaProductosCatalogo
+            } else {
+                listaProductosCatalogo.filter {
+                    it.nombre.contains(filtro, ignoreCase = true) || it.barcode.contains(filtro, ignoreCase = true)
+                }
+            }
+
+            if (filtrados.isEmpty()) {
+                val tvVacio = TextView(this).apply {
+                    text = if (listaProductosCatalogo.isEmpty()) "Cargando catálogo o no hay productos registrados..." else "No hay productos coincidentes."
+                    setTextColor(Color.parseColor("#888888"))
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    setPadding(0, 30, 0, 30)
+                }
+                llContenedor.addView(tvVacio)
+                return
+            }
+
+            for (prod in filtrados) {
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(16, 12, 16, 12)
+                    setBackgroundColor(if (prod.stock <= 0) Color.parseColor("#1F2230") else Color.parseColor("#24283B"))
+                    val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    params.setMargins(0, 0, 0, 8)
+                    layoutParams = params
+                }
+
+                val llInfo = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val tvNom = TextView(this).apply {
+                    text = prod.nombre
+                    setTextColor(if (prod.stock <= 0) Color.parseColor("#888888") else Color.WHITE)
+                    textSize = 14f
+                    setTypeface(null, Typeface.BOLD)
+                }
+
+                val tvPrecio = TextView(this).apply {
+                    text = "${if (prod.precio % 1.0 == 0.0) prod.precio.toInt().toString() else prod.precio.toString()} Bs"
+                    setTextColor(Color.parseColor("#DEFF9A"))
+                    textSize = 13f
+                }
+                llInfo.addView(tvNom)
+                llInfo.addView(tvPrecio)
+
+                val tvStockBadge = TextView(this).apply {
+                    if (prod.stock <= 0) {
+                        text = "🚫 Agotado (0)"
+                        setTextColor(Color.parseColor("#FF5252"))
+                        setBackgroundColor(Color.parseColor("#331A1A"))
+                    } else {
+                        text = "🟢 Stock: ${prod.stock}"
+                        setTextColor(Color.parseColor("#00E676"))
+                        setBackgroundColor(Color.parseColor("#1B3E2B"))
+                    }
+                    textSize = 11f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(12, 6, 12, 6)
+                }
+
+                card.addView(llInfo)
+                card.addView(tvStockBadge)
+
+                if (prod.stock > 0) {
+                    card.isClickable = true
+                    card.isFocusable = true
+                    card.setOnClickListener {
+                        onSeleccion(prod)
+                        dialog.dismiss()
+                    }
+                } else {
+                    card.setOnClickListener {
+                        Toast.makeText(this, "⚠️ '${prod.nombre}' está agotado (stock: 0)", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                llContenedor.addView(card)
+            }
+        }
+
+        renderizarLista("")
+
+        etBuscar.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                renderizarLista(s?.toString()?.trim() ?: "")
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        dialog.show()
     }
 
     private fun mostrarDialogoTablaTarifasMinicine(onSelect: ((Int, Double) -> Unit)? = null) {

@@ -325,6 +325,9 @@ class FirebaseRoomRepository(
                         }
                     }
 
+                    val seccionId = value["seccionId"] as? String ?: ""
+                    val seccionNombre = value["seccionNombre"] as? String ?: ""
+
                     roomsList.add(
                         Room(
                             id = idVal,
@@ -341,7 +344,9 @@ class FirebaseRoomRepository(
                             precioCobrado = precioCobrado,
                             metodoPago = metodoPago,
                             comprobanteUri = comprobanteUri,
-                            pedidos = pedidosList
+                            pedidos = pedidosList,
+                            seccionId = seccionId,
+                            seccionNombre = seccionNombre
                         )
                     )
                 }
@@ -373,7 +378,9 @@ class FirebaseRoomRepository(
                 "precioCobrado" to room.precioCobrado,
                 "metodoPago" to room.metodoPago,
                 "comprobanteUri" to room.comprobanteUri,
-                "pedidos" to room.pedidos
+                "pedidos" to room.pedidos,
+                "seccionId" to room.seccionId,
+                "seccionNombre" to room.seccionNombre
             )
             val jsonBody = gson.toJson(payload).toRequestBody(jsonMediaType)
 

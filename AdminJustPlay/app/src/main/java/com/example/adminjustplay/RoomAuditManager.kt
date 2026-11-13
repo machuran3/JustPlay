@@ -92,22 +92,24 @@ class RoomAuditManager(
     /**
      * Muestra la vista de bitácora de auditoría filtrada por área específica (Cine, Volantes, Just Dance).
      */
+    /**
+     * Muestra la vista de bitácora de auditoría filtrada por área específica (Cine, Volantes, Just Dance).
+     * Rediseñado para mostrar registros inmutables con diseño limpio idéntico a Registros y búsqueda por cliente/celular.
+     */
     fun mostrarDialogoHistorialAuditoriaPorArea(categoriaFiltro: String?, tituloArea: String) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_historial_auditoria, null)
         val tvTitulo = dialogView.findViewById<TextView>(R.id.tvDialogAuditTitulo)
         val tvContador = dialogView.findViewById<TextView>(R.id.tvDialogAuditContador)
         val tvSub = dialogView.findViewById<TextView>(R.id.tvDialogAuditSubtitulo)
+        val tvResumen = dialogView.findViewById<TextView>(R.id.tvDialogAuditResumen)
         val btnCerrar = dialogView.findViewById<TextView>(R.id.btnDialogAuditCerrar)
         val etBuscar = dialogView.findViewById<EditText>(R.id.etDialogAuditBuscar)
         val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llDialogAuditContenedor)
         val tvEstado = dialogView.findViewById<TextView>(R.id.tvDialogAuditEstado)
 
         tvTitulo.text = tituloArea
-        tvSub.text = if (categoriaFiltro != null) {
-            "Historial forense exclusivo del área $categoriaFiltro: quién, cuándo y desde qué dispositivo se operó."
-        } else {
-            "Registro forense global de quién y desde qué celular/dispositivo se operaron las salas."
-        }
+        tvSub.text = "Auditoría forense e inmutable: clientes, celulares, importes cobrados y registros activos/borrados."
+        tvResumen.visibility = View.VISIBLE
 
         val dialog = AlertDialog.Builder(context)
             .setView(dialogView)
@@ -116,70 +118,129 @@ class RoomAuditManager(
 
         btnCerrar.setOnClickListener { dialog.dismiss() }
 
-        val todosLosItems = mutableListOf<RoomAuditEvent>()
+        val todosLosRegistros = mutableListOf<RegistroEntry>()
 
-        fun renderizarEventos(lista: List<RoomAuditEvent>) {
+        fun renderizarRegistros(lista: List<RegistroEntry>) {
             llContenedor.removeAllViews()
-            tvContador.text = "${lista.size} eventos"
+            tvContador.text = "${lista.size} registros"
+
+            val totalActivos = lista.filter { !it.eliminado }.sumOf { it.totalCobrado }
+            val countBorrados = lista.count { it.eliminado }
+            val totalActivosFmt = if (totalActivos % 1.0 == 0.0) totalActivos.toInt().toString() else totalActivos.toString()
+            tvResumen.text = "📊 ${lista.size} registros (Borrados: $countBorrados) • Total activo: $totalActivosFmt Bs"
 
             if (lista.isEmpty()) {
                 val tvVacio = TextView(context).apply {
-                    text = "No se encontraron eventos para el criterio de búsqueda."
+                    text = "No se encontraron registros de auditoría para el criterio de búsqueda."
                     setTextColor(Color.parseColor("#888888"))
                     textSize = 13f
                     gravity = Gravity.CENTER
-                    setPadding(0, 24, 0, 24)
+                    setPadding(0, 30, 0, 30)
                 }
                 llContenedor.addView(tvVacio)
                 return
             }
 
-            for (ev in lista) {
-                val itemView = LayoutInflater.from(context).inflate(R.layout.item_auditoria, llContenedor, false)
+            for (reg in lista) {
+                val itemView = LayoutInflater.from(context).inflate(R.layout.item_registro_admin, llContenedor, false)
 
-                val tvFecha = itemView.findViewById<TextView>(R.id.tvAuditFechaHora)
-                val tvBadge = itemView.findViewById<TextView>(R.id.tvAuditBadgeAccion)
-                val tvTituloItem = itemView.findViewById<TextView>(R.id.tvAuditTitulo)
-                val tvResp = itemView.findViewById<TextView>(R.id.tvAuditResponsable)
-                val tvDisp = itemView.findViewById<TextView>(R.id.tvAuditDispositivo)
-                val tvDet = itemView.findViewById<TextView>(R.id.tvAuditDetalles)
-                val tvHighlight = itemView.findViewById<TextView>(R.id.tvAuditHighlight)
+                val cardView = itemView.findViewById<androidx.cardview.widget.CardView>(R.id.cardRegistroAdmin)
+                val tvRegFechaHora = itemView.findViewById<TextView>(R.id.tvRegFechaHora)
+                val tvRegMetodoPago = itemView.findViewById<TextView>(R.id.tvRegMetodoPago)
+                val tvRegTitulo = itemView.findViewById<TextView>(R.id.tvRegTitulo)
+                val tvRegCliente = itemView.findViewById<TextView>(R.id.tvRegCliente)
+                val tvRegDetalles = itemView.findViewById<TextView>(R.id.tvRegDetalles)
+                val tvRegVolantes = itemView.findViewById<TextView>(R.id.tvRegVolantes)
+                val tvRegPedidos = itemView.findViewById<TextView>(R.id.tvRegPedidos)
+                val tvRegTotal = itemView.findViewById<TextView>(R.id.tvRegTotal)
+                val btnVerComprobante = itemView.findViewById<TextView>(R.id.btnVerComprobanteRegistro)
+                val btnEliminarRegistro = itemView.findViewById<TextView>(R.id.btnEliminarRegistro)
+                val llBannerEliminado = itemView.findViewById<LinearLayout>(R.id.llBannerEliminado)
+                val tvInfoEliminacion = itemView.findViewById<TextView>(R.id.tvInfoEliminacion)
+                val btnRestaurarRegistro = itemView.findViewById<Button>(R.id.btnRestaurarRegistro)
 
-                tvFecha.text = ev.fechaHora
+                btnEliminarRegistro.visibility = View.GONE
 
-                // Badge de acción con colores semánticos
-                val (badgeColor, badgeIcon) = when (ev.tipoAccion.uppercase()) {
-                    "INICIO_TIEMPO", "INICIAR" -> Pair("#00E676", "▶")
-                    "ELIMINACION", "ELIMINAR", "LIBERAR", "FINALIZAR" -> Pair("#FF5252", "🛑")
-                    "PAUSAR", "PAUSA" -> Pair("#FFD700", "⏸️")
-                    "AGREGAR_TIEMPO" -> Pair("#00E5FF", "⏱️")
-                    "MODIFICACION", "EDICION" -> Pair("#FFB300", "✏️")
-                    else -> Pair("#DEFF9A", "📌")
+                tvRegFechaHora.text = reg.fechaHora
+
+                val textoCliente = if (!reg.celular.isNullOrEmpty() && reg.celular != "S/N") {
+                    "👤 Cliente: ${reg.cliente} (📱 Cel: ${reg.celular})"
+                } else {
+                    "👤 Cliente: ${reg.cliente}"
                 }
-                tvBadge.text = "$badgeIcon ${ev.tipoAccion}"
-                tvBadge.setTextColor(Color.parseColor(badgeColor))
+                tvRegCliente.text = textoCliente
 
-                // Icono según categoría
-                val iconoCat = when {
-                    ev.categoria.contains("Cine", ignoreCase = true) || ev.categoria.contains("Minicine", ignoreCase = true) -> "🎬"
-                    ev.categoria.contains("Auto", ignoreCase = true) || ev.categoria.contains("Volante", ignoreCase = true) -> "🏎️"
-                    ev.categoria.contains("Dance", ignoreCase = true) -> "💃"
-                    else -> "🛋️"
+                val icono = when {
+                    reg.nombreElemento.contains("Dance", ignoreCase = true) -> "💃"
+                    reg.nombreElemento.contains("Car", ignoreCase = true) || reg.nombreElemento.contains("Auto", ignoreCase = true) || reg.nombreElemento.contains("Volante", ignoreCase = true) -> "🏎️"
+                    reg.nombreElemento.contains("Egreso", ignoreCase = true) -> "💸"
+                    reg.nombreElemento.contains("Mostrador", ignoreCase = true) || reg.tipo.contains("Directa", ignoreCase = true) -> "🛒"
+                    else -> "🎬"
                 }
-                val catNombre = if (ev.categoria.isNotBlank()) "(${ev.categoria})" else ""
-                tvTituloItem.text = "$iconoCat ${ev.salaNombre} $catNombre"
+                tvRegTitulo.text = "$icono ${reg.nombreElemento}"
 
-                tvResp.text = "👤 Responsable: ${ev.usuarioNombre} (${ev.usuarioRol})"
-                val dispId = if (ev.dispositivoId.isNotBlank()) " | ID: ${ev.dispositivoId}" else ""
-                tvDisp.text = "📱 Dispositivo: ${ev.dispositivoModelo}$dispId"
+                val peliculaText = if (!reg.peliculaJuego.isNullOrBlank()) "Película/Juego: ${reg.peliculaJuego}" else ""
+                val tiempoText = if (!reg.tiempoConfigurado.isNullOrBlank()) "Tiempo: ${reg.tiempoConfigurado}" else ""
+                val infoExtra = listOf(peliculaText, tiempoText).filter { it.isNotBlank() }.joinToString(" | ")
+                tvRegDetalles.text = if (infoExtra.isNotBlank()) infoExtra else "Sin información adicional de tiempo"
 
-                val tiempoStr = if (ev.tiempoMinutos > 0) "⏱️ Tiempo: ${ev.tiempoMinutos} min" else "⏱️ Tiempo: Libre"
-                val extraDet = if (ev.detalles.isNotBlank()) " | ${ev.detalles}" else ""
-                tvDet.text = "$tiempoStr$extraDet"
+                tvRegPedidos.text = "Pedidos: ${if (reg.pedidos.isBlank()) "Ninguno" else reg.pedidos}"
 
-                // Resaltado de acción
-                tvHighlight.text = "⚡ Acción registrada con trazabilidad de seguridad"
-                tvHighlight.setTextColor(Color.parseColor(badgeColor))
+                val montoFormat = if (reg.totalCobrado % 1.0 == 0.0) reg.totalCobrado.toInt().toString() else reg.totalCobrado.toString()
+                tvRegTotal.text = "Total: $montoFormat Bs"
+                tvRegTotal.setTextColor(if (reg.eliminado) Color.parseColor("#FF5252") else Color.parseColor("#00E676"))
+
+                val metodo = when {
+                    reg.metodoPago.startsWith("Mixto", ignoreCase = true) -> "💵📱 ${reg.metodoPago}"
+                    reg.metodoPago.equals("QR", ignoreCase = true) -> "📱 QR"
+                    else -> "💵 Efectivo"
+                }
+                tvRegMetodoPago.text = metodo
+
+                if (reg.cantidadVolantes != null && reg.cantidadVolantes!! > 0) {
+                    tvRegVolantes.visibility = View.VISIBLE
+                    tvRegVolantes.text = "🏎️ Volantes: ${reg.cantidadVolantes}"
+                } else {
+                    tvRegVolantes.visibility = View.GONE
+                }
+
+                if (!reg.comprobanteUri.isNullOrEmpty()) {
+                    btnVerComprobante.visibility = View.VISIBLE
+                    btnVerComprobante.setOnClickListener {
+                        ImageUtils.mostrarDialogoVerComprobante(context, reg.comprobanteUri!!, "Comprobante: ${reg.nombreElemento} (${reg.cliente})")
+                    }
+                } else {
+                    btnVerComprobante.visibility = View.GONE
+                }
+
+                if (reg.eliminado) {
+                    cardView.setCardBackgroundColor(Color.parseColor("#261418"))
+                    llBannerEliminado.visibility = View.VISIBLE
+                    val elimPor = reg.eliminadoPor ?: "Personal"
+                    val fechaElim = reg.fechaEliminacion ?: "Fecha desconocida"
+                    val motivo = reg.motivoEliminacion ?: "Sin motivo registrado"
+                    tvInfoEliminacion.text = "⚠️ REGISTRO BORRADO\nPor: $elimPor | Fecha: $fechaElim ($motivo)"
+                    btnRestaurarRegistro.visibility = View.VISIBLE
+                    btnRestaurarRegistro.setOnClickListener {
+                        AlertDialog.Builder(context)
+                            .setTitle("Restaurar Registro")
+                            .setMessage("¿Deseas restaurar este registro a la base de datos?")
+                            .setPositiveButton("Sí, restaurar") { _, _ ->
+                                reg.eliminado = false
+                                reg.eliminadoPor = null
+                                reg.fechaEliminacion = null
+                                reg.motivoEliminacion = null
+                                database.child("auditoria_registros").child(reg.idFirebase).setValue(reg)
+                                database.child("registros").child(reg.idFirebase).setValue(reg)
+                                Toast.makeText(context, "Registro restaurado", Toast.LENGTH_SHORT).show()
+                            }
+                            .setNegativeButton("Cancelar", null)
+                            .show()
+                    }
+                } else {
+                    cardView.setCardBackgroundColor(Color.parseColor("#1A1C29"))
+                    llBannerEliminado.visibility = View.GONE
+                }
 
                 llContenedor.addView(itemView)
             }
@@ -190,17 +251,17 @@ class RoomAuditManager(
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val q = s?.toString()?.trim()?.lowercase() ?: ""
                 if (q.isEmpty()) {
-                    renderizarEventos(todosLosItems)
+                    renderizarRegistros(todosLosRegistros)
                 } else {
-                    val filtrados = todosLosItems.filter {
-                        it.salaNombre.lowercase().contains(q) ||
-                                it.usuarioNombre.lowercase().contains(q) ||
-                                it.tipoAccion.lowercase().contains(q) ||
-                                it.dispositivoModelo.lowercase().contains(q) ||
+                    val filtrados = todosLosRegistros.filter {
+                        it.cliente.lowercase().contains(q) ||
+                                (it.celular ?: "").lowercase().contains(q) ||
+                                it.nombreElemento.lowercase().contains(q) ||
+                                (it.peliculaJuego ?: "").lowercase().contains(q) ||
                                 it.fechaHora.lowercase().contains(q) ||
-                                it.detalles.lowercase().contains(q)
+                                (it.creadoPor ?: "").lowercase().contains(q)
                     }
-                    renderizarEventos(filtrados)
+                    renderizarRegistros(filtrados)
                 }
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
@@ -208,72 +269,56 @@ class RoomAuditManager(
 
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                todosLosItems.clear()
+                todosLosRegistros.clear()
                 if (!snapshot.exists() || !snapshot.hasChildren()) {
-                    tvEstado.text = "No hay registros de auditoría disponibles para esta sección."
-                    tvContador.text = "0 eventos"
+                    tvEstado.text = "No hay registros de auditoría disponibles."
+                    tvContador.text = "0 registros"
                     return
                 }
 
                 for (snap in snapshot.children) {
-                    val cat = snap.child("categoria").getValue(String::class.java) ?: ""
-                    val sId = snap.child("sala_id").getValue(String::class.java) ?: ""
-                    val sIdInt = sId.toIntOrNull() ?: 0
+                    val reg = snap.getValue(RegistroEntry::class.java) ?: continue
+                    reg.idFirebase = snap.key ?: ""
 
                     if (categoriaFiltro != null) {
-                        val coincide = when (categoriaFiltro) {
-                            "Minicine", "CINE" -> cat.equals("Minicine", ignoreCase = true) || (sIdInt in 1..99)
-                            "Autitos", "AUTITOS" -> cat.equals("Autitos", ignoreCase = true) || (sIdInt in 100..199)
-                            "Just Dance", "JUST_DANCE" -> cat.equals("Just Dance", ignoreCase = true) || (sIdInt >= 200)
-                            else -> cat.contains(categoriaFiltro, ignoreCase = true)
+                        val coincide = when (categoriaFiltro.uppercase()) {
+                            "CINE", "MINICINE" -> reg.nombreElemento.contains("Sala", true) || reg.tipo.contains("Cine", true)
+                            "AUTITOS", "VOLANTES" -> reg.nombreElemento.contains("Car", true) || reg.nombreElemento.contains("Auto", true) || reg.nombreElemento.contains("Volante", true)
+                            "JUST_DANCE", "JUST DANCE" -> reg.nombreElemento.contains("Dance", true)
+                            else -> reg.nombreElemento.contains(categoriaFiltro, true) || reg.tipo.contains(categoriaFiltro, true)
                         }
                         if (!coincide) continue
                     }
 
-                    val ev = RoomAuditEvent(
-                        id = snap.child("id").getValue(String::class.java) ?: snap.key ?: "",
-                        tipoAccion = snap.child("tipo_accion").getValue(String::class.java) ?: "",
-                        salaId = sId,
-                        salaNombre = snap.child("sala_nombre").getValue(String::class.java) ?: "",
-                        categoria = cat,
-                        tiempoMinutos = snap.child("tiempo_minutos").getValue(Int::class.java) ?: 0,
-                        usuarioNombre = snap.child("usuario_nombre").getValue(String::class.java) ?: "Desconocido",
-                        usuarioRol = snap.child("usuario_rol").getValue(String::class.java) ?: "Empleado",
-                        dispositivoModelo = snap.child("dispositivo_modelo").getValue(String::class.java) ?: "Dispositivo Móvil",
-                        dispositivoId = snap.child("dispositivo_id").getValue(String::class.java) ?: "",
-                        fechaHora = snap.child("fecha_hora").getValue(String::class.java) ?: "",
-                        timestamp = snap.child("timestamp").getValue(Long::class.java) ?: 0L,
-                        detalles = snap.child("detalles").getValue(String::class.java) ?: ""
-                    )
-                    todosLosItems.add(ev)
+                    todosLosRegistros.add(reg)
                 }
 
-                todosLosItems.sortByDescending { it.timestamp }
+                todosLosRegistros.sortByDescending { it.timestamp }
 
                 val q = etBuscar.text?.toString()?.trim()?.lowercase() ?: ""
                 if (q.isEmpty()) {
-                    renderizarEventos(todosLosItems)
+                    renderizarRegistros(todosLosRegistros)
                 } else {
-                    val filtrados = todosLosItems.filter {
-                        it.salaNombre.lowercase().contains(q) ||
-                                it.usuarioNombre.lowercase().contains(q) ||
-                                it.tipoAccion.lowercase().contains(q) ||
-                                it.dispositivoModelo.lowercase().contains(q) ||
+                    val filtrados = todosLosRegistros.filter {
+                        it.cliente.lowercase().contains(q) ||
+                                (it.celular ?: "").lowercase().contains(q) ||
+                                it.nombreElemento.lowercase().contains(q) ||
+                                (it.peliculaJuego ?: "").lowercase().contains(q) ||
                                 it.fechaHora.lowercase().contains(q) ||
-                                it.detalles.lowercase().contains(q)
+                                (it.creadoPor ?: "").lowercase().contains(q)
                     }
-                    renderizarEventos(filtrados)
+                    renderizarRegistros(filtrados)
                 }
             }
 
             override fun onCancelled(error: DatabaseError) {
-                tvEstado.text = "Error al cargar la bitácora: ${error.message}"
+                tvEstado.text = "Error al cargar auditoría: ${error.message}"
             }
         }
 
-        database.child("auditoria_salas").limitToLast(150).addValueEventListener(listener)
+        database.child("auditoria_registros").limitToLast(250).addValueEventListener(listener)
         dialog.setOnDismissListener {
-            database.child("auditoria_salas").removeEventListener(listener)
+            database.child("auditoria_registros").removeEventListener(listener)
         }
 
         dialog.show()

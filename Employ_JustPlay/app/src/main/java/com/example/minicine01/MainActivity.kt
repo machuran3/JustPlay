@@ -94,6 +94,7 @@ class MainActivity : AppCompatActivity() {
     private var salasMinicine: List<Sala> = emptyList()
     private var salasAutitos: List<Sala> = emptyList()
     private var salasJustDance: List<Sala> = emptyList()
+    private val listaSecciones = mutableListOf<SeccionSala>()
 
     private val historialCompleto = mutableListOf<RegistroEntry>()
     private val historialFiltrado = mutableListOf<RegistroEntry>()
@@ -131,6 +132,7 @@ class MainActivity : AppCompatActivity() {
     // CACHE DE PRODUCTOS PARA CONTROL DE STOCK / EVITAR VENTA FANTASMA
     private val catalogoProductosCache = mutableMapOf<String, Pair<Double, Int>>() // barcode -> (precio, stock)
     private val nombreAProductoCache = mutableMapOf<String, Pair<String, Int>>() // lowercaseName -> (barcode, stock)
+    private val listaProductosCatalogo = mutableListOf<ProductoItem>()
 
     private var isFabMenuExpanded = false
     private lateinit var fabOverlay: View
@@ -798,6 +800,23 @@ class MainActivity : AppCompatActivity() {
             override fun onCancelled(error: DatabaseError) {}
         })
 
+        // 0.1 ESCUCHAR SECCIONES DINÁMICAS DE SALAS
+        database.child("secciones_salas").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                listaSecciones.clear()
+                for (snap in snapshot.children) {
+                    val sec = snap.getValue(SeccionSala::class.java)
+                    if (sec != null) {
+                        sec.id = snap.key ?: sec.id
+                        listaSecciones.add(sec)
+                        BasePriceConfig.preciosDinamicos[sec.id] = sec.precioBaseDefault
+                        BasePriceConfig.preciosDinamicos[sec.nombre] = sec.precioBaseDefault
+                    }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
         // 1. ESCUCHAR SALAS EN TIEMPO REAL
         database.child("salas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -811,13 +830,16 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                salasMinicine = tempSalas.filter { it.id < 100 && !it.nombre.contains("Car", ignoreCase = true) && !it.nombre.contains("Dance", ignoreCase = true) }.sortedBy { it.id }
-                salasAutitos = tempSalas.filter { it.id in 101..199 || it.nombre.contains("Car", ignoreCase = true) || it.nombre.contains("Auto", ignoreCase = true) }.sortedBy { it.id }
-                salasJustDance = tempSalas.filter { it.id >= 200 || it.nombre.contains("Dance", ignoreCase = true) }.sortedBy { it.id }
+                salasMinicine = tempSalas.filter { it.esMinicine() }.sortedBy { it.id }
+                salasAutitos = tempSalas.filter { (it.seccionNombre.equals("Autitos", true) || it.seccionNombre.equals("Volantes", true) || (it.seccionNombre.isBlank() && (it.id in 101..199 || it.nombre.contains("Car", true) || it.nombre.contains("Auto", true) || it.nombre.contains("Volante", true)))) && !it.esMinicine() }.sortedBy { it.id }
+                salasJustDance = tempSalas.filter { (it.seccionNombre.equals("Just Dance", true) || (it.seccionNombre.isBlank() && (it.id >= 200 || it.nombre.contains("Dance", true)))) && !it.esMinicine() }.sortedBy { it.id }
+
+                val salasDinamicas = tempSalas.filter { it !in salasMinicine && it !in salasAutitos && it !in salasJustDance }.sortedBy { it.id }
 
                 configurarRecyclerView(findViewById(R.id.rvSalasMinicine), salasMinicine)
                 configurarRecyclerView(findViewById(R.id.rvSalasAutitos), salasAutitos)
                 configurarRecyclerView(findViewById(R.id.rvSalasJustDance), salasJustDance)
+                renderizarSeccionesDinamicas(salasDinamicas)
 
                 actualizarContadorOcupacion()
 
@@ -986,6 +1008,19 @@ class MainActivity : AppCompatActivity() {
         etPelicula.visibility = View.GONE
         etTiempo.visibility = View.GONE
         etPrecioSala.visibility = View.GONE
+
+        // Limpieza de interfaz: Quitar la opción "Ver tablas de tarifas minicines" de la venta mostrador
+        val btnVerTablaTarifas = dialogView.findViewById<Button>(R.id.btnVerTablaTarifas)
+        btnVerTablaTarifas?.visibility = View.GONE
+
+        val btnSeleccionarProductoCatalogo = dialogView.findViewById<Button>(R.id.btnSeleccionarProductoCatalogo)
+        btnSeleccionarProductoCatalogo?.setOnClickListener {
+            mostrarDialogoSelectorProductos { prod ->
+                etPedNombre.setText(prod.nombre)
+                etPedPrecio.setText(if (prod.precio % 1.0 == 0.0) prod.precio.toInt().toString() else prod.precio.toString())
+                if (etPedCantidad.text.isNullOrBlank()) etPedCantidad.setText("1")
+            }
+        }
 
         val pedidosVenta = mutableListOf<Pedido>()
 
@@ -1354,6 +1389,37 @@ class MainActivity : AppCompatActivity() {
             if (layoutTablero.visibility == View.VISIBLE) {
                 fabMain.visibility = View.VISIBLE
             }
+        }
+    }
+
+    private fun renderizarSeccionesDinamicas(salasDinamicas: List<Sala>) {
+        val contenedor = findViewById<LinearLayout>(R.id.llSeccionesSalasDinamicas) ?: return
+        contenedor.removeAllViews()
+
+        if (salasDinamicas.isEmpty()) return
+
+        val agrupadas = salasDinamicas.groupBy { it.seccionNombre.ifBlank { "Otras Salas" } }
+
+        for ((nombreSeccion, salasDeSeccion) in agrupadas) {
+            val secInfo = listaSecciones.find { it.nombre.equals(nombreSeccion, ignoreCase = true) }
+            val icon = secInfo?.icono ?: "🎮"
+
+            val tvHeader = TextView(this).apply {
+                text = "$icon $nombreSeccion"
+                setTextColor(Color.parseColor("#DEFF9A"))
+                textSize = 18f
+                setTypeface(null, Typeface.BOLD)
+                val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.setMargins(0, 32, 0, 16)
+                layoutParams = lp
+            }
+            contenedor.addView(tvHeader)
+
+            val rv = RecyclerView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            }
+            configurarRecyclerView(rv, salasDeSeccion)
+            contenedor.addView(rv)
         }
     }
 
@@ -2073,6 +2139,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val btnSeleccionarProductoCatalogo = dialogView.findViewById<Button>(R.id.btnSeleccionarProductoCatalogo)
+        btnSeleccionarProductoCatalogo?.setOnClickListener {
+            mostrarDialogoSelectorProductos { prod ->
+                etPedNombre.setText(prod.nombre)
+                etPedPrecio.setText(if (prod.precio % 1.0 == 0.0) prod.precio.toInt().toString() else prod.precio.toString())
+                if (etPedCantidad.text.isNullOrBlank()) etPedCantidad.setText("1")
+            }
+        }
+
         if (esMinicine) {
             etTiempo.addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -2441,6 +2516,7 @@ class MainActivity : AppCompatActivity() {
             database.child("salas").child(sala.id.toString()).setValue(sala)
 
             val tipoSala = when {
+                sala.seccionNombre.isNotBlank() -> sala.seccionNombre
                 esMinicine -> "Minicine"
                 esAutitos -> "Autitos"
                 else -> "Just Dance"
@@ -3102,6 +3178,7 @@ class MainActivity : AppCompatActivity() {
             override fun onDataChange(snapshot: DataSnapshot) {
                 catalogoProductosCache.clear()
                 nombreAProductoCache.clear()
+                listaProductosCatalogo.clear()
                 for (child in snapshot.children) {
                     val barcode = child.key ?: continue
                     val nombre = child.child("nombre").getValue(String::class.java) ?: continue
@@ -3111,10 +3188,124 @@ class MainActivity : AppCompatActivity() {
                         ?: child.child("stock_actual").getValue(Long::class.java)?.toInt() ?: 0
                     catalogoProductosCache[barcode] = Pair(precio, stock)
                     nombreAProductoCache[nombre.trim().lowercase()] = Pair(barcode, stock)
+                    listaProductosCatalogo.add(ProductoItem(barcode, nombre, precio, stock))
                 }
+                listaProductosCatalogo.sortBy { it.nombre.lowercase() }
             }
             override fun onCancelled(error: DatabaseError) {}
         })
+    }
+
+    private fun mostrarDialogoSelectorProductos(onSeleccion: (ProductoItem) -> Unit) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_selector_producto_catalogo, null)
+        val dialog = AlertDialog.Builder(this).setView(dialogView).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        val btnCerrar = dialogView.findViewById<TextView>(R.id.btnCerrarSelectorProducto)
+        val etBuscar = dialogView.findViewById<EditText>(R.id.etBuscarProductoSelector)
+        val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llContenedorProductosSelector)
+
+        btnCerrar.setOnClickListener { dialog.dismiss() }
+
+        fun renderizarLista(filtro: String) {
+            llContenedor.removeAllViews()
+            val filtrados = if (filtro.isBlank()) {
+                listaProductosCatalogo
+            } else {
+                listaProductosCatalogo.filter {
+                    it.nombre.contains(filtro, ignoreCase = true) || it.barcode.contains(filtro, ignoreCase = true)
+                }
+            }
+
+            if (filtrados.isEmpty()) {
+                val tvVacio = TextView(this).apply {
+                    text = if (listaProductosCatalogo.isEmpty()) "Cargando catálogo o no hay productos registrados..." else "No hay productos coincidentes."
+                    setTextColor(Color.parseColor("#888888"))
+                    textSize = 13f
+                    gravity = Gravity.CENTER
+                    setPadding(0, 30, 0, 30)
+                }
+                llContenedor.addView(tvVacio)
+                return
+            }
+
+            for (prod in filtrados) {
+                val card = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(16, 12, 16, 12)
+                    setBackgroundColor(if (prod.stock <= 0) Color.parseColor("#1F2230") else Color.parseColor("#24283B"))
+                    val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    params.setMargins(0, 0, 0, 8)
+                    layoutParams = params
+                }
+
+                val llInfo = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+
+                val tvNom = TextView(this).apply {
+                    text = prod.nombre
+                    setTextColor(if (prod.stock <= 0) Color.parseColor("#888888") else Color.WHITE)
+                    textSize = 14f
+                    setTypeface(null, Typeface.BOLD)
+                }
+
+                val tvPrecio = TextView(this).apply {
+                    text = "${if (prod.precio % 1.0 == 0.0) prod.precio.toInt().toString() else prod.precio.toString()} Bs"
+                    setTextColor(Color.parseColor("#DEFF9A"))
+                    textSize = 13f
+                }
+                llInfo.addView(tvNom)
+                llInfo.addView(tvPrecio)
+
+                val tvStockBadge = TextView(this).apply {
+                    if (prod.stock <= 0) {
+                        text = "🚫 Agotado (0)"
+                        setTextColor(Color.parseColor("#FF5252"))
+                        setBackgroundColor(Color.parseColor("#331A1A"))
+                    } else {
+                        text = "🟢 Stock: ${prod.stock}"
+                        setTextColor(Color.parseColor("#00E676"))
+                        setBackgroundColor(Color.parseColor("#1B3E2B"))
+                    }
+                    textSize = 11f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(12, 6, 12, 6)
+                }
+
+                card.addView(llInfo)
+                card.addView(tvStockBadge)
+
+                if (prod.stock > 0) {
+                    card.isClickable = true
+                    card.isFocusable = true
+                    card.setOnClickListener {
+                        onSeleccion(prod)
+                        dialog.dismiss()
+                    }
+                } else {
+                    card.setOnClickListener {
+                        Toast.makeText(this, "⚠️ '${prod.nombre}' está agotado (stock: 0)", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
+                llContenedor.addView(card)
+            }
+        }
+
+        renderizarLista("")
+
+        etBuscar.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                renderizarLista(s?.toString()?.trim() ?: "")
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        dialog.show()
     }
 
     private fun mostrarDialogoTablaTarifasMinicine(onSelect: ((Int, Double) -> Unit)? = null) {

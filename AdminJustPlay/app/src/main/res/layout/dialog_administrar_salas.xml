@@ -53,6 +53,17 @@
                 android:text="Agrega nuevas salas, puestos de autitos o salas Just Dance al tablero en vivo:"
                 android:textColor="#A0A0A0"
                 android:textSize="13sp"
+                android:layout_marginBottom="10dp"/>
+
+            <Button
+                android:id="@+id/btnAbrirGestionSecciones"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="📁 Administrar Secciones (VR, Volantes, etc.)"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#2D3349"
+                android:textStyle="bold"
+                android:textSize="12sp"
                 android:layout_marginBottom="14dp"/>
 
             <!-- 1. AUMENTAR MINICINE -->
@@ -208,6 +219,76 @@
 
                         <Button
                             android:id="@+id/btnAgregarDance"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="➕ Agregar"
+                            android:backgroundTint="#DEFF9A"
+                            android:textColor="#000000"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:layout_marginStart="8dp"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- 4. AUMENTAR SALA EN CUALQUIER SECCIÓN DINÁMICA -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="#24283B"
+                app:cardCornerRadius="10dp"
+                android:layout_marginBottom="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🎮 Aumentar Sala por Sección Dinámica"
+                        android:textColor="#DEFF9A"
+                        android:textSize="14sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Selecciona la sección:"
+                        android:textColor="#A0A0A0"
+                        android:textSize="11sp"
+                        android:layout_marginTop="6dp"/>
+
+                    <Spinner
+                        android:id="@+id/spSeccionParaNuevaSala"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_spinner_rounded"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="8dp"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <EditText
+                            android:id="@+id/etNumeroNuevaSalaDinamica"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:hint="Nro de Puesto (Ej. 1, 2, 3...)"
+                            android:textColor="#FFFFFF"
+                            android:textColorHint="#666666"
+                            android:backgroundTint="#DEFF9A"
+                            android:inputType="number"
+                            android:textSize="14sp"/>
+
+                        <Button
+                            android:id="@+id/btnAgregarSalaDinamica"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="➕ Agregar"

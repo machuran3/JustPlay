@@ -155,6 +155,27 @@ fun main() = application {
                                     Text("💃 Just Dance ($countDance)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
 
+                                val dynamicCategories = remember(state.rooms) {
+                                    state.rooms.map { it.categoria }
+                                        .distinct()
+                                        .filter { it.isNotBlank() && it !in listOf("Minicine", "Autitos", "Just Dance") }
+                                }
+                                for (customCat in dynamicCategories) {
+                                    val isCustom = state.currentTab == "SEC_$customCat"
+                                    val countCat = state.rooms.count { it.categoria == customCat }
+                                    Button(
+                                        onClick = { viewModel.switchTab("SEC_$customCat") },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isCustom) AccentGreen else BgDark,
+                                            contentColor = if (isCustom) Color.Black else Color.White
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.height(38.dp)
+                                    ) {
+                                        Text("🎮 $customCat ($countCat)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+
                                 val isSchedule = state.currentTab == "SCHEDULE"
                                 Button(
                                     onClick = { viewModel.switchTab("SCHEDULE") },
@@ -269,10 +290,23 @@ fun main() = application {
                                 onRefreshRooms = { viewModel.refreshRooms() }
                             )
                         }
-                        else -> { // "SALAS" (Minicine)
+                        "SALAS" -> {
                             RoomDashboardPanel(
                                 rooms = state.rooms,
                                 category = "Minicine",
+                                onRoomClick = { viewModel.openRoomDetail(it) },
+                                onRefreshRooms = { viewModel.refreshRooms() }
+                            )
+                        }
+                        else -> {
+                            val targetCategory = if (state.currentTab.startsWith("SEC_")) {
+                                state.currentTab.removePrefix("SEC_")
+                            } else {
+                                "Minicine"
+                            }
+                            RoomDashboardPanel(
+                                rooms = state.rooms,
+                                category = targetCategory,
                                 onRoomClick = { viewModel.openRoomDetail(it) },
                                 onRefreshRooms = { viewModel.refreshRooms() }
                             )

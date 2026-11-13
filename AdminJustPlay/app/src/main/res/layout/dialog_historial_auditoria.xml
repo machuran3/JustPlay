@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="12dp"
+    android:layout_margin="8dp"
     app:cardBackgroundColor="#1A1C29"
     app:cardCornerRadius="16dp"
     app:cardElevation="6dp">
@@ -12,7 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="18dp">
+        android:padding="16dp">
 
         <!-- CABECERA -->
         <LinearLayout
@@ -26,7 +26,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="🛡️ Auditoría &amp; Trazabilidad"
+                android:text="🛡️ Auditoría de Salas"
                 android:textColor="#FFFFFF"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -64,10 +64,197 @@
             android:text="Registro histórico inmutable: quién, cuándo y desde qué dispositivo se operó."
             android:textColor="#A0A0A0"
             android:textSize="12sp"
-            android:layout_marginTop="4dp"
-            android:layout_marginBottom="12dp" />
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="8dp" />
 
-        <!-- RESUMEN / BADGES DE FILTRO O TOTALES (OPCIONAL) -->
+        <!-- PESTAÑAS ACTIVOS / BORRADOS / TODOS -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginBottom="8dp">
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnAuditFiltroActivos"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="🟢 Activos"
+                    android:textSize="11sp"
+                    android:backgroundTint="#DEFF9A"
+                    android:textColor="#000000"
+                    android:textStyle="bold"
+                    android:paddingHorizontal="10dp"/>
+
+                <Button
+                    android:id="@+id/btnAuditFiltroBorrados"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="🗑️ Borrados (Papelera)"
+                    android:textSize="11sp"
+                    android:backgroundTint="#24283B"
+                    android:textColor="#FF5252"
+                    android:textStyle="bold"
+                    android:layout_marginStart="6dp"
+                    android:paddingHorizontal="10dp"/>
+
+                <Button
+                    android:id="@+id/btnAuditFiltroTodos"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="📋 Todo el Historial"
+                    android:textSize="11sp"
+                    android:backgroundTint="#24283B"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:layout_marginStart="6dp"
+                    android:paddingHorizontal="10dp"/>
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- FILTROS FECHA Y RANGO DE HORAS -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <Button
+                    android:id="@+id/btnAuditFiltroFecha"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:text="📅 Fecha: Todas"
+                    android:backgroundTint="#24283B"
+                    android:textColor="#DEFF9A"
+                    android:textSize="11sp"
+                    android:textStyle="bold"/>
+
+                <Button
+                    android:id="@+id/btnAuditLimpiarFecha"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="🔄 Todas"
+                    android:backgroundTint="#1A1C29"
+                    android:textColor="#A0A0A0"
+                    android:textSize="11sp"
+                    android:layout_marginStart="6dp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <Button
+                    android:id="@+id/btnAuditHoraInicio"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:text="⏰ Desde: Inicio"
+                    android:backgroundTint="#24283B"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"/>
+
+                <Button
+                    android:id="@+id/btnAuditHoraFin"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:text="⏰ Hasta: Fin"
+                    android:backgroundTint="#24283B"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    android:layout_marginStart="4dp"/>
+
+                <Button
+                    android:id="@+id/btnAuditLimpiarHoras"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="✕ Horas"
+                    android:backgroundTint="#1A1C29"
+                    android:textColor="#A0A0A0"
+                    android:textSize="11sp"
+                    android:layout_marginStart="6dp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- CHECKBOXES DE FILTROS TICKEABLES POR SECCIÓN -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:layout_marginBottom="8dp">
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <CheckBox
+                    android:id="@+id/cbAuditCine"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎬 Cines"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:checked="true"/>
+
+                <CheckBox
+                    android:id="@+id/cbAuditAutitos"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🏎️ Autitos"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:checked="true"
+                    android:layout_marginStart="8dp"/>
+
+                <CheckBox
+                    android:id="@+id/cbAuditDance"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💃 Just Dance"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:checked="true"
+                    android:layout_marginStart="8dp"/>
+
+                <LinearLayout
+                    android:id="@+id/llAuditFiltrosSeccionesDinamicas"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"/>
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- BUSCADOR RÁPIDO EN TIEMPO REAL -->
+        <EditText
+            android:id="@+id/etDialogAuditBuscar"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:hint="🔍 Buscar por cliente, celular, sala..."
+            android:textColor="#FFFFFF"
+            android:textColorHint="#787C99"
+            android:textSize="13sp"
+            android:background="#24283B"
+            android:paddingHorizontal="12dp"
+            android:layout_marginBottom="8dp"
+            android:singleLine="true" />
+
+        <!-- RESUMEN DE TOTALES -->
         <TextView
             android:id="@+id/tvDialogAuditResumen"
             android:layout_width="match_parent"
@@ -75,22 +262,7 @@
             android:textColor="#DEFF9A"
             android:textSize="12sp"
             android:textStyle="bold"
-            android:layout_marginBottom="8dp"
-            android:visibility="gone" />
-
-        <!-- BUSCADOR RÁPIDO EN TIEMPO REAL -->
-        <EditText
-            android:id="@+id/etDialogAuditBuscar"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:hint="🔍 Buscar por nombre de cliente, celular, sala..."
-            android:textColor="#FFFFFF"
-            android:textColorHint="#787C99"
-            android:textSize="13sp"
-            android:background="#24283B"
-            android:paddingHorizontal="12dp"
-            android:layout_marginBottom="10dp"
-            android:singleLine="true" />
+            android:layout_marginBottom="8dp" />
 
         <!-- CONTENEDOR CON SCROLL -->
         <ScrollView
@@ -109,7 +281,7 @@
                     android:id="@+id/tvDialogAuditEstado"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Cargando bitácora de auditoría..."
+                    android:text="Cargando registros de auditoría..."
                     android:textColor="#DEFF9A"
                     android:textSize="13sp"
                     android:gravity="center"

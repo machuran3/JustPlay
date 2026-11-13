@@ -1,7 +1,10 @@
 package com.example.adminjustplay
 
 import android.app.AlertDialog
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.view.Gravity
@@ -13,6 +16,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.ValueEventListener
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -86,15 +90,11 @@ class RoomAuditManager(
      * Muestra la vista de bitácora de auditoría detallada de salas e identidad de dispositivos.
      */
     fun mostrarDialogoHistorialAuditoriaSalas() {
-        mostrarDialogoHistorialAuditoriaPorArea(null, "🛡️ Trazabilidad de Salas & Dispositivos")
+        mostrarDialogoHistorialAuditoriaPorArea(null, "🛡️ Auditoría de Salas")
     }
 
     /**
-     * Muestra la vista de bitácora de auditoría filtrada por área específica (Cine, Volantes, Just Dance).
-     */
-    /**
-     * Muestra la vista de bitácora de auditoría filtrada por área específica (Cine, Volantes, Just Dance).
-     * Rediseñado para mostrar registros inmutables con diseño limpio idéntico a Registros y búsqueda por cliente/celular.
+     * Muestra la vista de bitácora de auditoría de salas con filtros gráficos avanzados (fecha, horas, estado, secciones).
      */
     fun mostrarDialogoHistorialAuditoriaPorArea(categoriaFiltro: String?, tituloArea: String) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_historial_auditoria, null)
@@ -107,6 +107,24 @@ class RoomAuditManager(
         val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llDialogAuditContenedor)
         val tvEstado = dialogView.findViewById<TextView>(R.id.tvDialogAuditEstado)
 
+        // Botones de filtro de estado
+        val btnAuditFiltroActivos = dialogView.findViewById<Button>(R.id.btnAuditFiltroActivos)
+        val btnAuditFiltroBorrados = dialogView.findViewById<Button>(R.id.btnAuditFiltroBorrados)
+        val btnAuditFiltroTodos = dialogView.findViewById<Button>(R.id.btnAuditFiltroTodos)
+
+        // Filtro de fecha y horas
+        val btnAuditFiltroFecha = dialogView.findViewById<Button>(R.id.btnAuditFiltroFecha)
+        val btnAuditLimpiarFecha = dialogView.findViewById<Button>(R.id.btnAuditLimpiarFecha)
+        val btnAuditHoraInicio = dialogView.findViewById<Button>(R.id.btnAuditHoraInicio)
+        val btnAuditHoraFin = dialogView.findViewById<Button>(R.id.btnAuditHoraFin)
+        val btnAuditLimpiarHoras = dialogView.findViewById<Button>(R.id.btnAuditLimpiarHoras)
+
+        // Checkboxes de sección
+        val cbAuditCine = dialogView.findViewById<CheckBox>(R.id.cbAuditCine)
+        val cbAuditAutitos = dialogView.findViewById<CheckBox>(R.id.cbAuditAutitos)
+        val cbAuditDance = dialogView.findViewById<CheckBox>(R.id.cbAuditDance)
+        val llAuditFiltrosSeccionesDinamicas = dialogView.findViewById<LinearLayout>(R.id.llAuditFiltrosSeccionesDinamicas)
+
         tvTitulo.text = tituloArea
         tvSub.text = "Auditoría forense e inmutable: clientes, celulares, importes cobrados y registros activos/borrados."
         tvResumen.visibility = View.VISIBLE
@@ -118,7 +136,21 @@ class RoomAuditManager(
 
         btnCerrar.setOnClickListener { dialog.dismiss() }
 
+        var modoAuditoria = "ACTIVOS" // "ACTIVOS", "BORRADOS", "TODOS"
+        var fechaFiltro: String? = null // "dd/MM/yyyy"
+        var horaInicioFiltro: String? = null // "HH:mm"
+        var horaFinFiltro: String? = null // "HH:mm"
+
+        val dynamicCheckboxes = mutableMapOf<String, CheckBox>()
+        val seccionesDinamicas = mutableListOf<SeccionSala>()
         val todosLosRegistros = mutableListOf<RegistroEntry>()
+
+        if (categoriaFiltro != null) {
+            val catUpper = categoriaFiltro.uppercase()
+            cbAuditCine.isChecked = catUpper in listOf("CINE", "MINICINE")
+            cbAuditAutitos.isChecked = catUpper in listOf("AUTITOS", "VOLANTES")
+            cbAuditDance.isChecked = catUpper in listOf("JUST_DANCE", "JUST DANCE")
+        }
 
         fun renderizarRegistros(lista: List<RegistroEntry>) {
             llContenedor.removeAllViews()
@@ -126,12 +158,13 @@ class RoomAuditManager(
 
             val totalActivos = lista.filter { !it.eliminado }.sumOf { it.totalCobrado }
             val countBorrados = lista.count { it.eliminado }
+            val countActivos = lista.count { !it.eliminado }
             val totalActivosFmt = if (totalActivos % 1.0 == 0.0) totalActivos.toInt().toString() else totalActivos.toString()
-            tvResumen.text = "📊 ${lista.size} registros (Borrados: $countBorrados) • Total activo: $totalActivosFmt Bs"
+            tvResumen.text = "📊 ${lista.size} registros (Activos: $countActivos | Borrados: $countBorrados) • Total activo: $totalActivosFmt Bs"
 
             if (lista.isEmpty()) {
                 val tvVacio = TextView(context).apply {
-                    text = "No se encontraron registros de auditoría para el criterio de búsqueda."
+                    text = "No se encontraron registros de auditoría para el criterio seleccionado."
                     setTextColor(Color.parseColor("#888888"))
                     textSize = 13f
                     gravity = Gravity.CENTER
@@ -246,23 +279,206 @@ class RoomAuditManager(
             }
         }
 
+        fun aplicarFiltros() {
+            val q = etBuscar.text?.toString()?.trim()?.lowercase() ?: ""
+
+            val filtrados = todosLosRegistros.filter { reg ->
+                // 1. Filtro Modo Auditoría (Activos / Borrados / Todos)
+                when (modoAuditoria) {
+                    "ACTIVOS" -> if (reg.eliminado) return@filter false
+                    "BORRADOS" -> if (!reg.eliminado) return@filter false
+                    "TODOS" -> { }
+                }
+
+                // 2. Filtro de Fecha (formato dd/MM/yyyy)
+                if (fechaFiltro != null) {
+                    if (!reg.fechaHora.startsWith(fechaFiltro!!)) return@filter false
+                }
+
+                // 3. Filtro de Rango Horario (formato HH:mm)
+                if (horaInicioFiltro != null || horaFinFiltro != null) {
+                    val horaRegistro = if (reg.fechaHora.length >= 16) reg.fechaHora.substring(11, 16) else ""
+                    if (horaRegistro.isNotEmpty()) {
+                        if (horaInicioFiltro != null && horaRegistro < horaInicioFiltro!!) return@filter false
+                        if (horaFinFiltro != null && horaRegistro > horaFinFiltro!!) return@filter false
+                    }
+                }
+
+                // 4. Filtro por Sección (Cines, Volantes, Dance, Secciones Dinámicas)
+                val tipo = reg.tipo.lowercase()
+                val nombreEl = reg.nombreElemento.lowercase()
+
+                val seccionCoincidente = seccionesDinamicas.find { sec ->
+                    val secNom = sec.nombre.lowercase()
+                    val secPref = sec.prefijoSala.lowercase()
+                    tipo.equals(secNom, ignoreCase = true) ||
+                    (secNom.isNotBlank() && (tipo.contains(secNom) || nombreEl.contains(secNom))) ||
+                    (secPref.isNotBlank() && nombreEl.contains(secPref))
+                }
+
+                val pasaSeccion = when {
+                    seccionCoincidente != null -> dynamicCheckboxes[seccionCoincidente.id]?.isChecked ?: true
+                    tipo.contains("dance") || nombreEl.contains("dance") -> cbAuditDance.isChecked
+                    tipo.contains("auto") || nombreEl.contains("car") || nombreEl.contains("auto") || nombreEl.contains("volante") -> cbAuditAutitos.isChecked
+                    tipo.contains("cine") || nombreEl.contains("cine") || (nombreEl.contains("sala") && !tipo.contains("consumo") && !nombreEl.contains("consumo")) -> cbAuditCine.isChecked
+                    else -> true
+                }
+                if (!pasaSeccion) return@filter false
+
+                // 5. Búsqueda por texto libre
+                if (q.isNotEmpty()) {
+                    val coincideTexto = reg.cliente.lowercase().contains(q) ||
+                            (reg.celular ?: "").lowercase().contains(q) ||
+                            reg.nombreElemento.lowercase().contains(q) ||
+                            (reg.peliculaJuego ?: "").lowercase().contains(q) ||
+                            reg.fechaHora.lowercase().contains(q) ||
+                            (reg.creadoPor ?: "").lowercase().contains(q) ||
+                            (reg.metodoPago ?: "").lowercase().contains(q)
+                    if (!coincideTexto) return@filter false
+                }
+
+                true
+            }
+
+            renderizarRegistros(filtrados)
+        }
+
+        fun actualizarEstilosBotones() {
+            val colorActivo = Color.parseColor("#DEFF9A")
+            val colorBorrados = Color.parseColor("#FF5252")
+            val colorFondo = Color.parseColor("#24283B")
+
+            when (modoAuditoria) {
+                "ACTIVOS" -> {
+                    btnAuditFiltroActivos.backgroundTintList = ColorStateList.valueOf(colorActivo)
+                    btnAuditFiltroActivos.setTextColor(Color.BLACK)
+                    btnAuditFiltroBorrados.backgroundTintList = ColorStateList.valueOf(colorFondo)
+                    btnAuditFiltroBorrados.setTextColor(colorBorrados)
+                    btnAuditFiltroTodos.backgroundTintList = ColorStateList.valueOf(colorFondo)
+                    btnAuditFiltroTodos.setTextColor(Color.WHITE)
+                }
+                "BORRADOS" -> {
+                    btnAuditFiltroActivos.backgroundTintList = ColorStateList.valueOf(colorFondo)
+                    btnAuditFiltroActivos.setTextColor(Color.WHITE)
+                    btnAuditFiltroBorrados.backgroundTintList = ColorStateList.valueOf(colorBorrados)
+                    btnAuditFiltroBorrados.setTextColor(Color.WHITE)
+                    btnAuditFiltroTodos.backgroundTintList = ColorStateList.valueOf(colorFondo)
+                    btnAuditFiltroTodos.setTextColor(Color.WHITE)
+                }
+                "TODOS" -> {
+                    btnAuditFiltroActivos.backgroundTintList = ColorStateList.valueOf(colorFondo)
+                    btnAuditFiltroActivos.setTextColor(Color.WHITE)
+                    btnAuditFiltroBorrados.backgroundTintList = ColorStateList.valueOf(colorFondo)
+                    btnAuditFiltroBorrados.setTextColor(colorBorrados)
+                    btnAuditFiltroTodos.backgroundTintList = ColorStateList.valueOf(colorActivo)
+                    btnAuditFiltroTodos.setTextColor(Color.BLACK)
+                }
+            }
+        }
+
+        btnAuditFiltroActivos.setOnClickListener {
+            modoAuditoria = "ACTIVOS"
+            actualizarEstilosBotones()
+            aplicarFiltros()
+        }
+        btnAuditFiltroBorrados.setOnClickListener {
+            modoAuditoria = "BORRADOS"
+            actualizarEstilosBotones()
+            aplicarFiltros()
+        }
+        btnAuditFiltroTodos.setOnClickListener {
+            modoAuditoria = "TODOS"
+            actualizarEstilosBotones()
+            aplicarFiltros()
+        }
+        actualizarEstilosBotones()
+
+        btnAuditFiltroFecha.setOnClickListener {
+            val cal = Calendar.getInstance()
+            DatePickerDialog(context, { _, year, month, day ->
+                fechaFiltro = String.format("%02d/%02d/%d", day, month + 1, year)
+                btnAuditFiltroFecha.text = "📅 $fechaFiltro"
+                btnAuditFiltroFecha.setTextColor(Color.parseColor("#DEFF9A"))
+                aplicarFiltros()
+            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+        }
+
+        btnAuditLimpiarFecha.setOnClickListener {
+            fechaFiltro = null
+            btnAuditFiltroFecha.text = "📅 Fecha: Todas"
+            btnAuditFiltroFecha.setTextColor(Color.parseColor("#A0A0A0"))
+            aplicarFiltros()
+        }
+
+        btnAuditHoraInicio.setOnClickListener {
+            val cal = Calendar.getInstance()
+            TimePickerDialog(context, { _, hourOfDay, minute ->
+                horaInicioFiltro = String.format("%02d:%02d", hourOfDay, minute)
+                btnAuditHoraInicio.text = "⏰ Desde: $horaInicioFiltro"
+                btnAuditHoraInicio.setTextColor(Color.parseColor("#DEFF9A"))
+                aplicarFiltros()
+            }, cal.get(Calendar.HOUR_OF_DAY), 0, true).show()
+        }
+
+        btnAuditHoraFin.setOnClickListener {
+            val cal = Calendar.getInstance()
+            TimePickerDialog(context, { _, hourOfDay, minute ->
+                horaFinFiltro = String.format("%02d:%02d", hourOfDay, minute)
+                btnAuditHoraFin.text = "⏰ Hasta: $horaFinFiltro"
+                btnAuditHoraFin.setTextColor(Color.parseColor("#DEFF9A"))
+                aplicarFiltros()
+            }, cal.get(Calendar.HOUR_OF_DAY), 59, true).show()
+        }
+
+        btnAuditLimpiarHoras.setOnClickListener {
+            horaInicioFiltro = null
+            horaFinFiltro = null
+            btnAuditHoraInicio.text = "⏰ Desde: Inicio"
+            btnAuditHoraInicio.setTextColor(Color.WHITE)
+            btnAuditHoraFin.text = "⏰ Hasta: Fin"
+            btnAuditHoraFin.setTextColor(Color.WHITE)
+            aplicarFiltros()
+        }
+
+        cbAuditCine.setOnCheckedChangeListener { _, _ -> aplicarFiltros() }
+        cbAuditAutitos.setOnCheckedChangeListener { _, _ -> aplicarFiltros() }
+        cbAuditDance.setOnCheckedChangeListener { _, _ -> aplicarFiltros() }
+
+        // Cargar secciones dinámicas para crear checkboxes
+        database.child("secciones_salas").addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                seccionesDinamicas.clear()
+                llAuditFiltrosSeccionesDinamicas.removeAllViews()
+                dynamicCheckboxes.clear()
+
+                for (snap in snapshot.children) {
+                    val sec = snap.getValue(SeccionSala::class.java) ?: continue
+                    sec.id = snap.key ?: sec.id
+                    if (sec.id.lowercase() in listOf("minicine", "autitos", "just_dance")) continue
+                    seccionesDinamicas.add(sec)
+
+                    val cb = CheckBox(context).apply {
+                        text = "${sec.icono} ${sec.nombre}"
+                        setTextColor(Color.WHITE)
+                        textSize = 12f
+                        isChecked = (categoriaFiltro == null || categoriaFiltro.equals(sec.nombre, ignoreCase = true) || categoriaFiltro.equals(sec.id, ignoreCase = true))
+                        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                        lp.marginStart = 16
+                        layoutParams = lp
+                        setOnCheckedChangeListener { _, _ -> aplicarFiltros() }
+                    }
+                    dynamicCheckboxes[sec.id] = cb
+                    llAuditFiltrosSeccionesDinamicas.addView(cb)
+                }
+                aplicarFiltros()
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
         etBuscar.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val q = s?.toString()?.trim()?.lowercase() ?: ""
-                if (q.isEmpty()) {
-                    renderizarRegistros(todosLosRegistros)
-                } else {
-                    val filtrados = todosLosRegistros.filter {
-                        it.cliente.lowercase().contains(q) ||
-                                (it.celular ?: "").lowercase().contains(q) ||
-                                it.nombreElemento.lowercase().contains(q) ||
-                                (it.peliculaJuego ?: "").lowercase().contains(q) ||
-                                it.fechaHora.lowercase().contains(q) ||
-                                (it.creadoPor ?: "").lowercase().contains(q)
-                    }
-                    renderizarRegistros(filtrados)
-                }
+                aplicarFiltros()
             }
             override fun afterTextChanged(s: android.text.Editable?) {}
         })
@@ -273,42 +489,19 @@ class RoomAuditManager(
                 if (!snapshot.exists() || !snapshot.hasChildren()) {
                     tvEstado.text = "No hay registros de auditoría disponibles."
                     tvContador.text = "0 registros"
+                    renderizarRegistros(emptyList())
                     return
                 }
 
                 for (snap in snapshot.children) {
                     val reg = snap.getValue(RegistroEntry::class.java) ?: continue
                     reg.idFirebase = snap.key ?: ""
-
-                    if (categoriaFiltro != null) {
-                        val coincide = when (categoriaFiltro.uppercase()) {
-                            "CINE", "MINICINE" -> reg.nombreElemento.contains("Sala", true) || reg.tipo.contains("Cine", true)
-                            "AUTITOS", "VOLANTES" -> reg.nombreElemento.contains("Car", true) || reg.nombreElemento.contains("Auto", true) || reg.nombreElemento.contains("Volante", true)
-                            "JUST_DANCE", "JUST DANCE" -> reg.nombreElemento.contains("Dance", true)
-                            else -> reg.nombreElemento.contains(categoriaFiltro, true) || reg.tipo.contains(categoriaFiltro, true)
-                        }
-                        if (!coincide) continue
-                    }
-
                     todosLosRegistros.add(reg)
                 }
 
                 todosLosRegistros.sortByDescending { it.timestamp }
-
-                val q = etBuscar.text?.toString()?.trim()?.lowercase() ?: ""
-                if (q.isEmpty()) {
-                    renderizarRegistros(todosLosRegistros)
-                } else {
-                    val filtrados = todosLosRegistros.filter {
-                        it.cliente.lowercase().contains(q) ||
-                                (it.celular ?: "").lowercase().contains(q) ||
-                                it.nombreElemento.lowercase().contains(q) ||
-                                (it.peliculaJuego ?: "").lowercase().contains(q) ||
-                                it.fechaHora.lowercase().contains(q) ||
-                                (it.creadoPor ?: "").lowercase().contains(q)
-                    }
-                    renderizarRegistros(filtrados)
-                }
+                tvEstado.visibility = View.GONE
+                aplicarFiltros()
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -316,7 +509,7 @@ class RoomAuditManager(
             }
         }
 
-        database.child("auditoria_registros").limitToLast(250).addValueEventListener(listener)
+        database.child("auditoria_registros").limitToLast(500).addValueEventListener(listener)
         dialog.setOnDismissListener {
             database.child("auditoria_registros").removeEventListener(listener)
         }

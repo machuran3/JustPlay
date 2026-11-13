@@ -162,7 +162,7 @@ fun main() = application {
                                 }
                                 for (customCat in dynamicCategories) {
                                     val isCustom = state.currentTab == "SEC_$customCat"
-                                    val countCat = state.rooms.count { it.categoria == customCat }
+                                    val countCat = state.rooms.count { it.categoria.equals(customCat, ignoreCase = true) || it.seccionNombre.equals(customCat, ignoreCase = true) }
                                     Button(
                                         onClick = { viewModel.switchTab("SEC_$customCat") },
                                         colors = ButtonDefaults.buttonColors(

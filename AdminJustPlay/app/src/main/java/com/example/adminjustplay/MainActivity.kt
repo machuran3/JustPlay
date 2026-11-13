@@ -378,24 +378,18 @@ class MainActivity : AppCompatActivity() {
         navigationView.menu.add(0, 6, 5, "🏗️ Aumentar / Gestionar Salas").setIcon(android.R.drawable.ic_input_add)
         navigationView.menu.add(0, 7, 6, "🔄 Buscar Actualizaciones").setIcon(android.R.drawable.ic_popup_sync)
         navigationView.menu.add(0, 8, 7, "🖥️ Terminales POS y Catálogo").setIcon(android.R.drawable.ic_menu_manage)
-        navigationView.menu.add(0, 9, 8, "🍿 Auditoría Minicine").setIcon(android.R.drawable.ic_menu_view)
-        navigationView.menu.add(0, 10, 9, "🏎️ Auditoría Volantes").setIcon(android.R.drawable.ic_menu_view)
-        navigationView.menu.add(0, 11, 10, "💃 Auditoría Just Dance").setIcon(android.R.drawable.ic_menu_view)
-        navigationView.menu.add(0, 12, 11, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
-        navigationView.menu.add(0, 13, 12, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
-        navigationView.menu.add(0, 14, 13, "🛡️ Historial Global de Salas").setIcon(android.R.drawable.ic_menu_info_details)
-        navigationView.menu.add(0, 15, 14, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
-        navigationView.menu.add(0, 16, 15, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
-        navigationView.menu.add(0, 17, 16, "📁 Gestión de Secciones").setIcon(android.R.drawable.ic_menu_manage)
+        navigationView.menu.add(0, 12, 8, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
+        navigationView.menu.add(0, 13, 9, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
+        navigationView.menu.add(0, 14, 10, "🛡️ Auditoría de Salas").setIcon(android.R.drawable.ic_menu_info_details)
+        navigationView.menu.add(0, 15, 11, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
+        navigationView.menu.add(0, 16, 12, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
+        navigationView.menu.add(0, 17, 13, "📁 Gestión de Secciones").setIcon(android.R.drawable.ic_menu_manage)
 
         navigationView.setNavigationItemSelectedListener { item ->
             when (item.itemId) {
                 6 -> mostrarDialogoAdministrarSalas()
                 7 -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
                 8 -> posManager.mostrarDialogoGestionPOS()
-                9 -> roomAuditManager.mostrarDialogoHistorialAuditoriaPorArea("CINE", "🍿 Auditoría Minicine")
-                10 -> roomAuditManager.mostrarDialogoHistorialAuditoriaPorArea("AUTITOS", "🏎️ Auditoría Volantes")
-                11 -> roomAuditManager.mostrarDialogoHistorialAuditoriaPorArea("JUST_DANCE", "💃 Auditoría Just Dance")
                 12 -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
                 13 -> egresosManager.mostrarDialogoGestionEgresos()
                 14 -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
@@ -409,12 +403,9 @@ class MainActivity : AppCompatActivity() {
                         title.contains("Gestión de Secciones") || title.contains("Secciones") -> mostrarDialogoGestionarSecciones()
                         title.contains("Actualizaciones") -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
                         title.contains("Terminales POS") -> posManager.mostrarDialogoGestionPOS()
-                        title.contains("Auditoría Minicine") -> roomAuditManager.mostrarDialogoHistorialAuditoriaPorArea("CINE", "🍿 Auditoría Minicine")
-                        title.contains("Auditoría Volantes") -> roomAuditManager.mostrarDialogoHistorialAuditoriaPorArea("AUTITOS", "🏎️ Auditoría Volantes")
-                        title.contains("Auditoría Just Dance") -> roomAuditManager.mostrarDialogoHistorialAuditoriaPorArea("JUST_DANCE", "💃 Auditoría Just Dance")
                         title.contains("Auditoría Productos") -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
                         title.contains("Egresos") -> egresosManager.mostrarDialogoGestionEgresos()
-                        title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
+                        title.contains("Auditoría de Salas") || title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
                         title.contains("Precios Base") -> posManager.mostrarDialogoPreciosBase()
                         title.contains("Tabla de Tarifas") -> mostrarDialogoTablaTarifasMinicine()
                         else -> navegarAPantalla(title)
@@ -2069,12 +2060,45 @@ class MainActivity : AppCompatActivity() {
         fun redibujarListaSecciones() {
             llContenedor.removeAllViews()
 
-            val baseSections = listOf(
-                Triple("🎬", "Minicine", "Tarifa Plana (Base: ${BasePriceConfig.precioMinicine} Bs)"),
-                Triple("🏎️", "Autitos (Simuladores)", "Tiempo Libre (Base: ${BasePriceConfig.precioVolantes} Bs)"),
-                Triple("💃", "Just Dance", "Por Hora (Base: ${BasePriceConfig.precioJustDance} Bs)")
+            val secCine = listaSecciones.find { it.id == "minicine" } ?: SeccionSala(
+                id = "minicine",
+                nombre = "Minicine",
+                icono = "🎬",
+                orden = 1,
+                precioBaseDefault = BasePriceConfig.precioMinicine,
+                tipoCobro = "POR_TARIFA",
+                permitePelicula = true,
+                prefijoSala = "Sala",
+                baseIdRango = 1,
+                activa = true
             )
-            for ((icon, name, info) in baseSections) {
+            val secAutitos = listaSecciones.find { it.id == "autitos" } ?: SeccionSala(
+                id = "autitos",
+                nombre = "Autitos (Simuladores)",
+                icono = "🏎️",
+                orden = 2,
+                precioBaseDefault = BasePriceConfig.precioVolantes,
+                tipoCobro = "TIEMPO_LIBRE",
+                permitePelicula = false,
+                prefijoSala = "Car",
+                baseIdRango = 100,
+                activa = true
+            )
+            val secDance = listaSecciones.find { it.id == "just_dance" } ?: SeccionSala(
+                id = "just_dance",
+                nombre = "Just Dance",
+                icono = "💃",
+                orden = 3,
+                precioBaseDefault = BasePriceConfig.precioJustDance,
+                tipoCobro = "POR_HORA",
+                permitePelicula = false,
+                prefijoSala = "Just Dance",
+                baseIdRango = 200,
+                activa = true
+            )
+
+            val baseSections = listOf(secCine, secAutitos, secDance)
+            for (sec in baseSections) {
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     setPadding(24, 18, 24, 18)
@@ -2085,9 +2109,10 @@ class MainActivity : AppCompatActivity() {
                     layoutParams = lp
                 }
                 val tvInfo = TextView(this).apply {
-                    text = "$icon $name\n$info"
+                    val peliculaStr = if (sec.permitePelicula) "🎬 Con catálogo" else "⏱️ Sin película"
+                    text = "${sec.icono} ${sec.nombre} (Prefijo: ${sec.prefijoSala})\nBase: ${sec.precioBaseDefault} Bs • ${sec.tipoCobro} • $peliculaStr"
                     setTextColor(Color.WHITE)
-                    textSize = 13f
+                    textSize = 12f
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 }
                 val badge = TextView(this).apply {
@@ -2095,13 +2120,39 @@ class MainActivity : AppCompatActivity() {
                     setTextColor(Color.parseColor("#DEFF9A"))
                     textSize = 11f
                     setTypeface(null, Typeface.BOLD)
+                    setPadding(8, 0, 8, 0)
+                }
+                val btnEditarBase = TextView(this).apply {
+                    text = "✏️ Editar"
+                    setTextColor(Color.parseColor("#DEFF9A"))
+                    textSize = 11f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(12, 8, 12, 8)
+                    setOnClickListener {
+                        seccionEnEdicion = sec
+                        tvTituloForm?.text = "✏️ Editar Sección Base: ${sec.nombre}"
+                        etNombre.setText(sec.nombre)
+                        etIcono.setText(sec.icono)
+                        etPrefijo.setText(sec.prefijoSala)
+                        etPrecioBase.setText(sec.precioBaseDefault.toString())
+                        spTipoCobro.setSelection(when (sec.tipoCobro) {
+                            "POR_HORA" -> 1
+                            "POR_TARIFA" -> 2
+                            else -> 0
+                        })
+                        cbPermitePelicula.isChecked = sec.permitePelicula
+                        btnGuardar.text = "💾 Actualizar '${sec.nombre}'"
+                        Toast.makeText(this@MainActivity, "Modo edición activo para '${sec.nombre}'", Toast.LENGTH_SHORT).show()
+                    }
                 }
                 row.addView(tvInfo)
                 row.addView(badge)
+                row.addView(btnEditarBase)
                 llContenedor.addView(row)
             }
 
-            if (listaSecciones.isEmpty()) {
+            val customSections = listaSecciones.filter { it.id.lowercase() !in listOf("minicine", "autitos", "just_dance") }
+            if (customSections.isEmpty()) {
                 val tvEmpty = TextView(this).apply {
                     text = "No has creado secciones adicionales aún."
                     setTextColor(Color.parseColor("#787C99"))
@@ -2110,7 +2161,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 llContenedor.addView(tvEmpty)
             } else {
-                for (sec in listaSecciones) {
+                for (sec in customSections) {
                     val row = LinearLayout(this).apply {
                         orientation = LinearLayout.HORIZONTAL
                         setPadding(24, 18, 24, 18)
@@ -2161,17 +2212,30 @@ class MainActivity : AppCompatActivity() {
                         setOnClickListener {
                             AlertDialog.Builder(this@MainActivity)
                                 .setTitle("Eliminar Sección")
-                                .setMessage("¿Estás seguro de que deseas eliminar permanentemente la sección '${sec.nombre}'?")
+                                .setMessage("¿Estás seguro de que deseas eliminar la sección '${sec.nombre}'? Se eliminarán también todas las salas asociadas a esta sección.")
                                 .setPositiveButton("Sí, eliminar") { _, _ ->
                                     if (seccionEnEdicion?.id == sec.id) {
                                         resetearFormulario()
                                     }
                                     database.child("secciones_salas").child(sec.id).removeValue()
-                                        .addOnSuccessListener {
-                                            database.child("config_precios").child("precio_${sec.id}").removeValue()
-                                            Toast.makeText(this@MainActivity, "Sección '${sec.nombre}' eliminada", Toast.LENGTH_SHORT).show()
-                                            redibujarListaSecciones()
+                                    database.child("config_precios").child("precio_${sec.id}").removeValue()
+                                    // Cascada: Eliminar todas las salas asociadas a esta sección
+                                    database.child("salas").get().addOnSuccessListener { snapshot ->
+                                        for (child in snapshot.children) {
+                                            val sala = child.getValue(Sala::class.java)
+                                            val idStr = child.key ?: ""
+                                            val idNum = idStr.toIntOrNull() ?: -1
+                                            val matchesSection = (sala?.seccionId == sec.id) ||
+                                                    (sala?.seccionNombre.equals(sec.nombre, ignoreCase = true)) ||
+                                                    (sec.prefijoSala.isNotBlank() && sala?.nombre?.startsWith(sec.prefijoSala, ignoreCase = true) == true) ||
+                                                    (sec.baseIdRango > 0 && idNum in sec.baseIdRango..(sec.baseIdRango + 99))
+                                            if (matchesSection) {
+                                                child.ref.removeValue()
+                                            }
                                         }
+                                        Toast.makeText(this@MainActivity, "Sección '${sec.nombre}' y sus salas eliminadas", Toast.LENGTH_SHORT).show()
+                                        redibujarListaSecciones()
+                                    }
                                 }
                                 .setNegativeButton("Cancelar", null)
                                 .show()
@@ -2222,6 +2286,20 @@ class MainActivity : AppCompatActivity() {
 
                 database.child("secciones_salas").child(secId).setValue(seccionActualizada)
                     .addOnSuccessListener {
+                        when (secId) {
+                            "minicine" -> {
+                                database.child("config_precios").child("precio_minicine").setValue(precio)
+                                BasePriceConfig.precioMinicine = precio
+                            }
+                            "autitos" -> {
+                                database.child("config_precios").child("precio_volantes").setValue(precio)
+                                BasePriceConfig.precioVolantes = precio
+                            }
+                            "just_dance" -> {
+                                database.child("config_precios").child("precio_just_dance").setValue(precio)
+                                BasePriceConfig.precioJustDance = precio
+                            }
+                        }
                         database.child("config_precios").child("precio_$secId").setValue(precio)
                         BasePriceConfig.preciosDinamicos[secId] = precio
                         BasePriceConfig.preciosDinamicos[nombre] = precio

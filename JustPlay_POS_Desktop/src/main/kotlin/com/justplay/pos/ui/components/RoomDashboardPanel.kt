@@ -46,7 +46,12 @@ fun RoomDashboardPanel(
             "Minicine" -> rooms.filter { it.categoria == "Minicine" }
             "Autitos" -> rooms.filter { it.categoria == "Autitos" }
             "Just Dance" -> rooms.filter { it.categoria == "Just Dance" }
-            else -> rooms
+            "Todas" -> rooms
+            else -> rooms.filter {
+                it.categoria.equals(category, ignoreCase = true) ||
+                it.seccionNombre.equals(category, ignoreCase = true) ||
+                it.seccionId.equals(category, ignoreCase = true)
+            }
         }
         baseList.sortedWith(compareBy({ extractRoomNumber(it.nombre, it.id) }, { it.id }))
     }

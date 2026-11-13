@@ -90,11 +90,11 @@ class RoomAuditManager(
      * Muestra la vista de bitácora de auditoría detallada de salas e identidad de dispositivos.
      */
     fun mostrarDialogoHistorialAuditoriaSalas() {
-        mostrarDialogoHistorialAuditoriaPorArea(null, "🛡️ Auditoría de Salas")
+        mostrarDialogoHistorialAuditoriaPorArea(null, "🛡️ Auditoría")
     }
 
     /**
-     * Muestra la vista de bitácora de auditoría de salas con filtros gráficos avanzados (fecha, horas, estado, secciones).
+     * Muestra la vista de bitácora de auditoría con filtros gráficos avanzados (fecha, horas, estado, secciones).
      */
     fun mostrarDialogoHistorialAuditoriaPorArea(categoriaFiltro: String?, tituloArea: String) {
         val dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_historial_auditoria, null)
@@ -106,6 +106,8 @@ class RoomAuditManager(
         val etBuscar = dialogView.findViewById<EditText>(R.id.etDialogAuditBuscar)
         val llContenedor = dialogView.findViewById<LinearLayout>(R.id.llDialogAuditContenedor)
         val tvEstado = dialogView.findViewById<TextView>(R.id.tvDialogAuditEstado)
+
+        tvTitulo.text = tituloArea
 
         // Botones de filtro de estado
         val btnAuditFiltroActivos = dialogView.findViewById<Button>(R.id.btnAuditFiltroActivos)
@@ -194,14 +196,17 @@ class RoomAuditManager(
 
                 btnEliminarRegistro.visibility = View.GONE
 
-                tvRegFechaHora.text = reg.fechaHora
+                // Hora exacta de la acción o registro
+                tvRegFechaHora.text = "⏰ Hora: ${reg.fechaHora}"
 
+                // Quién lo hizo (responsable) y cliente
+                val responsable = if (!reg.creadoPor.isNullOrBlank()) reg.creadoPor else "Personal"
                 val textoCliente = if (!reg.celular.isNullOrEmpty() && reg.celular != "S/N") {
                     "👤 Cliente: ${reg.cliente} (📱 Cel: ${reg.celular})"
                 } else {
                     "👤 Cliente: ${reg.cliente}"
                 }
-                tvRegCliente.text = textoCliente
+                tvRegCliente.text = "$textoCliente\n🧑‍💼 Responsable: $responsable"
 
                 val icono = when {
                     reg.nombreElemento.contains("Dance", ignoreCase = true) -> "💃"
@@ -217,7 +222,8 @@ class RoomAuditManager(
                 val infoExtra = listOf(peliculaText, tiempoText).filter { it.isNotBlank() }.joinToString(" | ")
                 tvRegDetalles.text = if (infoExtra.isNotBlank()) infoExtra else "Sin información adicional de tiempo"
 
-                tvRegPedidos.text = "Pedidos: ${if (reg.pedidos.isBlank()) "Ninguno" else reg.pedidos}"
+                // En la sección Auditoría ya no es necesario mostrar lo que se vendió (productos)
+                tvRegPedidos.visibility = View.GONE
 
                 val montoFormat = if (reg.totalCobrado % 1.0 == 0.0) reg.totalCobrado.toInt().toString() else reg.totalCobrado.toString()
                 tvRegTotal.text = "Total: $montoFormat Bs"
@@ -252,7 +258,7 @@ class RoomAuditManager(
                     val elimPor = reg.eliminadoPor ?: "Personal"
                     val fechaElim = reg.fechaEliminacion ?: "Fecha desconocida"
                     val motivo = reg.motivoEliminacion ?: "Sin motivo registrado"
-                    tvInfoEliminacion.text = "⚠️ REGISTRO BORRADO\nPor: $elimPor | Fecha: $fechaElim ($motivo)"
+                    tvInfoEliminacion.text = "⚠️ REGISTRO BORRADO\n🗑️ Borrado por: $elimPor | ⏰ Hora: $fechaElim\n📝 Motivo: $motivo"
                     btnRestaurarRegistro.visibility = View.VISIBLE
                     btnRestaurarRegistro.setOnClickListener {
                         AlertDialog.Builder(context)

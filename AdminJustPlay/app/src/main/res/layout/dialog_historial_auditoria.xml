@@ -26,7 +26,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="🛡️ Auditoría de Salas"
+                android:text="🛡️ Auditoría"
                 android:textColor="#FFFFFF"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -61,7 +61,7 @@
             android:id="@+id/tvDialogAuditSubtitulo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Registro histórico inmutable: quién, cuándo y desde qué dispositivo se operó."
+            android:text="Control de operaciones: responsable, hora exacta, importes y estado."
             android:textColor="#A0A0A0"
             android:textSize="12sp"
             android:layout_marginTop="2dp"

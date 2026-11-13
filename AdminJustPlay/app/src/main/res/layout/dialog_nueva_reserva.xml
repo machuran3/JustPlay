@@ -96,16 +96,21 @@
                 android:textSize="13sp"
                 android:layout_marginTop="14dp"/>
 
-            <RadioGroup
-                android:id="@+id/rgResTipo"
+            <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
+                android:scrollbars="none"
                 android:layout_marginTop="4dp">
-                <RadioButton android:id="@+id/rbResCine" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Minicine" android:textColor="#FFFFFF" android:checked="true"/>
-                <RadioButton android:id="@+id/rbResAuto" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Autitos" android:textColor="#FFFFFF" />
-                <RadioButton android:id="@+id/rbResDance" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Just Dance" android:textColor="#FFFFFF" />
-            </RadioGroup>
+                <RadioGroup
+                    android:id="@+id/rgResTipo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <RadioButton android:id="@+id/rbResCine" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Minicine" android:textColor="#FFFFFF" android:checked="true"/>
+                    <RadioButton android:id="@+id/rbResAuto" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Autitos" android:textColor="#FFFFFF" />
+                    <RadioButton android:id="@+id/rbResDance" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Just Dance" android:textColor="#FFFFFF" />
+                </RadioGroup>
+            </HorizontalScrollView>
 
             <!-- CANTIDAD DE VOLANTES (SOLO AUTITOS) -->
             <LinearLayout

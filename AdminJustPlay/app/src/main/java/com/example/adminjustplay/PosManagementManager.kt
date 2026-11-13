@@ -775,20 +775,33 @@ class PosManagementManager(
                     "precio_minicine" to nuevoMinicine,
                     "precio_volantes" to nuevoVolantes,
                     "precio_just_dance" to nuevoJustDance,
+                    "precio_autitos" to nuevoVolantes,
+                    "precio_salas" to nuevoMinicine,
                     "ultima_actualizacion" to fecha,
                     "actualizado_por" to "Admin"
                 )
+
+                BasePriceConfig.precioMinicine = nuevoMinicine
+                BasePriceConfig.precioVolantes = nuevoVolantes
+                BasePriceConfig.precioJustDance = nuevoJustDance
+
+                // Sincronizar secciones base en secciones_salas
+                database.child("secciones_salas").child("minicine").child("precioBaseDefault").setValue(nuevoMinicine)
+                database.child("secciones_salas").child("autitos").child("precioBaseDefault").setValue(nuevoVolantes)
+                database.child("secciones_salas").child("just_dance").child("precioBaseDefault").setValue(nuevoJustDance)
 
                 for ((secId, pair) in mapaInputsDinamicos) {
                     val (sec, et) = pair
                     val precioVal = et.text.toString().toDoubleOrNull() ?: sec.precioBaseDefault
                     updateMap["precio_$secId"] = precioVal
+                    BasePriceConfig.preciosDinamicos[secId] = precioVal
+                    BasePriceConfig.preciosDinamicos[sec.nombre] = precioVal
                     // Sincronizar también con la sección de sala en Firebase
                     database.child("secciones_salas").child(secId).child("precioBaseDefault").setValue(precioVal)
                 }
 
                 database.child("config_precios").updateChildren(updateMap).addOnSuccessListener {
-                    Toast.makeText(context, "✅ Precios base actualizados correctamente", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "✅ Precios base actualizados y sincronizados", Toast.LENGTH_SHORT).show()
                 }.addOnFailureListener {
                     Toast.makeText(context, "❌ Error al guardar precios: ${it.message}", Toast.LENGTH_SHORT).show()
                 }

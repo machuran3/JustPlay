@@ -209,13 +209,29 @@ object BasePriceConfig {
     fun updateFromSnapshot(snapshot: com.google.firebase.database.DataSnapshot) {
         val pM = snapshot.child("precio_minicine").getValue(Double::class.java)
             ?: snapshot.child("precio_minicine").getValue(Long::class.java)?.toDouble()
+            ?: snapshot.child("precio_salas").getValue(Double::class.java)
+            ?: snapshot.child("precio_salas").getValue(Long::class.java)?.toDouble()
         val pV = snapshot.child("precio_volantes").getValue(Double::class.java)
             ?: snapshot.child("precio_volantes").getValue(Long::class.java)?.toDouble()
+            ?: snapshot.child("precio_autitos").getValue(Double::class.java)
+            ?: snapshot.child("precio_autitos").getValue(Long::class.java)?.toDouble()
         val pJD = snapshot.child("precio_just_dance").getValue(Double::class.java)
             ?: snapshot.child("precio_just_dance").getValue(Long::class.java)?.toDouble()
 
         if (pM != null && pM > 0) precioMinicine = pM
         if (pV != null && pV > 0) precioVolantes = pV
         if (pJD != null && pJD > 0) precioJustDance = pJD
+
+        for (child in snapshot.children) {
+            val key = child.key ?: continue
+            val v = child.getValue(Double::class.java) ?: child.getValue(Long::class.java)?.toDouble()
+            if (v != null && v > 0) {
+                if (key.startsWith("precio_")) {
+                    val secKey = key.removePrefix("precio_")
+                    preciosDinamicos[secKey] = v
+                }
+                preciosDinamicos[key] = v
+            }
+        }
     }
 }

@@ -93,8 +93,13 @@ class MainActivity : AppCompatActivity() {
     private var salasMinicine: List<Sala> = emptyList()
     private var salasAutitos: List<Sala> = emptyList()
     private var salasJustDance: List<Sala> = emptyList()
+    private var salasDinamicas: List<Sala> = emptyList()
     private val listaSecciones = mutableListOf<SeccionSala>()
     private val filtrosSeccionesDinamicasEstado = mutableMapOf<String, Boolean>()
+
+    private var adapterSalasMinicine: SalasAdapter? = null
+    private var adapterSalasAutitos: SalasAdapter? = null
+    private var adapterSalasJustDance: SalasAdapter? = null
 
     // REGISTRO Y AUDITORIA
     private val historialCompleto = mutableListOf<RegistroEntry>()
@@ -107,6 +112,7 @@ class MainActivity : AppCompatActivity() {
     private val reservasMinicineList = mutableListOf<Reserva>()
     private val reservasAutitosList = mutableListOf<Reserva>()
     private val reservasDanceList = mutableListOf<Reserva>()
+    private val reservasDinamicasMap = mutableMapOf<String, MutableList<Reserva>>()
 
     private lateinit var adapterResMinicine: ReservasAdapter
     private lateinit var adapterResAutitos: ReservasAdapter
@@ -380,7 +386,7 @@ class MainActivity : AppCompatActivity() {
         navigationView.menu.add(0, 8, 7, "🖥️ Terminales POS y Catálogo").setIcon(android.R.drawable.ic_menu_manage)
         navigationView.menu.add(0, 12, 8, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
         navigationView.menu.add(0, 13, 9, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
-        navigationView.menu.add(0, 14, 10, "🛡️ Auditoría de Salas").setIcon(android.R.drawable.ic_menu_info_details)
+        navigationView.menu.add(0, 14, 10, "🛡️ Auditoría").setIcon(android.R.drawable.ic_menu_info_details)
         navigationView.menu.add(0, 15, 11, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
         navigationView.menu.add(0, 16, 12, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
         navigationView.menu.add(0, 17, 13, "📁 Gestión de Secciones").setIcon(android.R.drawable.ic_menu_manage)
@@ -405,7 +411,7 @@ class MainActivity : AppCompatActivity() {
                         title.contains("Terminales POS") -> posManager.mostrarDialogoGestionPOS()
                         title.contains("Auditoría Productos") -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
                         title.contains("Egresos") -> egresosManager.mostrarDialogoGestionEgresos()
-                        title.contains("Auditoría de Salas") || title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
+                        (title.contains("Auditoría") && !title.contains("Productos")) || title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
                         title.contains("Precios Base") -> posManager.mostrarDialogoPreciosBase()
                         title.contains("Tabla de Tarifas") -> mostrarDialogoTablaTarifasMinicine()
                         else -> navegarAPantalla(title)
@@ -1044,11 +1050,11 @@ class MainActivity : AppCompatActivity() {
                 salasAutitos = tempSalas.filter { (it.seccionNombre.equals("Autitos", true) || it.seccionNombre.equals("Volantes", true) || (it.seccionNombre.isBlank() && (it.id in 101..199 || it.nombre.contains("Car", true) || it.nombre.contains("Auto", true) || it.nombre.contains("Volante", true)))) && !it.esMinicine() }.sortedBy { it.id }
                 salasJustDance = tempSalas.filter { (it.seccionNombre.equals("Just Dance", true) || (it.seccionNombre.isBlank() && (it.id >= 200 || it.nombre.contains("Dance", true)))) && !it.esMinicine() }.sortedBy { it.id }
 
-                val salasDinamicas = tempSalas.filter { it !in salasMinicine && it !in salasAutitos && it !in salasJustDance }.sortedBy { it.id }
+                salasDinamicas = tempSalas.filter { it !in salasMinicine && it !in salasAutitos && it !in salasJustDance }.sortedBy { it.id }
 
-                configurarRecyclerView(findViewById(R.id.rvSalasMinicine), salasMinicine)
-                configurarRecyclerView(findViewById(R.id.rvSalasAutitos), salasAutitos)
-                configurarRecyclerView(findViewById(R.id.rvSalasJustDance), salasJustDance)
+                adapterSalasMinicine = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasMinicine), salasMinicine, adapterSalasMinicine) { adapterSalasMinicine = it }
+                adapterSalasAutitos = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasAutitos), salasAutitos, adapterSalasAutitos) { adapterSalasAutitos = it }
+                adapterSalasJustDance = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasJustDance), salasJustDance, adapterSalasJustDance) { adapterSalasJustDance = it }
                 renderizarSeccionesDinamicas(salasDinamicas)
 
                 actualizarContadorOcupacion()
@@ -1064,8 +1070,8 @@ class MainActivity : AppCompatActivity() {
             override fun onCancelled(error: DatabaseError) {}
         })
 
-        // 2. ESCUCHAR AUDITORIA Y REGISTROS HISTORICOS (INMUTABLE)
-        database.child("auditoria_registros").addValueEventListener(object : ValueEventListener {
+        // 2. ESCUCHAR AUDITORIA Y REGISTROS HISTORICOS (OPTIMIZADO CON LÍMITE)
+        database.child("auditoria_registros").limitToLast(300).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 historialCompleto.clear()
                 for (snap in snapshot.children) {
@@ -1084,13 +1090,14 @@ class MainActivity : AppCompatActivity() {
             override fun onCancelled(error: DatabaseError) {}
         })
 
-        // 3. ESCUCHAR RESERVAS
+        // 3. ESCUCHAR RESERVAS (CON SOPORTE DE SECCIONES DINÁMICAS)
         database.child("reservas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 listaReservasGlobales.clear()
                 reservasMinicineList.clear()
                 reservasAutitosList.clear()
                 reservasDanceList.clear()
+                reservasDinamicasMap.clear()
 
                 for (snap in snapshot.children) {
                     val res = snap.getValue(Reserva::class.java)
@@ -1100,7 +1107,11 @@ class MainActivity : AppCompatActivity() {
                         when (res.tipoSala) {
                             "Minicine" -> reservasMinicineList.add(res)
                             "Autitos" -> reservasAutitosList.add(res)
-                            else -> reservasDanceList.add(res)
+                            "Just Dance" -> reservasDanceList.add(res)
+                            else -> {
+                                val list = reservasDinamicasMap.getOrPut(res.tipoSala) { mutableListOf() }
+                                list.add(res)
+                            }
                         }
                     }
                 }
@@ -1108,9 +1119,14 @@ class MainActivity : AppCompatActivity() {
                 reservasMinicineList.sortBy { it.getSortTimestamp() }
                 reservasAutitosList.sortBy { it.getSortTimestamp() }
                 reservasDanceList.sortBy { it.getSortTimestamp() }
+                for (list in reservasDinamicasMap.values) {
+                    list.sortBy { it.getSortTimestamp() }
+                }
+
                 adapterResMinicine.notifyDataSetChanged()
                 adapterResAutitos.notifyDataSetChanged()
                 adapterResDance.notifyDataSetChanged()
+                renderizarReservasSeccionesDinamicas()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1201,6 +1217,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 actualizarFiltrosSeccionesDinamicas()
+                renderizarReservasSeccionesDinamicas()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1658,26 +1675,45 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun configurarRecyclerView(rv: RecyclerView, lista: List<Sala>) {
-        rv.layoutManager = GridLayoutManager(this, 2)
-        rv.adapter = SalasAdapter(
-            listaSalas = lista,
-            onClickSala = { salaSeleccionada ->
-                if (!estaConectadoInternet) {
-                    mostrarDialogoDetallesSalaSoloLectura(salaSeleccionada)
-                    return@SalasAdapter
-                }
+    private fun actualizarRecyclerViewSalas(rv: RecyclerView, lista: List<Sala>, adapterExistente: SalasAdapter?, onSetAdapter: (SalasAdapter) -> Unit): SalasAdapter {
+        return if (adapterExistente != null && rv.adapter == adapterExistente) {
+            adapterExistente.actualizarLista(lista)
+            adapterExistente
+        } else {
+            val nuevoAdapter = SalasAdapter(
+                listaSalas = lista,
+                onClickSala = { salaSeleccionada ->
+                    if (!estaConectadoInternet) {
+                        mostrarDialogoDetallesSalaSoloLectura(salaSeleccionada)
+                        return@SalasAdapter
+                    }
 
-                if (salaSeleccionada.estado == EstadoSala.DISPONIBLE) {
-                    mostrarDialogoFuncion(salaSeleccionada, esNueva = true)
-                } else {
-                    mostrarDialogoFuncion(salaSeleccionada, esNueva = false)
+                    if (salaSeleccionada.estado == EstadoSala.DISPONIBLE) {
+                        mostrarDialogoFuncion(salaSeleccionada, esNueva = true)
+                    } else {
+                        mostrarDialogoFuncion(salaSeleccionada, esNueva = false)
+                    }
+                },
+                onLongClickSala = { salaSeleccionada ->
+                    mostrarDialogoConfirmarEliminarSalaDirecto(salaSeleccionada)
                 }
-            },
-            onLongClickSala = { salaSeleccionada ->
-                mostrarDialogoConfirmarEliminarSalaDirecto(salaSeleccionada)
+            )
+            if (rv.layoutManager == null) {
+                rv.layoutManager = GridLayoutManager(this, 2)
             }
-        )
+            rv.adapter = nuevoAdapter
+            onSetAdapter(nuevoAdapter)
+            nuevoAdapter
+        }
+    }
+
+    private fun configurarRecyclerView(rv: RecyclerView, lista: List<Sala>) {
+        val adapterActual = rv.adapter as? SalasAdapter
+        if (adapterActual != null) {
+            adapterActual.actualizarLista(lista)
+        } else {
+            actualizarRecyclerViewSalas(rv, lista, null) {}
+        }
     }
 
     private fun eliminarSalaDeFirebase(sala: Sala) {
@@ -2377,6 +2413,54 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun renderizarReservasSeccionesDinamicas() {
+        val contenedor = findViewById<LinearLayout>(R.id.llContenedorReservasSeccionesDinamicas) ?: return
+        contenedor.removeAllViews()
+
+        val seccionesParaMostrar = mutableSetOf<String>()
+        for (sec in listaSecciones) {
+            if (sec.id.lowercase() !in listOf("minicine", "autitos", "just_dance") &&
+                sec.nombre.lowercase() !in listOf("minicine", "autitos", "volantes", "just dance")) {
+                seccionesParaMostrar.add(sec.nombre)
+            }
+        }
+        for (key in reservasDinamicasMap.keys) {
+            if (key.isNotBlank()) seccionesParaMostrar.add(key)
+        }
+
+        if (seccionesParaMostrar.isEmpty()) return
+
+        for (nombreSeccion in seccionesParaMostrar) {
+            val secInfo = listaSecciones.find { it.nombre.equals(nombreSeccion, ignoreCase = true) }
+            val icono = secInfo?.icono ?: "🎮"
+            val listaRes = reservasDinamicasMap[nombreSeccion] ?: mutableListOf()
+
+            val tvHeader = TextView(this).apply {
+                text = "$icono $nombreSeccion"
+                setTextColor(Color.parseColor("#DEFF9A"))
+                textSize = 16f
+                setTypeface(null, Typeface.BOLD)
+                val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.setMargins(0, 32, 0, 8)
+                layoutParams = lp
+            }
+            contenedor.addView(tvHeader)
+
+            val rv = RecyclerView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                isNestedScrollingEnabled = false
+            }
+            val adapterRes = ReservasAdapter(
+                listaRes,
+                onEditarReserva = { mostrarDialogoEditarReserva(it) },
+                onAsignarSala = { mostrarDialogoSeleccionarSalaLibre(it) }
+            )
+            rv.layoutManager = LinearLayoutManager(this)
+            rv.adapter = adapterRes
+            contenedor.addView(rv)
+        }
+    }
+
     private fun mostrarDialogoDetallesSalaSoloLectura(sala: Sala) {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_detalle_sala_solo_lectura, null)
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
@@ -2653,7 +2737,14 @@ class MainActivity : AppCompatActivity() {
         val salasLibres = when (reserva.tipoSala) {
             "Minicine" -> salasMinicine.filter { it.estado == EstadoSala.DISPONIBLE }
             "Autitos" -> salasAutitos.filter { it.estado == EstadoSala.DISPONIBLE }
-            else -> salasJustDance.filter { it.estado == EstadoSala.DISPONIBLE }
+            "Just Dance" -> salasJustDance.filter { it.estado == EstadoSala.DISPONIBLE }
+            else -> salasDinamicas.filter {
+                it.estado == EstadoSala.DISPONIBLE && (
+                    it.seccionNombre.equals(reserva.tipoSala, ignoreCase = true) ||
+                    it.seccionId.equals(reserva.tipoSala, ignoreCase = true) ||
+                    it.nombre.contains(reserva.tipoSala, ignoreCase = true)
+                )
+            }
         }
 
         if (salasLibres.isEmpty()) {
@@ -2954,9 +3045,13 @@ class MainActivity : AppCompatActivity() {
             btnConfirmar.text = "Iniciar Función"
             btnGuardarCambios?.visibility = View.GONE
             sala.pedidos.clear()
+            val precioSugerido = sala.getPrecioBaseSugerido()
+            val precioFmt = if (precioSugerido % 1.0 == 0.0) precioSugerido.toInt().toString() else precioSugerido.toString()
             if (esMinicine) {
                 etTiempo.setText("2:00")
-                etPrecioSala.setText("40")
+                etPrecioSala.setText(precioFmt)
+            } else {
+                etPrecioSala.setText(precioFmt)
             }
             redibujarPedidos()
             refrescarTotalUI()
@@ -3378,6 +3473,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // SECCIONES DINÁMICAS EN EL DIÁLOGO DE RESERVAS
+        for (sec in listaSecciones) {
+            if (sec.id.lowercase() in listOf("minicine", "autitos", "just_dance") ||
+                sec.nombre.lowercase() in listOf("minicine", "autitos", "volantes", "just dance")) continue
+            val rb = RadioButton(this).apply {
+                text = "${sec.icono} ${sec.nombre}"
+                tag = sec.nombre
+                setTextColor(Color.WHITE)
+                val lp = RadioGroup.LayoutParams(RadioGroup.LayoutParams.WRAP_CONTENT, RadioGroup.LayoutParams.WRAP_CONTENT)
+                lp.marginStart = 16
+                layoutParams = lp
+            }
+            rgResTipo.addView(rb)
+        }
+
         fun recalcularMixtoReserva() {
             val adelanto = etResAdelanto.text.toString().toDoubleOrNull() ?: 0.0
             val efec = etResMontoEfectivoMixto?.text.toString().toDoubleOrNull() ?: 0.0
@@ -3488,7 +3598,19 @@ class MainActivity : AppCompatActivity() {
                     etResVolantes.setText(reservaExistente.cantidadVolantes.toString())
                 }
                 "Just Dance" -> rbResDance.isChecked = true
-                else -> rbResCine.isChecked = true
+                "Minicine" -> rbResCine.isChecked = true
+                else -> {
+                    var checkedCustom = false
+                    for (i in 0 until rgResTipo.childCount) {
+                        val child = rgResTipo.getChildAt(i)
+                        if (child is RadioButton && child.tag?.toString()?.equals(reservaExistente.tipoSala, ignoreCase = true) == true) {
+                            child.isChecked = true
+                            checkedCustom = true
+                            break
+                        }
+                    }
+                    if (!checkedCustom) rbResCine.isChecked = true
+                }
             }
 
             when {
@@ -3516,7 +3638,8 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val tipoSala = when (rgResTipo.checkedRadioButtonId) {
+            val checkedRb = dialogView.findViewById<RadioButton>(rgResTipo.checkedRadioButtonId)
+            val tipoSala = checkedRb?.tag?.toString() ?: when (rgResTipo.checkedRadioButtonId) {
                 R.id.rbResAuto -> "Autitos"
                 R.id.rbResDance -> "Just Dance"
                 else -> "Minicine"

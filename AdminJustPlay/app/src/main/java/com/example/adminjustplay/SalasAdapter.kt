@@ -16,10 +16,15 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 class SalasAdapter(
-    private val listaSalas: List<Sala>,
+    private var listaSalas: List<Sala>,
     private val onClickSala: (Sala) -> Unit,
     private val onLongClickSala: ((Sala) -> Unit)? = null
 ) : RecyclerView.Adapter<SalasAdapter.SalaViewHolder>() {
+
+    fun actualizarLista(nuevaLista: List<Sala>) {
+        listaSalas = nuevaLista.toList()
+        notifyDataSetChanged()
+    }
 
     class SalaViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val tvNombreSala: TextView = view.findViewById(R.id.tvNombreSala)

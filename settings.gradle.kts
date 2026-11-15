@@ -20,6 +20,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "JustPlay"
-include(":app")
+include(":Employ_JustPlay")
+project(":Employ_JustPlay").projectDir = file("Employ_JustPlay/app")
 include(":AdminJustPlay")
 project(":AdminJustPlay").projectDir = file("AdminJustPlay/app")

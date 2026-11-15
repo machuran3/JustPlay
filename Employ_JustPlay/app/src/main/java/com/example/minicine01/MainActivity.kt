@@ -21,6 +21,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Log
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -247,442 +248,450 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
         try {
-            // INICIALIZAR CANAL DE NOTIFICACIONES Y PERMISOS
-            crearCanalNotificaciones()
-            solicitarPermisoNotificaciones()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+            setContentView(R.layout.activity_main)
 
-        // INICIALIZAR FECHA HOY POR DEFECTO PARA EL REGISTRO
-        fechaFiltroSeleccionada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-        horaInicioFiltro = null
-        horaFinFiltro = null
+            // 1. INICIALIZAR TODAS LAS VISTAS Y CONTENEDORES PRINCIPALES PRIMERO
+            drawerLayout = findViewById(R.id.drawerLayout)
+            layoutTablero = findViewById(R.id.layoutTablero)
+            layoutRegistro = findViewById(R.id.layoutRegistro)
+            layoutReservasGenerales = findViewById(R.id.layoutReservasGenerales)
+            layoutVetados = findViewById(R.id.layoutVetados)
+            tvTituloToolbar = findViewById(R.id.tvTituloToolbar)
+            tvBadgeOffline = findViewById(R.id.tvBadgeOffline)
 
-        // INICIALIZAR FIREBASE Y GESTORES SOLID
-        database = FirebaseDatabase.getInstance().reference
-        iniciarListenerCatalogoProductos()
-        roomAuditManager = RoomAuditManager(this, database)
-        productAuditManager = ProductAuditManager(this, database)
-        egresosManager = EgresosManager(this, database)
-        qrValidationHelper = QrPaymentValidationHelper(this, database) { solicitudId ->
-            capturarComprobantesParaSolicitud(solicitudId)
-        }
-        qrValidationHelper.iniciarEscucha()
-        otgScanner = OtgBarcodeScannerHelper(object : IBarcodeScanListener {
-            override fun onBarcodeScanned(barcode: String) {
-                mostrarDialogoVentaOTGEmergencia(barcode)
-            }
-        })
+            tvMinicineOcupadas = findViewById(R.id.tvMinicineOcupadas)
+            tvAutitosOcupados = findViewById(R.id.tvAutitosOcupados)
+            tvJustDanceOcupados = findViewById(R.id.tvJustDanceOcupados)
+            llContenedorReservasDash = findViewById(R.id.llContenedorReservasDash)
 
-        drawerLayout = findViewById(R.id.drawerLayout)
-        layoutTablero = findViewById(R.id.layoutTablero)
-        layoutRegistro = findViewById(R.id.layoutRegistro)
-        layoutReservasGenerales = findViewById(R.id.layoutReservasGenerales)
-        layoutVetados = findViewById(R.id.layoutVetados)
-        tvTituloToolbar = findViewById(R.id.tvTituloToolbar)
-        tvBadgeOffline = findViewById(R.id.tvBadgeOffline)
+            fabOverlay = findViewById(R.id.fabOverlay)
+            llFabVenta = findViewById(R.id.llFabVenta)
+            llFabReservas = findViewById(R.id.llFabReservas)
+            fabMain = findViewById(R.id.fabMain)
 
-        tvMinicineOcupadas = findViewById(R.id.tvMinicineOcupadas)
-        tvAutitosOcupados = findViewById(R.id.tvAutitosOcupados)
-        tvJustDanceOcupados = findViewById(R.id.tvJustDanceOcupados)
-        llContenedorReservasDash = findViewById(R.id.llContenedorReservasDash)
-
-        fabOverlay = findViewById(R.id.fabOverlay)
-        llFabVenta = findViewById(R.id.llFabVenta)
-        llFabReservas = findViewById(R.id.llFabReservas)
-        fabMain = findViewById(R.id.fabMain)
-
-        try {
-            // INICIALIZAR MONITOREO DE PRESENCIA Y SEGURIDAD
-            PresenciaManager.iniciarMonitoreoPresencia(this, "Employ_JustPlay", "Empleado")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        // ELEMENTOS DE SEGURIDAD Y LOGIN DE PIN
-        val layoutLoginPin = findViewById<View>(R.id.layoutLoginPin)
-        val tvLoginDispositivoInfo = findViewById<TextView>(R.id.tvLoginDispositivoInfo)
-        val tvLoginVigenciaAcceso = findViewById<TextView>(R.id.tvLoginVigenciaAcceso)
-        val etLoginPin = findViewById<EditText>(R.id.etLoginPin)
-        val tvLoginMensajeError = findViewById<TextView>(R.id.tvLoginMensajeError)
-        val btnLoginIngresar = findViewById<Button>(R.id.btnLoginIngresar)
-
-        val layoutBloqueo = findViewById<View>(R.id.layoutBloqueoDispositivo)
-        val tvTituloBloqueo = findViewById<TextView>(R.id.tvTituloBloqueo)
-        val tvMotivoBloqueo = findViewById<TextView>(R.id.tvMotivoBloqueo)
-        val tvDispositivoInfoBloqueo = findViewById<TextView>(R.id.tvDispositivoInfoBloqueo)
-        val btnReintentarPin = findViewById<Button>(R.id.btnReintentarPin)
-
-        fun refrescarInfoLogin() {
-            val user = PresenciaManager.obtenerUsuarioActualModel()
-            tvLoginDispositivoInfo.text = "📱 ${user.nombre} (${user.id})"
-            tvLoginVigenciaAcceso.text = "⏳ Acceso: ${user.obtenerTiempoRestanteTexto()}"
-            tvDispositivoInfoBloqueo.text = "Dispositivo: ${user.nombre} (${user.id})"
-        }
-
-        // Estado inicial de sesión: si ya estaba autenticado, entrar directo
-        val userInicial = PresenciaManager.obtenerUsuarioActualModel()
-        val estabaAutenticado = PresenciaManager.estaSesionAutenticada(this)
-
-        if (estabaAutenticado && !userInicial.bloqueado && !userInicial.estaExpirado()) {
-            sesionIniciada = true
-            layoutLoginPin.visibility = View.GONE
-            layoutBloqueo.visibility = View.GONE
-            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-            if (layoutTablero.visibility == View.VISIBLE && estaConectadoInternet) {
-                fabMain.visibility = View.VISIBLE
-            }
-        } else if (estabaAutenticado && userInicial.bloqueado) {
-            sesionIniciada = true
-            layoutLoginPin.visibility = View.GONE
-            layoutBloqueo.visibility = View.VISIBLE
-            tvTituloBloqueo.text = "🚫 Acceso Bloqueado"
-            tvMotivoBloqueo.text = userInicial.motivoBloqueo
-            fabMain.visibility = View.GONE
-            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        } else if (estabaAutenticado && userInicial.estaExpirado()) {
-            sesionIniciada = true
-            layoutLoginPin.visibility = View.GONE
-            layoutBloqueo.visibility = View.VISIBLE
-            tvTituloBloqueo.text = "⏰ Acceso Expirado"
-            tvMotivoBloqueo.text = "Tu tiempo de conexión autorizado (${userInicial.tipoTiempoAcceso}) ha finalizado. Solicita al Administrador reactivar tu sesión."
-            fabMain.visibility = View.GONE
-            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        } else {
-            sesionIniciada = false
-            layoutLoginPin.visibility = View.VISIBLE
-            layoutBloqueo.visibility = View.GONE
-            fabMain.visibility = View.GONE
-            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-        }
-
-        refrescarInfoLogin()
-
-        btnLoginIngresar.setOnClickListener {
-            val pinIngresado = etLoginPin.text.toString().trim()
-            val user = PresenciaManager.obtenerUsuarioActualModel()
-            val pinConfigurado = user.pin.trim().ifEmpty { "0001" }
-
-            // Permitir PIN configurado, PIN por defecto o PIN maestro de emergencia (0001, 1234, 9999)
-            val esPinValido = pinIngresado == pinConfigurado || 
-                              pinIngresado == "0001" || 
-                              pinIngresado == "1234" || 
-                              pinIngresado == "9999"
-
-            if (!esPinValido) {
-                tvLoginMensajeError.visibility = View.VISIBLE
-                tvLoginMensajeError.text = "PIN incorrecto. (PIN inicial por defecto: 0001)"
-                return@setOnClickListener
+            // 2. CANAL DE NOTIFICACIONES Y PERMISOS
+            try {
+                crearCanalNotificaciones()
+                solicitarPermisoNotificaciones()
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
 
-            if (user.bloqueado && pinIngresado != "9999") {
+            fechaFiltroSeleccionada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+            horaInicioFiltro = null
+            horaFinFiltro = null
+
+            // 3. INICIALIZAR BASE DE DATOS Y GESTORES SOLID
+            database = FirebaseDatabase.getInstance().reference
+            roomAuditManager = RoomAuditManager(this, database)
+            productAuditManager = ProductAuditManager(this, database)
+            egresosManager = EgresosManager(this, database)
+            qrValidationHelper = QrPaymentValidationHelper(this, database) { solicitudId ->
+                capturarComprobantesParaSolicitud(solicitudId)
+            }
+            otgScanner = OtgBarcodeScannerHelper(object : IBarcodeScanListener {
+                override fun onBarcodeScanned(barcode: String) {
+                    mostrarDialogoVentaOTGEmergencia(barcode)
+                }
+            })
+
+            // 4. INICIALIZAR TODOS LOS ADAPTERS Y ENLAZARLOS A SUS RECYCLERVIEWS
+            // 4.1 Registro
+            val rvRegistro = findViewById<RecyclerView>(R.id.rvRegistro)
+            rvRegistro.layoutManager = LinearLayoutManager(this)
+            registroAdapter = RegistroAdapter(historialFiltrado) { registroAEliminar ->
+                registroAEliminar.eliminado = true
+                registroAEliminar.fechaEliminacion = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+                registroAEliminar.eliminadoPor = PresenciaManager.obtenerNombreUsuario(this)
+                database.child("auditoria_registros").child(registroAEliminar.idFirebase).setValue(registroAEliminar)
+                database.child("registros").child(registroAEliminar.idFirebase).removeValue()
+            }
+            rvRegistro.adapter = registroAdapter
+
+            // 4.2 Reservas
+            configurarAdaptersReservas()
+
+            // 4.3 Vetados
+            vetadosAdapter = VetadosAdapter(listaVetadosGlobal,
+                onEditar = { vetado ->
+                    if (!estaConectadoInternet) {
+                        Toast.makeText(this, "⚠️ Sin conexión: No se pueden editar clientes sin internet.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        mostrarDialogoVetarCliente(vetado)
+                    }
+                },
+                onEliminar = { vetado ->
+                    if (!estaConectadoInternet) {
+                        Toast.makeText(this, "⚠️ Sin conexión: No se pueden eliminar clientes sin internet.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        database.child("vetados").child(vetado.celular).removeValue()
+                    }
+                }
+            )
+            val rvVetados = findViewById<RecyclerView>(R.id.rvVetados)
+            rvVetados.layoutManager = LinearLayoutManager(this)
+            rvVetados.adapter = vetadosAdapter
+
+            // 5. CONFIGURAR INTERACCIÓN Y EVENTOS DE UI
+            fabMain.setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Modo sin conexión: Estás en modo de solo lectura. Conéctate a internet para registrar ventas o reservas.", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                toggleFabMenu()
+            }
+            fabOverlay.setOnClickListener { toggleFabMenu() }
+
+            findViewById<FloatingActionButton>(R.id.fabVenta).setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden registrar ventas sin internet.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                toggleFabMenu()
+                mostrarDialogoVentaDirecta()
+            }
+
+            findViewById<FloatingActionButton>(R.id.fabReservas).setOnClickListener {
+                toggleFabMenu()
+                navegarAPantalla("Reservas")
+            }
+
+            findViewById<FloatingActionButton>(R.id.fabAgregarVetado).setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden agregar vetados sin internet.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                mostrarDialogoVetarCliente(null)
+            }
+
+            findViewById<FloatingActionButton>(R.id.fabAgregarReservaPantalla).setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden agregar reservas sin internet.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                mostrarDialogoNuevaReserva()
+            }
+
+            val checkboxes = listOf(
+                findViewById<CheckBox>(R.id.cbFiltroCine),
+                findViewById<CheckBox>(R.id.cbFiltroAutitos),
+                findViewById<CheckBox>(R.id.cbFiltroDance),
+                findViewById<CheckBox>(R.id.cbFiltroMostrador),
+                findViewById<CheckBox>(R.id.cbFiltroEfectivo),
+                findViewById<CheckBox>(R.id.cbFiltroQR),
+                findViewById<CheckBox>(R.id.cbFiltroEgresos)
+            )
+            checkboxes.forEach { cb ->
+                cb?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosRegistro() }
+            }
+
+            findViewById<Button>(R.id.btnFiltroFecha).setOnClickListener {
+                val cal = Calendar.getInstance()
+                DatePickerDialog(this, { _, year, month, day ->
+                    fechaFiltroSeleccionada = String.format("%02d/%02d/%d", day, month + 1, year)
+                    aplicarFiltrosRegistro()
+                }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+            }
+
+            findViewById<Button>(R.id.btnFiltroHoraInicio).setOnClickListener {
+                val cal = Calendar.getInstance()
+                TimePickerDialog(this, { _, hourOfDay, minute ->
+                    horaInicioFiltro = String.format("%02d:%02d", hourOfDay, minute)
+                    aplicarFiltrosRegistro()
+                }, cal.get(Calendar.HOUR_OF_DAY), 0, true).show()
+            }
+
+            findViewById<Button>(R.id.btnFiltroHoraFin).setOnClickListener {
+                val cal = Calendar.getInstance()
+                TimePickerDialog(this, { _, hourOfDay, minute ->
+                    horaFinFiltro = String.format("%02d:%02d", hourOfDay, minute)
+                    aplicarFiltrosRegistro()
+                }, cal.get(Calendar.HOUR_OF_DAY), 59, true).show()
+            }
+
+            findViewById<Button>(R.id.btnLimpiarHoras).setOnClickListener {
+                horaInicioFiltro = null
+                horaFinFiltro = null
+                aplicarFiltrosRegistro()
+            }
+
+            findViewById<Button>(R.id.btnLimpiarFecha).setOnClickListener {
+                fechaFiltroSeleccionada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                horaInicioFiltro = null
+                horaFinFiltro = null
+                aplicarFiltrosRegistro()
+            }
+
+            findViewById<Button>(R.id.btnExportar).setOnClickListener {
+                if (historialFiltrado.isEmpty()) {
+                    Toast.makeText(this, "No hay datos para exportar", Toast.LENGTH_SHORT).show()
+                } else {
+                    exportarCSV(historialFiltrado)
+                }
+            }
+
+            // ELEMENTOS DE SEGURIDAD Y LOGIN DE PIN
+            val layoutLoginPin = findViewById<View>(R.id.layoutLoginPin)
+            val tvLoginDispositivoInfo = findViewById<TextView>(R.id.tvLoginDispositivoInfo)
+            val tvLoginVigenciaAcceso = findViewById<TextView>(R.id.tvLoginVigenciaAcceso)
+            val etLoginPin = findViewById<EditText>(R.id.etLoginPin)
+            val tvLoginMensajeError = findViewById<TextView>(R.id.tvLoginMensajeError)
+            val btnLoginIngresar = findViewById<Button>(R.id.btnLoginIngresar)
+
+            val layoutBloqueo = findViewById<View>(R.id.layoutBloqueoDispositivo)
+            val tvTituloBloqueo = findViewById<TextView>(R.id.tvTituloBloqueo)
+            val tvMotivoBloqueo = findViewById<TextView>(R.id.tvMotivoBloqueo)
+            val tvDispositivoInfoBloqueo = findViewById<TextView>(R.id.tvDispositivoInfoBloqueo)
+            val btnReintentarPin = findViewById<Button>(R.id.btnReintentarPin)
+
+            fun refrescarInfoLogin() {
+                val user = PresenciaManager.obtenerUsuarioActualModel()
+                tvLoginDispositivoInfo.text = "📱 ${user.nombre} (${user.id})"
+                tvLoginVigenciaAcceso.text = "⏳ Acceso: ${user.obtenerTiempoRestanteTexto()}"
+                tvDispositivoInfoBloqueo.text = "Dispositivo: ${user.nombre} (${user.id})"
+            }
+
+            // Estado inicial de sesión
+            val userInicial = PresenciaManager.obtenerUsuarioActualModel()
+            val estabaAutenticado = PresenciaManager.estaSesionAutenticada(this)
+
+            if (estabaAutenticado && !userInicial.bloqueado && !userInicial.estaExpirado()) {
+                sesionIniciada = true
+                layoutLoginPin.visibility = View.GONE
+                layoutBloqueo.visibility = View.GONE
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+                if (layoutTablero.visibility == View.VISIBLE && estaConectadoInternet) {
+                    fabMain.visibility = View.VISIBLE
+                }
+            } else if (estabaAutenticado && userInicial.bloqueado) {
+                sesionIniciada = true
                 layoutLoginPin.visibility = View.GONE
                 layoutBloqueo.visibility = View.VISIBLE
                 tvTituloBloqueo.text = "🚫 Acceso Bloqueado"
-                tvMotivoBloqueo.text = user.motivoBloqueo
-                return@setOnClickListener
-            }
-
-            if (user.estaExpirado() && pinIngresado != "9999") {
+                tvMotivoBloqueo.text = userInicial.motivoBloqueo
+                fabMain.visibility = View.GONE
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            } else if (estabaAutenticado && userInicial.estaExpirado()) {
+                sesionIniciada = true
                 layoutLoginPin.visibility = View.GONE
                 layoutBloqueo.visibility = View.VISIBLE
                 tvTituloBloqueo.text = "⏰ Acceso Expirado"
-                tvMotivoBloqueo.text = "Tu tiempo de conexión autorizado (${user.tipoTiempoAcceso}) ha finalizado. Solicita al Administrador reactivar tu sesión."
-                return@setOnClickListener
+                tvMotivoBloqueo.text = "Tu tiempo de conexión autorizado (${userInicial.tipoTiempoAcceso}) ha finalizado. Solicita al Administrador reactivar tu sesión."
+                fabMain.visibility = View.GONE
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+            } else {
+                sesionIniciada = false
+                layoutLoginPin.visibility = View.VISIBLE
+                layoutBloqueo.visibility = View.GONE
+                fabMain.visibility = View.GONE
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             }
 
-            // Inicio de sesión exitoso
-            sesionIniciada = true
-            PresenciaManager.guardarSesionAutenticada(this, true)
-            layoutLoginPin.visibility = View.GONE
-            layoutBloqueo.visibility = View.GONE
-            tvLoginMensajeError.visibility = View.GONE
-            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-            navegarAPantalla("Just Play (Tablero)")
-            if (estaConectadoInternet) {
-                fabMain.visibility = View.VISIBLE
-            }
-            Toast.makeText(this, "¡Acceso concedido!", Toast.LENGTH_SHORT).show()
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
-            imm?.hideSoftInputFromWindow(etLoginPin.windowToken, 0)
-        }
-
-        btnReintentarPin.setOnClickListener {
-            layoutBloqueo.visibility = View.GONE
-            layoutLoginPin.visibility = View.VISIBLE
-            etLoginPin.text.clear()
-            tvLoginMensajeError.visibility = View.GONE
             refrescarInfoLogin()
-        }
 
-        // INICIALIZAR MONITOREO DE CAMBIOS EN TIEMPO REAL DEL USUARIO
-        PresenciaManager.onEstadoCambioListener = { user ->
-            runOnUiThread {
+            btnLoginIngresar.setOnClickListener {
+                val pinIngresado = etLoginPin.text.toString().trim()
+                val user = PresenciaManager.obtenerUsuarioActualModel()
+                val pinConfigurado = user.pin.trim().ifEmpty { "0001" }
+
+                val esPinValido = pinIngresado == pinConfigurado || 
+                                  pinIngresado == "0001" || 
+                                  pinIngresado == "1234" || 
+                                  pinIngresado == "9999"
+
+                if (!esPinValido) {
+                    tvLoginMensajeError.visibility = View.VISIBLE
+                    tvLoginMensajeError.text = "PIN incorrecto. (PIN inicial por defecto: 0001)"
+                    return@setOnClickListener
+                }
+
+                if (user.bloqueado && pinIngresado != "9999") {
+                    layoutLoginPin.visibility = View.GONE
+                    layoutBloqueo.visibility = View.VISIBLE
+                    tvTituloBloqueo.text = "🚫 Acceso Bloqueado"
+                    tvMotivoBloqueo.text = user.motivoBloqueo
+                    return@setOnClickListener
+                }
+
+                if (user.estaExpirado() && pinIngresado != "9999") {
+                    layoutLoginPin.visibility = View.GONE
+                    layoutBloqueo.visibility = View.VISIBLE
+                    tvTituloBloqueo.text = "⏰ Acceso Expirado"
+                    tvMotivoBloqueo.text = "Tu tiempo de conexión autorizado (${user.tipoTiempoAcceso}) ha finalizado. Solicita al Administrador reactivar tu sesión."
+                    return@setOnClickListener
+                }
+
+                sesionIniciada = true
+                PresenciaManager.guardarSesionAutenticada(this, true)
+                layoutLoginPin.visibility = View.GONE
+                layoutBloqueo.visibility = View.GONE
+                tvLoginMensajeError.visibility = View.GONE
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+                navegarAPantalla("Just Play (Tablero)")
+                if (estaConectadoInternet) {
+                    fabMain.visibility = View.VISIBLE
+                }
+                Toast.makeText(this, "¡Acceso concedido!", Toast.LENGTH_SHORT).show()
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(etLoginPin.windowToken, 0)
+            }
+
+            btnReintentarPin.setOnClickListener {
+                layoutBloqueo.visibility = View.GONE
+                layoutLoginPin.visibility = View.VISIBLE
+                etLoginPin.text.clear()
+                tvLoginMensajeError.visibility = View.GONE
                 refrescarInfoLogin()
-                if (sesionIniciada) {
-                    if (user.bloqueado) {
-                        layoutBloqueo.visibility = View.VISIBLE
-                        tvTituloBloqueo.text = "🚫 Acceso Bloqueado"
-                        tvMotivoBloqueo.text = user.motivoBloqueo
-                        fabMain.visibility = View.GONE
-                        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-                    } else if (user.estaExpirado()) {
-                        layoutBloqueo.visibility = View.VISIBLE
-                        tvTituloBloqueo.text = "⏰ Acceso Expirado"
-                        tvMotivoBloqueo.text = "Tu tiempo de conexión autorizado (${user.tipoTiempoAcceso}) ha finalizado. Solicita al Administrador reactivar tu sesión."
-                        fabMain.visibility = View.GONE
-                        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-                    } else {
-                        layoutBloqueo.visibility = View.GONE
-                        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
-                        if (layoutTablero.visibility == View.VISIBLE && estaConectadoInternet) {
-                            fabMain.visibility = View.VISIBLE
+            }
+
+            PresenciaManager.onEstadoCambioListener = { user ->
+                runOnUiThread {
+                    refrescarInfoLogin()
+                    if (sesionIniciada) {
+                        if (user.bloqueado) {
+                            layoutBloqueo.visibility = View.VISIBLE
+                            tvTituloBloqueo.text = "🚫 Acceso Bloqueado"
+                            tvMotivoBloqueo.text = user.motivoBloqueo
+                            fabMain.visibility = View.GONE
+                            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                        } else if (user.estaExpirado()) {
+                            layoutBloqueo.visibility = View.VISIBLE
+                            tvTituloBloqueo.text = "⏰ Acceso Expirado"
+                            tvMotivoBloqueo.text = "Tu tiempo de conexión autorizado (${user.tipoTiempoAcceso}) ha finalizado. Solicita al Administrador reactivar tu sesión."
+                            fabMain.visibility = View.GONE
+                            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                        } else {
+                            layoutBloqueo.visibility = View.GONE
+                            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
+                            if (layoutTablero.visibility == View.VISIBLE && estaConectadoInternet) {
+                                fabMain.visibility = View.VISIBLE
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Monitorear conectividad con Firebase Realtime Database
-        try {
-            FirebaseDatabase.getInstance().getReference(".info/connected").addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val connected = snapshot.getValue(Boolean::class.java) ?: false
-                    actualizarEstadoConexion(connected)
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+            runnableRelojes = object : Runnable {
+                override fun run() {
+                    actualizarRelojesReservas()
+                    verificarTiemposSalas()
 
-        // Monitorear conectividad a nivel de red Android
-        try {
-            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            cm.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    runOnUiThread { actualizarEstadoConexion(true) }
-                }
-                override fun onLost(network: Network) {
-                    runOnUiThread { actualizarEstadoConexion(false) }
-                }
-            })
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        fabMain.setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Modo sin conexión: Estás en modo de solo lectura. Conéctate a internet para registrar ventas o reservas.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            toggleFabMenu()
-        }
-        fabOverlay.setOnClickListener { toggleFabMenu() }
-
-        findViewById<FloatingActionButton>(R.id.fabVenta).setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Sin conexión: No se pueden registrar ventas sin internet.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            toggleFabMenu()
-            mostrarDialogoVentaDirecta()
-        }
-
-        findViewById<FloatingActionButton>(R.id.fabReservas).setOnClickListener {
-            toggleFabMenu()
-            navegarAPantalla("Reservas")
-        }
-
-        runnableRelojes = object : Runnable {
-            override fun run() {
-                actualizarRelojesReservas()
-                verificarTiemposSalas()
-
-                // Verificar si el tiempo límite del empleado expiró
-                if (sesionIniciada) {
-                    val user = PresenciaManager.obtenerUsuarioActualModel()
-                    if (user.estaExpirado() || user.bloqueado) {
-                        layoutBloqueo.visibility = View.VISIBLE
-                        tvTituloBloqueo.text = if (user.bloqueado) "🚫 Acceso Bloqueado" else "⏰ Acceso Expirado"
-                        tvMotivoBloqueo.text = if (user.bloqueado) user.motivoBloqueo else "Tu tiempo de conexión autorizado (${user.tipoTiempoAcceso}) ha finalizado."
-                        fabMain.visibility = View.GONE
-                        drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                    if (sesionIniciada) {
+                        val user = PresenciaManager.obtenerUsuarioActualModel()
+                        if (user.estaExpirado() || user.bloqueado) {
+                            layoutBloqueo.visibility = View.VISIBLE
+                            tvTituloBloqueo.text = if (user.bloqueado) "🚫 Acceso Bloqueado" else "⏰ Acceso Expirado"
+                            tvMotivoBloqueo.text = if (user.bloqueado) user.motivoBloqueo else "Tu tiempo de conexión autorizado (${user.tipoTiempoAcceso}) ha finalizado."
+                            fabMain.visibility = View.GONE
+                            drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                        }
                     }
+
+                    handlerRelojes.postDelayed(this, 1000)
                 }
-
-                handlerRelojes.postDelayed(this, 1000)
             }
-        }
-        handlerRelojes.post(runnableRelojes)
+            handlerRelojes.post(runnableRelojes)
 
-        val btnMenuHamburguesa = findViewById<TextView>(R.id.btnMenuHamburguesa)
-        btnMenuHamburguesa.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
+            val btnMenuHamburguesa = findViewById<TextView>(R.id.btnMenuHamburguesa)
+            btnMenuHamburguesa.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
 
-        val navigationView = findViewById<NavigationView>(R.id.navigationView)
-        navigationView.menu.add(0, 1, 0, "Just Play (Tablero)").setIcon(android.R.drawable.ic_menu_sort_by_size)
-        navigationView.menu.add(0, 2, 1, "Registro").setIcon(android.R.drawable.ic_menu_recent_history)
-        navigationView.menu.add(0, 3, 2, "Reservas").setIcon(android.R.drawable.ic_menu_today)
-        navigationView.menu.add(0, 4, 3, "Clientes Vetados").setIcon(android.R.drawable.ic_menu_close_clear_cancel)
-        navigationView.menu.add(0, 5, 4, "📦 Catálogo de Productos").setIcon(android.R.drawable.ic_menu_agenda)
-        navigationView.menu.add(0, 6, 5, "💸 Salidas de Caja / Insumos").setIcon(android.R.drawable.ic_menu_save)
-        navigationView.menu.add(0, 7, 6, "🔒 Bloquear Pantalla").setIcon(android.R.drawable.ic_lock_lock)
-        navigationView.menu.add(0, 8, 7, "🔄 Buscar Actualizaciones").setIcon(android.R.drawable.ic_popup_sync)
-        navigationView.menu.add(0, 9, 8, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
+            val navigationView = findViewById<NavigationView>(R.id.navigationView)
+            navigationView.menu.add(0, 1, 0, "Just Play (Tablero)").setIcon(android.R.drawable.ic_menu_sort_by_size)
+            navigationView.menu.add(0, 2, 1, "Registro").setIcon(android.R.drawable.ic_menu_recent_history)
+            navigationView.menu.add(0, 3, 2, "Reservas").setIcon(android.R.drawable.ic_menu_today)
+            navigationView.menu.add(0, 4, 3, "Clientes Vetados").setIcon(android.R.drawable.ic_menu_close_clear_cancel)
+            navigationView.menu.add(0, 5, 4, "📦 Catálogo de Productos").setIcon(android.R.drawable.ic_menu_agenda)
+            navigationView.menu.add(0, 6, 5, "💸 Salidas de Caja / Insumos").setIcon(android.R.drawable.ic_menu_save)
+            navigationView.menu.add(0, 7, 6, "🔒 Bloquear Pantalla").setIcon(android.R.drawable.ic_lock_lock)
+            navigationView.menu.add(0, 8, 7, "🔄 Buscar Actualizaciones").setIcon(android.R.drawable.ic_popup_sync)
+            navigationView.menu.add(0, 9, 8, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
 
-        navigationView.setNavigationItemSelectedListener { item ->
-            if (item.itemId == 5 || item.title.toString().contains("Catálogo")) {
-                mostrarDialogoCatalogoProductosEmpleado()
-            } else if (item.itemId == 6 || item.title.toString().contains("Salidas de Caja")) {
-                egresosManager.mostrarDialogoGestionEgresos(
-                    esAdmin = false,
-                    usuarioNombre = PresenciaManager.obtenerNombreUsuario(this),
-                    usuarioRol = "Empleado"
-                )
-            } else if (item.itemId == 7 || item.title.toString().contains("Bloquear")) {
-                sesionIniciada = false
-                PresenciaManager.guardarSesionAutenticada(this, false)
-                layoutLoginPin.visibility = View.VISIBLE
-                etLoginPin.text.clear()
-                tvLoginMensajeError.visibility = View.GONE
-                fabMain.visibility = View.GONE
-                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
-                refrescarInfoLogin()
-            } else if (item.itemId == 8 || item.title.toString().contains("Actualizaciones")) {
-                AppUpdateManager.verificarActualizacion(this, "Employ_JustPlay", mostrarToastSiNoHay = true)
-            } else if (item.itemId == 9 || item.title.toString().contains("Tabla de Tarifas")) {
-                mostrarDialogoTablaTarifasMinicine()
-            } else {
-                navegarAPantalla(item.title.toString())
-            }
-            drawerLayout.closeDrawers()
-            true
-        }
-
-        // COMPROBADOR AUTOMÁTICO DE ACTUALIZACIONES AL INICIAR (In-app updater)
-        try {
-            AppUpdateManager.verificarActualizacion(this, "Employ_JustPlay")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        val rvRegistro = findViewById<RecyclerView>(R.id.rvRegistro)
-        rvRegistro.layoutManager = LinearLayoutManager(this)
-        registroAdapter = RegistroAdapter(historialFiltrado) { registroAEliminar ->
-            registroAEliminar.eliminado = true
-            registroAEliminar.fechaEliminacion = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-            registroAEliminar.eliminadoPor = PresenciaManager.obtenerNombreUsuario(this)
-            database.child("auditoria_registros").child(registroAEliminar.idFirebase).setValue(registroAEliminar)
-            database.child("registros").child(registroAEliminar.idFirebase).removeValue()
-        }
-        rvRegistro.adapter = registroAdapter
-
-        configurarAdaptersReservas()
-
-        vetadosAdapter = VetadosAdapter(listaVetadosGlobal,
-            onEditar = { vetado ->
-                if (!estaConectadoInternet) {
-                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden editar clientes sin internet.", Toast.LENGTH_SHORT).show()
+            navigationView.setNavigationItemSelectedListener { item ->
+                if (item.itemId == 5 || item.title.toString().contains("Catálogo")) {
+                    mostrarDialogoCatalogoProductosEmpleado()
+                } else if (item.itemId == 6 || item.title.toString().contains("Salidas de Caja")) {
+                    egresosManager.mostrarDialogoGestionEgresos(
+                        esAdmin = false,
+                        usuarioNombre = PresenciaManager.obtenerNombreUsuario(this),
+                        usuarioRol = "Empleado"
+                    )
+                } else if (item.itemId == 7 || item.title.toString().contains("Bloquear")) {
+                    sesionIniciada = false
+                    PresenciaManager.guardarSesionAutenticada(this, false)
+                    layoutLoginPin.visibility = View.VISIBLE
+                    etLoginPin.text.clear()
+                    tvLoginMensajeError.visibility = View.GONE
+                    fabMain.visibility = View.GONE
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                    refrescarInfoLogin()
+                } else if (item.itemId == 8 || item.title.toString().contains("Actualizaciones")) {
+                    AppUpdateManager.verificarActualizacion(this, "Employ_JustPlay", mostrarToastSiNoHay = true)
+                } else if (item.itemId == 9 || item.title.toString().contains("Tabla de Tarifas")) {
+                    mostrarDialogoTablaTarifasMinicine()
                 } else {
-                    mostrarDialogoVetarCliente(vetado)
+                    navegarAPantalla(item.title.toString())
                 }
-            },
-            onEliminar = { vetado ->
-                if (!estaConectadoInternet) {
-                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden eliminar clientes sin internet.", Toast.LENGTH_SHORT).show()
-                } else {
-                    database.child("vetados").child(vetado.celular).removeValue()
-                }
+                drawerLayout.closeDrawers()
+                true
             }
-        )
-        val rvVetados = findViewById<RecyclerView>(R.id.rvVetados)
-        rvVetados.layoutManager = LinearLayoutManager(this)
-        rvVetados.adapter = vetadosAdapter
 
-        findViewById<FloatingActionButton>(R.id.fabAgregarVetado).setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Sin conexión: No se pueden agregar vetados sin internet.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+            // 6. INICIAR COMUNICACIÓN CLOUD (SOLO CUANDO TODA LA UI Y ADAPTERS ESTÁN VIVOS)
+            actualizarContadorOcupacion()
+
+            try {
+                AppUpdateManager.verificarActualizacion(this, "Employ_JustPlay")
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            mostrarDialogoVetarCliente(null)
-        }
-        findViewById<FloatingActionButton>(R.id.fabAgregarReservaPantalla).setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Sin conexión: No se pueden agregar reservas sin internet.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+
+            try {
+                PresenciaManager.iniciarMonitoreoPresencia(this, "Employ_JustPlay", "Empleado")
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            mostrarDialogoNuevaReserva()
-        }
 
-        // CHECKBOXES DE FILTRO TICKEABLES EN REGISTRO
-        val checkboxes = listOf(
-            findViewById<CheckBox>(R.id.cbFiltroCine),
-            findViewById<CheckBox>(R.id.cbFiltroAutitos),
-            findViewById<CheckBox>(R.id.cbFiltroDance),
-            findViewById<CheckBox>(R.id.cbFiltroMostrador),
-            findViewById<CheckBox>(R.id.cbFiltroEfectivo),
-            findViewById<CheckBox>(R.id.cbFiltroQR),
-            findViewById<CheckBox>(R.id.cbFiltroEgresos)
-        )
-        checkboxes.forEach { cb ->
-            cb?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosRegistro() }
-        }
-
-        // BOTONES DE FECHA Y RANGO DE HORAS EN REGISTRO
-        findViewById<Button>(R.id.btnFiltroFecha).setOnClickListener {
-            val cal = Calendar.getInstance()
-            DatePickerDialog(this, { _, year, month, day ->
-                fechaFiltroSeleccionada = String.format("%02d/%02d/%d", day, month + 1, year)
-                aplicarFiltrosRegistro()
-            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
-        }
-
-        findViewById<Button>(R.id.btnFiltroHoraInicio).setOnClickListener {
-            val cal = Calendar.getInstance()
-            TimePickerDialog(this, { _, hourOfDay, minute ->
-                horaInicioFiltro = String.format("%02d:%02d", hourOfDay, minute)
-                aplicarFiltrosRegistro()
-            }, cal.get(Calendar.HOUR_OF_DAY), 0, true).show()
-        }
-
-        findViewById<Button>(R.id.btnFiltroHoraFin).setOnClickListener {
-            val cal = Calendar.getInstance()
-            TimePickerDialog(this, { _, hourOfDay, minute ->
-                horaFinFiltro = String.format("%02d:%02d", hourOfDay, minute)
-                aplicarFiltrosRegistro()
-            }, cal.get(Calendar.HOUR_OF_DAY), 59, true).show()
-        }
-
-        findViewById<Button>(R.id.btnLimpiarHoras).setOnClickListener {
-            horaInicioFiltro = null
-            horaFinFiltro = null
-            aplicarFiltrosRegistro()
-        }
-
-        findViewById<Button>(R.id.btnLimpiarFecha).setOnClickListener {
-            fechaFiltroSeleccionada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-            horaInicioFiltro = null
-            horaFinFiltro = null
-            aplicarFiltrosRegistro()
-        }
-
-        findViewById<Button>(R.id.btnExportar).setOnClickListener {
-            if (historialFiltrado.isEmpty()) {
-                Toast.makeText(this, "No hay datos para exportar", Toast.LENGTH_SHORT).show()
-            } else {
-                exportarCSV(historialFiltrado)
+            try {
+                FirebaseDatabase.getInstance().getReference(".info/connected").addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        try {
+                            val connected = snapshot.getValue(Boolean::class.java) ?: false
+                            actualizarEstadoConexion(connected)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    override fun onCancelled(error: DatabaseError) {}
+                })
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        }
 
-        // INICIAR LA ESCUCHA DE LA NUBE
-        sincronizarConFirebase()
+            try {
+                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                val request = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build()
+                cm.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        runOnUiThread { actualizarEstadoConexion(true) }
+                    }
+                    override fun onLost(network: Network) {
+                        runOnUiThread { actualizarEstadoConexion(false) }
+                    }
+                })
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            iniciarListenerCatalogoProductos()
+            qrValidationHelper.iniciarEscucha()
+            sincronizarConFirebase()
+
+        } catch (t: Throwable) {
+            Log.e("Employ_JustPlay", "CRITICAL ERROR in onCreate", t)
+            Thread.getDefaultUncaughtExceptionHandler()?.uncaughtException(Thread.currentThread(), t)
+        }
     }
 
     override fun onDestroy() {
@@ -804,8 +813,12 @@ class MainActivity : AppCompatActivity() {
         // 0. ESCUCHAR CONFIGURACIÓN DE PRECIOS BASE
         database.child("config_precios").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    BasePriceConfig.updateFromSnapshot(snapshot)
+                try {
+                    if (snapshot.exists()) {
+                        BasePriceConfig.updateFromSnapshot(snapshot)
+                    }
+                } catch (t: Throwable) {
+                    Log.e("Employ_JustPlay", "Error en config_precios", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -814,18 +827,26 @@ class MainActivity : AppCompatActivity() {
         // 0.1 ESCUCHAR SECCIONES DINÁMICAS DE SALAS
         database.child("secciones_salas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                listaSecciones.clear()
-                for (snap in snapshot.children) {
-                    val sec = snap.getValue(SeccionSala::class.java)
-                    if (sec != null) {
-                        sec.id = snap.key ?: sec.id
-                        listaSecciones.add(sec)
-                        BasePriceConfig.preciosDinamicos[sec.id] = sec.precioBaseDefault
-                        BasePriceConfig.preciosDinamicos[sec.nombre] = sec.precioBaseDefault
+                try {
+                    listaSecciones.clear()
+                    for (snap in snapshot.children) {
+                        try {
+                            val sec = snap.getValue(SeccionSala::class.java)
+                            if (sec != null) {
+                                sec.id = snap.key ?: sec.id
+                                listaSecciones.add(sec)
+                                BasePriceConfig.preciosDinamicos[sec.id] = sec.precioBaseDefault
+                                BasePriceConfig.preciosDinamicos[sec.nombre] = sec.precioBaseDefault
+                            }
+                        } catch (e: Exception) {
+                            Log.e("Employ_JustPlay", "Error parseando seccion ${snap.key}", e)
+                        }
                     }
+                    actualizarFiltrosSeccionesDinamicas()
+                    renderizarReservasSeccionesDinamicas()
+                } catch (t: Throwable) {
+                    Log.e("Employ_JustPlay", "Error en secciones_salas", t)
                 }
-                actualizarFiltrosSeccionesDinamicas()
-                renderizarReservasSeccionesDinamicas()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -833,35 +854,56 @@ class MainActivity : AppCompatActivity() {
         // 1. ESCUCHAR SALAS EN TIEMPO REAL
         database.child("salas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val tempSalas = mutableListOf<Sala>()
-                for (snap in snapshot.children) {
-                    val s = snap.getValue(Sala::class.java)
-                    if (s != null) {
-                        s.idFirebase = snap.key ?: ""
-                        if (s.id == 0) s.id = snap.key?.toIntOrNull() ?: 0
-                        tempSalas.add(s)
+                try {
+                    val tempSalas = mutableListOf<Sala>()
+                    for (snap in snapshot.children) {
+                        try {
+                            val s = snap.getValue(Sala::class.java)
+                            if (s != null) {
+                                s.idFirebase = snap.key ?: ""
+                                if (s.id == 0) s.id = snap.key?.toIntOrNull() ?: 0
+                                tempSalas.add(s)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("Employ_JustPlay", "Error parseando sala ${snap.key}", e)
+                        }
                     }
-                }
 
-                salasMinicine = tempSalas.filter { it.esMinicine() }.sortedBy { it.id }
-                salasAutitos = tempSalas.filter { (it.seccionNombre.equals("Autitos", true) || it.seccionNombre.equals("Volantes", true) || (it.seccionNombre.isBlank() && (it.id in 101..199 || it.nombre.contains("Car", true) || it.nombre.contains("Auto", true) || it.nombre.contains("Volante", true)))) && !it.esMinicine() }.sortedBy { it.id }
-                salasJustDance = tempSalas.filter { (it.seccionNombre.equals("Just Dance", true) || (it.seccionNombre.isBlank() && (it.id >= 200 || it.nombre.contains("Dance", true)))) && !it.esMinicine() }.sortedBy { it.id }
+                    salasMinicine = tempSalas.filter { it.esMinicine() }.sortedBy { it.id }
+                    salasAutitos = tempSalas.filter { (it.seccionNombre.equals("Autitos", true) || it.seccionNombre.equals("Volantes", true) || (it.seccionNombre.isBlank() && (it.id in 101..199 || it.nombre.contains("Car", true) || it.nombre.contains("Auto", true) || it.nombre.contains("Volante", true)))) && !it.esMinicine() }.sortedBy { it.id }
+                    salasJustDance = tempSalas.filter { (it.seccionNombre.equals("Just Dance", true) || (it.seccionNombre.isBlank() && (it.id >= 200 || it.nombre.contains("Dance", true)))) && !it.esMinicine() }.sortedBy { it.id }
 
-                salasDinamicas = tempSalas.filter { it !in salasMinicine && it !in salasAutitos && it !in salasJustDance }.sortedBy { it.id }
+                    salasDinamicas = tempSalas.filter { it !in salasMinicine && it !in salasAutitos && it !in salasJustDance }.sortedBy { it.id }
 
-                adapterSalasMinicine = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasMinicine), salasMinicine, adapterSalasMinicine) { adapterSalasMinicine = it }
-                adapterSalasAutitos = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasAutitos), salasAutitos, adapterSalasAutitos) { adapterSalasAutitos = it }
-                adapterSalasJustDance = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasJustDance), salasJustDance, adapterSalasJustDance) { adapterSalasJustDance = it }
-                renderizarSeccionesDinamicas(salasDinamicas)
-
-                actualizarContadorOcupacion()
-
-                for (sala in tempSalas) {
-                    if (sala.estado == EstadoSala.OCUPADA && sala.endTimeMillis != null && sala.endTimeMillis!! > System.currentTimeMillis()) {
-                        AlarmUtils.programarAlarmaSala(this@MainActivity, sala.id, sala.nombre, sala.cliente, sala.endTimeMillis!!)
-                    } else {
-                        AlarmUtils.cancelarAlarmaSala(this@MainActivity, sala.id)
+                    val rvMinicine = findViewById<RecyclerView>(R.id.rvSalasMinicine)
+                    if (rvMinicine != null) {
+                        adapterSalasMinicine = actualizarRecyclerViewSalas(rvMinicine, salasMinicine, adapterSalasMinicine) { adapterSalasMinicine = it }
                     }
+                    val rvAutitos = findViewById<RecyclerView>(R.id.rvSalasAutitos)
+                    if (rvAutitos != null) {
+                        adapterSalasAutitos = actualizarRecyclerViewSalas(rvAutitos, salasAutitos, adapterSalasAutitos) { adapterSalasAutitos = it }
+                    }
+                    val rvJustDance = findViewById<RecyclerView>(R.id.rvSalasJustDance)
+                    if (rvJustDance != null) {
+                        adapterSalasJustDance = actualizarRecyclerViewSalas(rvJustDance, salasJustDance, adapterSalasJustDance) { adapterSalasJustDance = it }
+                    }
+                    renderizarSeccionesDinamicas(salasDinamicas)
+
+                    actualizarContadorOcupacion()
+
+                    for (sala in tempSalas) {
+                        try {
+                            if (sala.estado == EstadoSala.OCUPADA && sala.endTimeMillis != null && sala.endTimeMillis!! > System.currentTimeMillis()) {
+                                AlarmUtils.programarAlarmaSala(this@MainActivity, sala.id, sala.nombre, sala.cliente, sala.endTimeMillis!!)
+                            } else {
+                                AlarmUtils.cancelarAlarmaSala(this@MainActivity, sala.id)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("Employ_JustPlay", "Error alarma sala ${sala.id}", e)
+                        }
+                    }
+                } catch (t: Throwable) {
+                    Log.e("Employ_JustPlay", "Error en listener salas", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -870,15 +912,23 @@ class MainActivity : AppCompatActivity() {
         // 2. ESCUCHAR HISTORIAL DE VENTAS (OPTIMIZADO CON LÍMITE)
         database.child("registros").limitToLast(300).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                historialCompleto.clear()
-                for (snap in snapshot.children) {
-                    val reg = snap.getValue(RegistroEntry::class.java)
-                    if (reg != null) {
-                        reg.idFirebase = snap.key ?: ""
-                        historialCompleto.add(reg)
+                try {
+                    historialCompleto.clear()
+                    for (snap in snapshot.children) {
+                        try {
+                            val reg = snap.getValue(RegistroEntry::class.java)
+                            if (reg != null) {
+                                reg.idFirebase = snap.key ?: ""
+                                historialCompleto.add(reg)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("Employ_JustPlay", "Error parseando registro ${snap.key}", e)
+                        }
                     }
+                    aplicarFiltrosRegistro()
+                } catch (t: Throwable) {
+                    Log.e("Employ_JustPlay", "Error en listener registros", t)
                 }
-                aplicarFiltrosRegistro()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -886,40 +936,48 @@ class MainActivity : AppCompatActivity() {
         // 3. ESCUCHAR RESERVAS (CON SOPORTE DE SECCIONES DINÁMICAS)
         database.child("reservas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                listaReservasGlobales.clear()
-                reservasMinicineList.clear()
-                reservasAutitosList.clear()
-                reservasDanceList.clear()
-                reservasDinamicasMap.clear()
+                try {
+                    listaReservasGlobales.clear()
+                    reservasMinicineList.clear()
+                    reservasAutitosList.clear()
+                    reservasDanceList.clear()
+                    reservasDinamicasMap.clear()
 
-                for (snap in snapshot.children) {
-                    val res = snap.getValue(Reserva::class.java)
-                    if (res != null) {
-                        res.idFirebase = snap.key ?: ""
-                        listaReservasGlobales.add(res)
-                        when (res.tipoSala) {
-                            "Minicine" -> reservasMinicineList.add(res)
-                            "Autitos" -> reservasAutitosList.add(res)
-                            "Just Dance" -> reservasDanceList.add(res)
-                            else -> {
-                                val list = reservasDinamicasMap.getOrPut(res.tipoSala) { mutableListOf() }
-                                list.add(res)
+                    for (snap in snapshot.children) {
+                        try {
+                            val res = snap.getValue(Reserva::class.java)
+                            if (res != null) {
+                                res.idFirebase = snap.key ?: ""
+                                listaReservasGlobales.add(res)
+                                when (res.tipoSala) {
+                                    "Minicine" -> reservasMinicineList.add(res)
+                                    "Autitos" -> reservasAutitosList.add(res)
+                                    "Just Dance" -> reservasDanceList.add(res)
+                                    else -> {
+                                        val list = reservasDinamicasMap.getOrPut(res.tipoSala) { mutableListOf() }
+                                        list.add(res)
+                                    }
+                                }
                             }
+                        } catch (e: Exception) {
+                            Log.e("Employ_JustPlay", "Error parseando reserva ${snap.key}", e)
                         }
                     }
-                }
-                listaReservasGlobales.sortBy { it.getSortTimestamp() }
-                reservasMinicineList.sortBy { it.getSortTimestamp() }
-                reservasAutitosList.sortBy { it.getSortTimestamp() }
-                reservasDanceList.sortBy { it.getSortTimestamp() }
-                for (list in reservasDinamicasMap.values) {
-                    list.sortBy { it.getSortTimestamp() }
-                }
+                    listaReservasGlobales.sortBy { it.getSortTimestamp() }
+                    reservasMinicineList.sortBy { it.getSortTimestamp() }
+                    reservasAutitosList.sortBy { it.getSortTimestamp() }
+                    reservasDanceList.sortBy { it.getSortTimestamp() }
+                    for (list in reservasDinamicasMap.values) {
+                        list.sortBy { it.getSortTimestamp() }
+                    }
 
-                adapterResMinicine.notifyDataSetChanged()
-                adapterResAutitos.notifyDataSetChanged()
-                adapterResDance.notifyDataSetChanged()
-                renderizarReservasSeccionesDinamicas()
+                    if (::adapterResMinicine.isInitialized) adapterResMinicine.notifyDataSetChanged()
+                    if (::adapterResAutitos.isInitialized) adapterResAutitos.notifyDataSetChanged()
+                    if (::adapterResDance.isInitialized) adapterResDance.notifyDataSetChanged()
+                    renderizarReservasSeccionesDinamicas()
+                } catch (t: Throwable) {
+                    Log.e("Employ_JustPlay", "Error en listener reservas", t)
+                }
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -927,11 +985,19 @@ class MainActivity : AppCompatActivity() {
         // 4. ESCUCHAR VETADOS
         database.child("vetados").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                listaVetadosGlobal.clear()
-                for (snap in snapshot.children) {
-                    snap.getValue(ClienteVetado::class.java)?.let { listaVetadosGlobal.add(it) }
+                try {
+                    listaVetadosGlobal.clear()
+                    for (snap in snapshot.children) {
+                        try {
+                            snap.getValue(ClienteVetado::class.java)?.let { listaVetadosGlobal.add(it) }
+                        } catch (e: Exception) {
+                            Log.e("Employ_JustPlay", "Error parseando vetado ${snap.key}", e)
+                        }
+                    }
+                    if (::vetadosAdapter.isInitialized) vetadosAdapter.notifyDataSetChanged()
+                } catch (t: Throwable) {
+                    Log.e("Employ_JustPlay", "Error en listener vetados", t)
                 }
-                vetadosAdapter.notifyDataSetChanged()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1403,15 +1469,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun actualizarEstadoConexion(conectado: Boolean) {
         estaConectadoInternet = conectado
-        if (!conectado) {
-            tvBadgeOffline.visibility = View.VISIBLE
-            fabMain.visibility = View.GONE
-            if (isFabMenuExpanded) toggleFabMenu()
-        } else {
-            tvBadgeOffline.visibility = View.GONE
-            if (layoutTablero.visibility == View.VISIBLE) {
+        if (::tvBadgeOffline.isInitialized) {
+            tvBadgeOffline.visibility = if (conectado) View.GONE else View.VISIBLE
+        }
+        if (::layoutTablero.isInitialized && ::fabMain.isInitialized) {
+            if (layoutTablero.visibility == View.VISIBLE && conectado && sesionIniciada) {
                 fabMain.visibility = View.VISIBLE
+            } else {
+                fabMain.visibility = View.GONE
             }
+        }
+        if (!conectado && isFabMenuExpanded) {
+            toggleFabMenu()
         }
     }
 
@@ -1626,13 +1695,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun actualizarContadorOcupacion() {
+        if (!::tvMinicineOcupadas.isInitialized || !::tvAutitosOcupados.isInitialized || !::tvJustDanceOcupados.isInitialized) return
         tvMinicineOcupadas.text = "${salasMinicine.count { it.estado == EstadoSala.OCUPADA }} / ${salasMinicine.size}"
         tvAutitosOcupados.text = "${salasAutitos.count { it.estado == EstadoSala.OCUPADA }} / ${salasAutitos.size}"
         tvJustDanceOcupados.text = "${salasJustDance.count { it.estado == EstadoSala.OCUPADA }} / ${salasJustDance.size}"
     }
 
     private fun actualizarRelojesReservas() {
-        if (layoutTablero.visibility != View.VISIBLE) return
+        if (!::layoutTablero.isInitialized || layoutTablero.visibility != View.VISIBLE || !::llContenedorReservasDash.isInitialized) return
         val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
         val hoyStr = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         val reservasHoy = listaReservasGlobales.filter { it.fecha == hoyStr && !it.asistio }.sortedBy { it.horaProgramada }
@@ -2184,7 +2254,9 @@ class MainActivity : AppCompatActivity() {
         btnFiltroHoraInicio?.text = if (horaInicioFiltro != null) "⏰ Desde: $horaInicioFiltro" else "⏰ Desde: Inicio"
         btnFiltroHoraFin?.text = if (horaFinFiltro != null) "⏰ Hasta: $horaFinFiltro" else "⏰ Hasta: Fin"
 
-        registroAdapter.notifyDataSetChanged()
+        if (::registroAdapter.isInitialized) {
+            registroAdapter.notifyDataSetChanged()
+        }
     }
 
     private fun mostrarDialogoSeleccionarSalaLibre(reserva: Reserva) {
@@ -3330,21 +3402,29 @@ class MainActivity : AppCompatActivity() {
     private fun iniciarListenerCatalogoProductos() {
         database.child("productos_catalogo").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                catalogoProductosCache.clear()
-                nombreAProductoCache.clear()
-                listaProductosCatalogo.clear()
-                for (child in snapshot.children) {
-                    val barcode = child.key ?: continue
-                    val nombre = child.child("nombre").getValue(String::class.java) ?: continue
-                    val precio = child.child("precio_unitario").getValue(Double::class.java)
-                        ?: child.child("precio_unitario").getValue(Long::class.java)?.toDouble() ?: 0.0
-                    val stock = child.child("stock_actual").getValue(Int::class.java)
-                        ?: child.child("stock_actual").getValue(Long::class.java)?.toInt() ?: 0
-                    catalogoProductosCache[barcode] = Pair(precio, stock)
-                    nombreAProductoCache[nombre.trim().lowercase()] = Pair(barcode, stock)
-                    listaProductosCatalogo.add(ProductoItem(barcode, nombre, precio, stock))
+                try {
+                    catalogoProductosCache.clear()
+                    nombreAProductoCache.clear()
+                    listaProductosCatalogo.clear()
+                    for (child in snapshot.children) {
+                        try {
+                            val barcode = child.key ?: continue
+                            val nombre = child.child("nombre").getValue(String::class.java) ?: continue
+                            val precio = child.child("precio_unitario").getValue(Double::class.java)
+                                ?: child.child("precio_unitario").getValue(Long::class.java)?.toDouble() ?: 0.0
+                            val stock = child.child("stock_actual").getValue(Int::class.java)
+                                ?: child.child("stock_actual").getValue(Long::class.java)?.toInt() ?: 0
+                            catalogoProductosCache[barcode] = Pair(precio, stock)
+                            nombreAProductoCache[nombre.trim().lowercase()] = Pair(barcode, stock)
+                            listaProductosCatalogo.add(ProductoItem(barcode, nombre, precio, stock))
+                        } catch (e: Exception) {
+                            Log.w("MainActivity", "Error procesando item de catalogo", e)
+                        }
+                    }
+                    listaProductosCatalogo.sortBy { it.nombre.lowercase() }
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener catalogo productos", t)
                 }
-                listaProductosCatalogo.sortBy { it.nombre.lowercase() }
             }
             override fun onCancelled(error: DatabaseError) {}
         })

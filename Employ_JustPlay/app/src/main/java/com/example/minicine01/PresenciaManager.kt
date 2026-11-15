@@ -105,114 +105,134 @@ object PresenciaManager {
         motivoBloqueoAdmin = prefs.getString(KEY_MOTIVO_BLOQUEO, "Acceso restringido por el Administrador") ?: "Acceso restringido por el Administrador"
         miApp = appName
 
-        val db = FirebaseDatabase.getInstance()
-        val connectedRef = db.getReference(".info/connected")
-        val userStatusRef = db.getReference("presencia_usuarios").child(miUsuarioId)
-        databaseRef = userStatusRef
+        try {
+            val db = FirebaseDatabase.getInstance()
+            val connectedRef = db.getReference(".info/connected")
+            val userStatusRef = db.getReference("presencia_usuarios").child(miUsuarioId)
+            databaseRef = userStatusRef
 
-        // Escuchar cambios enviados por el Administrador (nombre, pin, bloqueo, tiempo límite)
-        userStatusRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    val adminNombre = snapshot.child("nombre").getValue(String::class.java)
-                    val adminPin = snapshot.child("pin").getValue(String::class.java)
-                    val adminRol = snapshot.child("rol").getValue(String::class.java)
-                    val adminBloqueado = snapshot.child("bloqueado").getValue(Boolean::class.java) ?: false
-                    val motivo = snapshot.child("motivoBloqueo").getValue(String::class.java) ?: "Acceso restringido por el Administrador"
-                    val tiempoLimite = snapshot.child("tiempoLimiteMillis").getValue(Long::class.java) ?: 0L
-                    val tipoTiempo = snapshot.child("tipoTiempoAcceso").getValue(String::class.java) ?: "Indefinido"
-                    val fechaFin = snapshot.child("fechaFinAccesoTexto").getValue(String::class.java) ?: "Sin límite"
+            // Escuchar cambios enviados por el Administrador (nombre, pin, bloqueo, tiempo límite)
+            userStatusRef.addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    try {
+                        if (snapshot.exists()) {
+                            val adminNombre = snapshot.child("nombre").getValue(String::class.java)
+                            val adminPin = snapshot.child("pin").getValue(String::class.java)
+                            val adminRol = snapshot.child("rol").getValue(String::class.java)
+                            val adminBloqueado = snapshot.child("bloqueado").getValue(Boolean::class.java) ?: false
+                            val motivo = snapshot.child("motivoBloqueo").getValue(String::class.java) ?: "Acceso restringido por el Administrador"
+                            val tiempoLimite = snapshot.child("tiempoLimiteMillis").getValue(Long::class.java) ?: 0L
+                            val tipoTiempo = snapshot.child("tipoTiempoAcceso").getValue(String::class.java) ?: "Indefinido"
+                            val fechaFin = snapshot.child("fechaFinAccesoTexto").getValue(String::class.java) ?: "Sin límite"
 
-                    if (!adminNombre.isNullOrEmpty()) {
-                        miNombre = adminNombre
-                        prefs.edit().putString(KEY_USER_NAME, adminNombre).apply()
+                            if (!adminNombre.isNullOrEmpty()) {
+                                miNombre = adminNombre
+                                prefs.edit().putString(KEY_USER_NAME, adminNombre).apply()
+                            }
+                            if (!adminPin.isNullOrEmpty()) {
+                                miPin = adminPin
+                                prefs.edit().putString(KEY_USER_PIN, adminPin).apply()
+                            }
+                            if (!adminRol.isNullOrEmpty()) {
+                                miRol = adminRol
+                                prefs.edit().putString(KEY_USER_ROLE, adminRol).apply()
+                            }
+
+                            estaBloqueadoAdmin = adminBloqueado
+                            motivoBloqueoAdmin = motivo
+                            miTiempoLimiteMillis = tiempoLimite
+                            miTipoTiempoAcceso = tipoTiempo
+                            miFechaFinAccesoTexto = fechaFin
+
+                            prefs.edit()
+                                .putBoolean(KEY_BLOQUEADO, adminBloqueado)
+                                .putString(KEY_MOTIVO_BLOQUEO, motivo)
+                                .putLong(KEY_TIEMPO_LIMITE, tiempoLimite)
+                                .putString(KEY_TIPO_TIEMPO, tipoTiempo)
+                                .putString(KEY_FECHA_FIN, fechaFin)
+                                .apply()
+                        } else {
+                            // Si el nodo aún no existe en Firebase, lo inicializamos
+                            val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+                            val initData = mapOf(
+                                "id" to miUsuarioId,
+                                "nombre" to miNombre,
+                                "rol" to miRol,
+                                "app" to miApp,
+                                "dispositivo" to deviceModel,
+                                "enLinea" to true,
+                                "ultimaConexion" to ServerValue.TIMESTAMP,
+                                "ultimaConexionTexto" to fechaActual,
+                                "seccionActual" to "Tablero",
+                                "pin" to miPin,
+                                "bloqueado" to false,
+                                "motivoBloqueo" to "Acceso restringido por el Administrador",
+                                "tiempoLimiteMillis" to miTiempoLimiteMillis,
+                                "tipoTiempoAcceso" to miTipoTiempoAcceso,
+                                "fechaFinAccesoTexto" to miFechaFinAccesoTexto
+                            )
+                            userStatusRef.updateChildren(initData)
+                        }
+
+                        val usuarioModel = obtenerUsuarioActualModel()
+                        onEstadoCambioListener?.invoke(usuarioModel)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
-                    if (!adminPin.isNullOrEmpty()) {
-                        miPin = adminPin
-                        prefs.edit().putString(KEY_USER_PIN, adminPin).apply()
-                    }
-                    if (!adminRol.isNullOrEmpty()) {
-                        miRol = adminRol
-                        prefs.edit().putString(KEY_USER_ROLE, adminRol).apply()
-                    }
-
-                    estaBloqueadoAdmin = adminBloqueado
-                    motivoBloqueoAdmin = motivo
-                    miTiempoLimiteMillis = tiempoLimite
-                    miTipoTiempoAcceso = tipoTiempo
-                    miFechaFinAccesoTexto = fechaFin
-
-                    prefs.edit()
-                        .putBoolean(KEY_BLOQUEADO, adminBloqueado)
-                        .putString(KEY_MOTIVO_BLOQUEO, motivo)
-                        .putLong(KEY_TIEMPO_LIMITE, tiempoLimite)
-                        .putString(KEY_TIPO_TIEMPO, tipoTiempo)
-                        .putString(KEY_FECHA_FIN, fechaFin)
-                        .apply()
-                } else {
-                    // Si el nodo aún no existe en Firebase, lo inicializamos
-                    val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-                    val initData = mapOf(
-                        "id" to miUsuarioId,
-                        "nombre" to miNombre,
-                        "rol" to miRol,
-                        "app" to miApp,
-                        "dispositivo" to deviceModel,
-                        "enLinea" to true,
-                        "ultimaConexion" to ServerValue.TIMESTAMP,
-                        "ultimaConexionTexto" to fechaActual,
-                        "seccionActual" to "Tablero",
-                        "pin" to miPin,
-                        "bloqueado" to false,
-                        "motivoBloqueo" to "Acceso restringido por el Administrador",
-                        "tiempoLimiteMillis" to miTiempoLimiteMillis,
-                        "tipoTiempoAcceso" to miTipoTiempoAcceso,
-                        "fechaFinAccesoTexto" to miFechaFinAccesoTexto
-                    )
-                    userStatusRef.updateChildren(initData)
                 }
 
-                val usuarioModel = obtenerUsuarioActualModel()
-                onEstadoCambioListener?.invoke(usuarioModel)
-            }
+                override fun onCancelled(error: DatabaseError) {}
+            })
 
-            override fun onCancelled(error: DatabaseError) {}
-        })
+            connectedRef.addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    try {
+                        val connected = snapshot.getValue(Boolean::class.java) ?: false
+                        if (connected) {
+                            val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+                            val disconnectData = mapOf(
+                                "enLinea" to false,
+                                "ultimaConexion" to ServerValue.TIMESTAMP,
+                                "ultimaConexionTexto" to fechaActual,
+                                "seccionActual" to "Desconectado"
+                            )
+                            try {
+                                userStatusRef.onDisconnect().updateChildren(disconnectData)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
 
-        connectedRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) ?: false
-                if (connected) {
-                    val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-                    val disconnectData = mapOf(
-                        "enLinea" to false,
-                        "ultimaConexion" to ServerValue.TIMESTAMP,
-                        "ultimaConexionTexto" to fechaActual,
-                        "seccionActual" to "Desconectado"
-                    )
-                    userStatusRef.onDisconnect().updateChildren(disconnectData)
-
-                    val connectData = mapOf(
-                        "id" to miUsuarioId,
-                        "nombre" to miNombre,
-                        "rol" to miRol,
-                        "app" to miApp,
-                        "dispositivo" to deviceModel,
-                        "enLinea" to true,
-                        "ultimaConexion" to ServerValue.TIMESTAMP,
-                        "ultimaConexionTexto" to fechaActual,
-                        "seccionActual" to "Tablero",
-                        "pin" to miPin,
-                        "tiempoLimiteMillis" to miTiempoLimiteMillis,
-                        "tipoTiempoAcceso" to miTipoTiempoAcceso,
-                        "fechaFinAccesoTexto" to miFechaFinAccesoTexto
-                    )
-                    userStatusRef.updateChildren(connectData)
+                            val connectData = mapOf(
+                                "id" to miUsuarioId,
+                                "nombre" to miNombre,
+                                "rol" to miRol,
+                                "app" to miApp,
+                                "dispositivo" to deviceModel,
+                                "enLinea" to true,
+                                "ultimaConexion" to ServerValue.TIMESTAMP,
+                                "ultimaConexionTexto" to fechaActual,
+                                "seccionActual" to "Tablero",
+                                "pin" to miPin,
+                                "tiempoLimiteMillis" to miTiempoLimiteMillis,
+                                "tipoTiempoAcceso" to miTipoTiempoAcceso,
+                                "fechaFinAccesoTexto" to miFechaFinAccesoTexto
+                            )
+                            try {
+                                userStatusRef.updateChildren(connectData)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
-            }
 
-            override fun onCancelled(error: DatabaseError) {}
-        })
+                override fun onCancelled(error: DatabaseError) {}
+            })
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun actualizarSeccion(seccion: String) {

@@ -68,42 +68,50 @@ object PresenciaManager {
         if (isTrackingInitialized) return
         isTrackingInitialized = true
 
-        val database = FirebaseDatabase.getInstance()
-        val connectedRef = database.getReference(".info/connected")
-        val userRef = database.getReference("presencia_usuarios").child(usuarioActualId)
+        try {
+            val database = FirebaseDatabase.getInstance()
+            val connectedRef = database.getReference(".info/connected")
+            val userRef = database.getReference("presencia_usuarios").child(usuarioActualId)
 
-        connectedRef.addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) ?: false
-                if (connected) {
-                    val dispositivo = "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
-                    val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+            connectedRef.addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    try {
+                        val connected = snapshot.getValue(Boolean::class.java) ?: false
+                        if (connected) {
+                            val dispositivo = "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}"
+                            val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
 
-                    val datosDesconexion = mapOf(
-                        "enLinea" to false,
-                        "ultimaConexion" to ServerValue.TIMESTAMP,
-                        "ultimaConexionTexto" to fechaActual,
-                        "seccionActual" to "Desconectado"
-                    )
-                    userRef.onDisconnect().updateChildren(datosDesconexion)
+                            val datosDesconexion = mapOf(
+                                "enLinea" to false,
+                                "ultimaConexion" to ServerValue.TIMESTAMP,
+                                "ultimaConexionTexto" to fechaActual,
+                                "seccionActual" to "Desconectado"
+                            )
+                            userRef.onDisconnect().updateChildren(datosDesconexion)
 
-                    val datosConexion = mapOf(
-                        "id" to usuarioActualId,
-                        "nombre" to if (nombreUsuarioActual.isNotBlank()) nombreUsuarioActual else "Usuario $usuarioActualId",
-                        "rol" to rolUsuarioActual,
-                        "app" to nombreApp,
-                        "enLinea" to true,
-                        "ultimaConexion" to ServerValue.TIMESTAMP,
-                        "ultimaConexionTexto" to fechaActual,
-                        "dispositivo" to dispositivo,
-                        "seccionActual" to "Tablero"
-                    )
-                    userRef.updateChildren(datosConexion)
+                            val datosConexion = mapOf(
+                                "id" to usuarioActualId,
+                                "nombre" to if (nombreUsuarioActual.isNotBlank()) nombreUsuarioActual else "Usuario $usuarioActualId",
+                                "rol" to rolUsuarioActual,
+                                "app" to nombreApp,
+                                "enLinea" to true,
+                                "ultimaConexion" to ServerValue.TIMESTAMP,
+                                "ultimaConexionTexto" to fechaActual,
+                                "dispositivo" to dispositivo,
+                                "seccionActual" to "Tablero"
+                            )
+                            userRef.updateChildren(datosConexion)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
-            }
 
-            override fun onCancelled(error: DatabaseError) {}
-        })
+                override fun onCancelled(error: DatabaseError) {}
+            })
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun actualizarSeccion(seccion: String) {

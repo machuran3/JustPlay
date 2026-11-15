@@ -25,6 +25,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Log
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -261,407 +262,419 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        crearCanalNotificaciones()
-        solicitarPermisoNotificaciones()
-
-        fechaFiltroSeleccionada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-        horaInicioFiltro = null
-        horaFinFiltro = null
-
-        // INICIALIZAR FIREBASE Y GESTORES SOLID
-        database = FirebaseDatabase.getInstance().reference
-        iniciarListenerCatalogoProductos()
-        posManager = PosManagementManager(this, database)
-        roomAuditManager = RoomAuditManager(this, database)
-        productAuditManager = ProductAuditManager(this, database)
-        egresosManager = EgresosManager(this, database)
-        qrValidationHelper = QrPaymentValidationHelper(this, database) { solicitudId ->
-            capturarComprobantesParaSolicitud(solicitudId)
-        }
-        qrValidationHelper.iniciarEscucha()
-        otgScanner = OtgBarcodeScannerHelper(object : IBarcodeScanListener {
-            override fun onBarcodeScanned(barcode: String) {
-                mostrarDialogoVentaOTGEmergencia(barcode)
-            }
-        })
-
-        drawerLayout = findViewById(R.id.drawerLayout)
-        layoutTablero = findViewById(R.id.layoutTablero)
-        layoutRegistro = findViewById(R.id.layoutRegistro)
-        layoutReservasGenerales = findViewById(R.id.layoutReservasGenerales)
-        layoutVetados = findViewById(R.id.layoutVetados)
-        layoutUsuariosOnline = findViewById(R.id.layoutUsuariosOnline)
-        tvTituloToolbar = findViewById(R.id.tvTituloToolbar)
-        tvBadgeOffline = findViewById(R.id.tvBadgeOffline)
-        tvBadgeUsuariosOnline = findViewById(R.id.tvBadgeUsuariosOnline)
-
-        tvMinicineOcupadas = findViewById(R.id.tvMinicineOcupadas)
-        tvAutitosOcupados = findViewById(R.id.tvAutitosOcupados)
-        tvJustDanceOcupados = findViewById(R.id.tvJustDanceOcupados)
-
-        fabOverlay = findViewById(R.id.fabOverlay)
-        llFabVenta = findViewById(R.id.llFabVenta)
-        llFabReservas = findViewById(R.id.llFabReservas)
-        fabMain = findViewById(R.id.fabMain)
-
-        // PRESENCIA AUTOMÁTICA DEL ADMINISTRADOR
-        PresenciaManager.iniciarMonitoreoPresencia(this, "AdminJustPlay", "Administrador")
-
-        tvBadgeUsuariosOnline.setOnClickListener {
-            navegarAPantalla("👥 Usuarios en Línea")
-        }
-
-        // Monitorear conectividad con Firebase Realtime Database
         try {
-            FirebaseDatabase.getInstance().getReference(".info/connected").addValueEventListener(object : ValueEventListener {
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    val connected = snapshot.getValue(Boolean::class.java) ?: false
-                    actualizarEstadoConexion(connected)
-                }
-                override fun onCancelled(error: DatabaseError) {}
-            })
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+            setContentView(R.layout.activity_main)
 
-        // Monitorear conectividad de red
-        try {
-            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            cm.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    runOnUiThread { actualizarEstadoConexion(true) }
-                }
-                override fun onLost(network: Network) {
-                    runOnUiThread { actualizarEstadoConexion(false) }
-                }
-            })
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+            // 1. INICIALIZAR TODAS LAS VISTAS Y CONTENEDORES PRINCIPALES PRIMERO
+            drawerLayout = findViewById(R.id.drawerLayout)
+            layoutTablero = findViewById(R.id.layoutTablero)
+            layoutRegistro = findViewById(R.id.layoutRegistro)
+            layoutReservasGenerales = findViewById(R.id.layoutReservasGenerales)
+            layoutVetados = findViewById(R.id.layoutVetados)
+            layoutUsuariosOnline = findViewById(R.id.layoutUsuariosOnline)
+            tvTituloToolbar = findViewById(R.id.tvTituloToolbar)
+            tvBadgeOffline = findViewById(R.id.tvBadgeOffline)
+            tvBadgeUsuariosOnline = findViewById(R.id.tvBadgeUsuariosOnline)
 
-        fabMain.setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Modo sin conexión: Estás en modo de solo lectura.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-            toggleFabMenu()
-        }
-        fabOverlay.setOnClickListener { toggleFabMenu() }
+            tvMinicineOcupadas = findViewById(R.id.tvMinicineOcupadas)
+            tvAutitosOcupados = findViewById(R.id.tvAutitosOcupados)
+            tvJustDanceOcupados = findViewById(R.id.tvJustDanceOcupados)
 
-        findViewById<FloatingActionButton>(R.id.fabVenta).setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Sin conexión: No se pueden registrar ventas sin internet.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            toggleFabMenu()
-            mostrarDialogoVentaDirecta()
-        }
+            fabOverlay = findViewById(R.id.fabOverlay)
+            llFabVenta = findViewById(R.id.llFabVenta)
+            llFabReservas = findViewById(R.id.llFabReservas)
+            fabMain = findViewById(R.id.fabMain)
 
-        findViewById<FloatingActionButton>(R.id.fabReservas).setOnClickListener {
-            toggleFabMenu()
-            navegarAPantalla("Reservas")
-        }
+            // 2. CANAL DE NOTIFICACIONES Y PERMISOS
+            crearCanalNotificaciones()
+            solicitarPermisoNotificaciones()
 
-        runnableRelojes = object : Runnable {
-            override fun run() {
-                actualizarRelojesReservas()
-                verificarTiemposSalas()
-                handlerRelojes.postDelayed(this, 1000)
-            }
-        }
-        handlerRelojes.post(runnableRelojes)
-
-        val btnMenuHamburguesa = findViewById<TextView>(R.id.btnMenuHamburguesa)
-        btnMenuHamburguesa.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
-
-        val navigationView = findViewById<NavigationView>(R.id.navigationView)
-        navigationView.menu.add(0, 1, 0, "Just Play (Tablero)").setIcon(android.R.drawable.ic_menu_sort_by_size)
-        navigationView.menu.add(0, 2, 1, "Registro y Auditoría").setIcon(android.R.drawable.ic_menu_recent_history)
-        navigationView.menu.add(0, 3, 2, "Reservas").setIcon(android.R.drawable.ic_menu_today)
-        navigationView.menu.add(0, 4, 3, "Clientes Vetados").setIcon(android.R.drawable.ic_menu_close_clear_cancel)
-        navigationView.menu.add(0, 5, 4, "👥 Usuarios en Línea").setIcon(android.R.drawable.ic_menu_myplaces)
-        navigationView.menu.add(0, 6, 5, "🏗️ Aumentar / Gestionar Salas").setIcon(android.R.drawable.ic_input_add)
-        navigationView.menu.add(0, 7, 6, "🔄 Buscar Actualizaciones").setIcon(android.R.drawable.ic_popup_sync)
-        navigationView.menu.add(0, 8, 7, "🖥️ Terminales POS y Catálogo").setIcon(android.R.drawable.ic_menu_manage)
-        navigationView.menu.add(0, 12, 8, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
-        navigationView.menu.add(0, 13, 9, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
-        navigationView.menu.add(0, 14, 10, "🛡️ Auditoría").setIcon(android.R.drawable.ic_menu_info_details)
-        navigationView.menu.add(0, 15, 11, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
-        navigationView.menu.add(0, 16, 12, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
-        navigationView.menu.add(0, 17, 13, "📁 Gestión de Secciones").setIcon(android.R.drawable.ic_menu_manage)
-
-        navigationView.setNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                6 -> mostrarDialogoAdministrarSalas()
-                7 -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
-                8 -> posManager.mostrarDialogoGestionPOS()
-                12 -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
-                13 -> egresosManager.mostrarDialogoGestionEgresos()
-                14 -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
-                15 -> posManager.mostrarDialogoPreciosBase()
-                16 -> mostrarDialogoTablaTarifasMinicine()
-                17 -> mostrarDialogoGestionarSecciones()
-                else -> {
-                    val title = item.title.toString()
-                    when {
-                        title.contains("Gestionar Salas") -> mostrarDialogoAdministrarSalas()
-                        title.contains("Gestión de Secciones") || title.contains("Secciones") -> mostrarDialogoGestionarSecciones()
-                        title.contains("Actualizaciones") -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
-                        title.contains("Terminales POS") -> posManager.mostrarDialogoGestionPOS()
-                        title.contains("Auditoría Productos") -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
-                        title.contains("Egresos") -> egresosManager.mostrarDialogoGestionEgresos()
-                        (title.contains("Auditoría") && !title.contains("Productos")) || title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
-                        title.contains("Precios Base") -> posManager.mostrarDialogoPreciosBase()
-                        title.contains("Tabla de Tarifas") -> mostrarDialogoTablaTarifasMinicine()
-                        else -> navegarAPantalla(title)
-                    }
-                }
-            }
-            drawerLayout.closeDrawers()
-            true
-        }
-
-        // COMPROBADOR AUTOMÁTICO DE ACTUALIZACIONES AL INICIAR (In-app updater)
-        try {
-            AppUpdateManager.verificarActualizacion(this, "AdminJustPlay")
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        // CONFIGURAR RECYCLERVIEW DE REGISTRO & AUDITORIA
-        val rvRegistro = findViewById<RecyclerView>(R.id.rvRegistro)
-        rvRegistro.layoutManager = LinearLayoutManager(this)
-        registroAdapter = RegistroAdminAdapter(
-            historialFiltrado,
-            onEliminarRegistro = { reg -> eliminarRegistro(reg) },
-            onRestaurarRegistro = { reg -> restaurarRegistro(reg) }
-        )
-        rvRegistro.adapter = registroAdapter
-
-        // PESTAÑAS DE FILTRO DE AUDITORIA
-        val btnAuditoriaActivos = findViewById<Button>(R.id.btnFiltroAuditoriaActivos)
-        val btnAuditoriaBorrados = findViewById<Button>(R.id.btnFiltroAuditoriaBorrados)
-        val btnAuditoriaTodos = findViewById<Button>(R.id.btnFiltroAuditoriaTodos)
-
-        fun actualizarBotonesAuditoria() {
-            btnAuditoriaActivos.setBackgroundColor(if (modoAuditoria == "ACTIVOS") Color.parseColor("#DEFF9A") else Color.parseColor("#24283B"))
-            btnAuditoriaActivos.setTextColor(if (modoAuditoria == "ACTIVOS") Color.BLACK else Color.WHITE)
-
-            btnAuditoriaBorrados.setBackgroundColor(if (modoAuditoria == "BORRADOS") Color.parseColor("#FF5252") else Color.parseColor("#24283B"))
-            btnAuditoriaBorrados.setTextColor(if (modoAuditoria == "BORRADOS") Color.WHITE else Color.parseColor("#FF5252"))
-
-            btnAuditoriaTodos.setBackgroundColor(if (modoAuditoria == "TODOS") Color.parseColor("#DEFF9A") else Color.parseColor("#24283B"))
-            btnAuditoriaTodos.setTextColor(if (modoAuditoria == "TODOS") Color.BLACK else Color.WHITE)
-        }
-
-        btnAuditoriaActivos.setOnClickListener {
-            modoAuditoria = "ACTIVOS"
-            actualizarBotonesAuditoria()
-            aplicarFiltrosRegistro()
-        }
-
-        btnAuditoriaBorrados.setOnClickListener {
-            modoAuditoria = "BORRADOS"
-            actualizarBotonesAuditoria()
-            aplicarFiltrosRegistro()
-        }
-
-        btnAuditoriaTodos.setOnClickListener {
-            modoAuditoria = "TODOS"
-            actualizarBotonesAuditoria()
-            aplicarFiltrosRegistro()
-        }
-
-        configurarAdaptersReservas()
-
-        // CONFIGURAR VETADOS
-        vetadosAdapter = VetadosAdapter(listaVetadosGlobal,
-            onEditar = { vetado ->
-                if (!estaConectadoInternet) {
-                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden editar clientes sin internet.", Toast.LENGTH_SHORT).show()
-                } else {
-                    mostrarDialogoVetarCliente(vetado)
-                }
-            },
-            onEliminar = { vetado ->
-                if (!estaConectadoInternet) {
-                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden eliminar clientes sin internet.", Toast.LENGTH_SHORT).show()
-                } else {
-                    database.child("vetados").child(vetado.celular).removeValue()
-                }
-            }
-        )
-        val rvVetados = findViewById<RecyclerView>(R.id.rvVetados)
-        rvVetados.layoutManager = LinearLayoutManager(this)
-        rvVetados.adapter = vetadosAdapter
-
-        // CONFIGURAR TABS Y VISTAS DE USUARIOS EN LINEA / TERMINALES POS
-        val btnTabTerminalesPos = findViewById<Button>(R.id.btnTabTerminalesPos)
-        val btnTabUsuariosMoviles = findViewById<Button>(R.id.btnTabUsuariosMoviles)
-        val layoutContenedorTerminalesPos = findViewById<LinearLayout>(R.id.layoutContenedorTerminalesPos)
-        val layoutContenedorUsuariosMoviles = findViewById<LinearLayout>(R.id.layoutContenedorUsuariosMoviles)
-        val rvTerminalesPos = findViewById<RecyclerView>(R.id.rvTerminalesPos)
-        btnTabTerminalesPosRef = btnTabTerminalesPos
-        btnTabUsuariosMovilesRef = btnTabUsuariosMoviles
-
-        terminalesPosAdapter = TerminalesPosAdapter(
-            listaTerminalesPos,
-            onRenombrar = { terminal ->
-                mostrarDialogoRenombrarTerminal(terminal)
-            },
-            onToggleAutorizar = { terminal ->
-                val nuevoEstado = !terminal.autorizado
-                val updates = mapOf(
-                    "autorizado" to nuevoEstado,
-                    "sessionToken" to if (!nuevoEstado) "" else terminal.sessionToken
-                )
-                database.child("terminales_pos").child(terminal.deviceId).updateChildren(updates)
-                    .addOnSuccessListener {
-                        val msg = if (nuevoEstado) "✅ Terminal '${terminal.nombre}' autorizada" else "🚫 Terminal '${terminal.nombre}' bloqueada"
-                        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-                    }
-                    .addOnFailureListener {
-                        Toast.makeText(this, "Error al actualizar estado de terminal", Toast.LENGTH_SHORT).show()
-                    }
-            }
-        )
-        rvTerminalesPos.layoutManager = LinearLayoutManager(this)
-        rvTerminalesPos.adapter = terminalesPosAdapter
-
-        btnTabTerminalesPos.setOnClickListener {
-            layoutContenedorTerminalesPos.visibility = View.VISIBLE
-            layoutContenedorUsuariosMoviles.visibility = View.GONE
-            btnTabTerminalesPos.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#DEFF9A"))
-            btnTabTerminalesPos.setTextColor(Color.parseColor("#000000"))
-            btnTabUsuariosMoviles.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#24283B"))
-            btnTabUsuariosMoviles.setTextColor(Color.parseColor("#FFFFFF"))
-        }
-
-        btnTabUsuariosMoviles.setOnClickListener {
-            layoutContenedorTerminalesPos.visibility = View.GONE
-            layoutContenedorUsuariosMoviles.visibility = View.VISIBLE
-            btnTabUsuariosMoviles.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#DEFF9A"))
-            btnTabUsuariosMoviles.setTextColor(Color.parseColor("#000000"))
-            btnTabTerminalesPos.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#24283B"))
-            btnTabTerminalesPos.setTextColor(Color.parseColor("#FFFFFF"))
-        }
-
-        // CONFIGURAR USUARIOS EN LINEA
-        val rvUsuariosOnline = findViewById<RecyclerView>(R.id.rvUsuariosOnline)
-        rvUsuariosOnline.layoutManager = LinearLayoutManager(this)
-        usuariosOnlineAdapter = UsuariosOnlineAdapter(
-            listaUsuariosOnline,
-            onGestionarUsuario = { usuarioSeleccionado ->
-                mostrarDialogoGestionarUsuario(usuarioSeleccionado)
-            },
-            onToggleBloqueo = { usuario ->
-                val nuevoEstado = !usuario.bloqueado
-                val motivo = if (nuevoEstado) "Desactivado por el Administrador" else ""
-                val updates = mapOf(
-                    "bloqueado" to nuevoEstado,
-                    "motivoBloqueo" to motivo
-                )
-                database.child("presencia_usuarios").child(usuario.id).updateChildren(updates)
-                    .addOnSuccessListener {
-                        val msg = if (nuevoEstado) "🚫 Dispositivo '${usuario.nombre}' desactivado" else "✅ Dispositivo '${usuario.nombre}' activado"
-                        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-                    }
-                    .addOnFailureListener {
-                        Toast.makeText(this, "Error al actualizar estado en Firebase", Toast.LENGTH_SHORT).show()
-                    }
-            }
-        )
-        rvUsuariosOnline.adapter = usuariosOnlineAdapter
-
-        findViewById<Button>(R.id.btnCrearNuevoUsuario).setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Sin conexión: Se requiere internet para registrar usuarios.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            mostrarDialogoCrearNuevoUsuario()
-        }
-
-        findViewById<FloatingActionButton>(R.id.fabAgregarVetado).setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Sin conexión: No se pueden agregar vetados sin internet.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            mostrarDialogoVetarCliente(null)
-        }
-
-        findViewById<FloatingActionButton>(R.id.fabAgregarReservaPantalla).setOnClickListener {
-            if (!estaConectadoInternet) {
-                Toast.makeText(this, "⚠️ Sin conexión: No se pueden agregar reservas sin internet.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            mostrarDialogoNuevaReserva()
-        }
-
-        // CHECKBOXES DE FILTRO TICKEABLES EN REGISTRO
-        val checkboxes = listOf(
-            findViewById<CheckBox>(R.id.cbFiltroCine),
-            findViewById<CheckBox>(R.id.cbFiltroAutitos),
-            findViewById<CheckBox>(R.id.cbFiltroDance),
-            findViewById<CheckBox>(R.id.cbFiltroMostrador),
-            findViewById<CheckBox>(R.id.cbFiltroEfectivo),
-            findViewById<CheckBox>(R.id.cbFiltroQR),
-            findViewById<CheckBox>(R.id.cbFiltroEgresos)
-        )
-        checkboxes.forEach { cb ->
-            cb?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosRegistro() }
-        }
-
-        findViewById<Button>(R.id.btnFiltroFecha).setOnClickListener {
-            val cal = Calendar.getInstance()
-            DatePickerDialog(this, { _, year, month, day ->
-                fechaFiltroSeleccionada = String.format("%02d/%02d/%d", day, month + 1, year)
-                aplicarFiltrosRegistro()
-            }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
-        }
-
-        findViewById<Button>(R.id.btnFiltroHoraInicio).setOnClickListener {
-            val cal = Calendar.getInstance()
-            TimePickerDialog(this, { _, hourOfDay, minute ->
-                horaInicioFiltro = String.format("%02d:%02d", hourOfDay, minute)
-                aplicarFiltrosRegistro()
-            }, cal.get(Calendar.HOUR_OF_DAY), 0, true).show()
-        }
-
-        findViewById<Button>(R.id.btnFiltroHoraFin).setOnClickListener {
-            val cal = Calendar.getInstance()
-            TimePickerDialog(this, { _, hourOfDay, minute ->
-                horaFinFiltro = String.format("%02d:%02d", hourOfDay, minute)
-                aplicarFiltrosRegistro()
-            }, cal.get(Calendar.HOUR_OF_DAY), 59, true).show()
-        }
-
-        findViewById<Button>(R.id.btnLimpiarHoras).setOnClickListener {
-            horaInicioFiltro = null
-            horaFinFiltro = null
-            aplicarFiltrosRegistro()
-        }
-
-        findViewById<Button>(R.id.btnLimpiarFecha).setOnClickListener {
             fechaFiltroSeleccionada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
             horaInicioFiltro = null
             horaFinFiltro = null
-            aplicarFiltrosRegistro()
-        }
 
-        findViewById<Button>(R.id.btnExportar).setOnClickListener {
-            if (historialFiltrado.isEmpty()) {
-                Toast.makeText(this, "No hay datos para exportar", Toast.LENGTH_SHORT).show()
-            } else {
-                exportarCSV(historialFiltrado)
+            // 3. INICIALIZAR BASE DE DATOS Y GESTORES SOLID
+            database = FirebaseDatabase.getInstance().reference
+            posManager = PosManagementManager(this, database)
+            roomAuditManager = RoomAuditManager(this, database)
+            productAuditManager = ProductAuditManager(this, database)
+            egresosManager = EgresosManager(this, database)
+            qrValidationHelper = QrPaymentValidationHelper(this, database) { solicitudId ->
+                capturarComprobantesParaSolicitud(solicitudId)
             }
-        }
+            otgScanner = OtgBarcodeScannerHelper(object : IBarcodeScanListener {
+                override fun onBarcodeScanned(barcode: String) {
+                    mostrarDialogoVentaOTGEmergencia(barcode)
+                }
+            })
 
-        sincronizarConFirebase()
+            // 4. INICIALIZAR TODOS LOS ADAPTERS Y ENLAZARLOS A SUS RECYCLERVIEWS
+            // 4.1 Registro & Auditoria
+            val rvRegistro = findViewById<RecyclerView>(R.id.rvRegistro)
+            rvRegistro.layoutManager = LinearLayoutManager(this)
+            registroAdapter = RegistroAdminAdapter(
+                historialFiltrado,
+                onEliminarRegistro = { reg -> eliminarRegistro(reg) },
+                onRestaurarRegistro = { reg -> restaurarRegistro(reg) }
+            )
+            rvRegistro.adapter = registroAdapter
+
+            // 4.2 Reservas
+            configurarAdaptersReservas()
+
+            // 4.3 Vetados
+            vetadosAdapter = VetadosAdapter(listaVetadosGlobal,
+                onEditar = { vetado ->
+                    if (!estaConectadoInternet) {
+                        Toast.makeText(this, "⚠️ Sin conexión: No se pueden editar clientes sin internet.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        mostrarDialogoVetarCliente(vetado)
+                    }
+                },
+                onEliminar = { vetado ->
+                    if (!estaConectadoInternet) {
+                        Toast.makeText(this, "⚠️ Sin conexión: No se pueden eliminar clientes sin internet.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        database.child("vetados").child(vetado.celular).removeValue()
+                    }
+                }
+            )
+            val rvVetados = findViewById<RecyclerView>(R.id.rvVetados)
+            rvVetados.layoutManager = LinearLayoutManager(this)
+            rvVetados.adapter = vetadosAdapter
+
+            // 4.4 Terminales POS
+            val btnTabTerminalesPos = findViewById<Button>(R.id.btnTabTerminalesPos)
+            val btnTabUsuariosMoviles = findViewById<Button>(R.id.btnTabUsuariosMoviles)
+            val layoutContenedorTerminalesPos = findViewById<LinearLayout>(R.id.layoutContenedorTerminalesPos)
+            val layoutContenedorUsuariosMoviles = findViewById<LinearLayout>(R.id.layoutContenedorUsuariosMoviles)
+            val rvTerminalesPos = findViewById<RecyclerView>(R.id.rvTerminalesPos)
+            btnTabTerminalesPosRef = btnTabTerminalesPos
+            btnTabUsuariosMovilesRef = btnTabUsuariosMoviles
+
+            terminalesPosAdapter = TerminalesPosAdapter(
+                listaTerminalesPos,
+                onRenombrar = { terminal -> mostrarDialogoRenombrarTerminal(terminal) },
+                onToggleAutorizar = { terminal ->
+                    val nuevoEstado = !terminal.autorizado
+                    val updates = mapOf(
+                        "autorizado" to nuevoEstado,
+                        "sessionToken" to if (!nuevoEstado) "" else terminal.sessionToken
+                    )
+                    database.child("terminales_pos").child(terminal.deviceId).updateChildren(updates)
+                }
+            )
+            rvTerminalesPos.layoutManager = LinearLayoutManager(this)
+            rvTerminalesPos.adapter = terminalesPosAdapter
+
+            // 4.5 Usuarios Online
+            val rvUsuariosOnline = findViewById<RecyclerView>(R.id.rvUsuariosOnline)
+            rvUsuariosOnline.layoutManager = LinearLayoutManager(this)
+            usuariosOnlineAdapter = UsuariosOnlineAdapter(
+                listaUsuariosOnline,
+                onGestionarUsuario = { usuarioSeleccionado -> mostrarDialogoGestionarUsuario(usuarioSeleccionado) },
+                onToggleBloqueo = { usuario ->
+                    val nuevoEstado = !usuario.bloqueado
+                    val motivo = if (nuevoEstado) "Desactivado por el Administrador" else ""
+                    val updates = mapOf(
+                        "bloqueado" to nuevoEstado,
+                        "motivoBloqueo" to motivo
+                    )
+                    database.child("presencia_usuarios").child(usuario.id).updateChildren(updates)
+                }
+            )
+            rvUsuariosOnline.adapter = usuariosOnlineAdapter
+
+            // 5. CONFIGURAR INTERACCIÓN Y EVENTOS DE UI
+            btnTabTerminalesPos.setOnClickListener {
+                layoutContenedorTerminalesPos.visibility = View.VISIBLE
+                layoutContenedorUsuariosMoviles.visibility = View.GONE
+                btnTabTerminalesPos.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#DEFF9A"))
+                btnTabTerminalesPos.setTextColor(Color.parseColor("#000000"))
+                btnTabUsuariosMoviles.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#24283B"))
+                btnTabUsuariosMoviles.setTextColor(Color.parseColor("#FFFFFF"))
+            }
+
+            btnTabUsuariosMoviles.setOnClickListener {
+                layoutContenedorTerminalesPos.visibility = View.GONE
+                layoutContenedorUsuariosMoviles.visibility = View.VISIBLE
+                btnTabUsuariosMoviles.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#DEFF9A"))
+                btnTabUsuariosMoviles.setTextColor(Color.parseColor("#000000"))
+                btnTabTerminalesPos.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#24283B"))
+                btnTabTerminalesPos.setTextColor(Color.parseColor("#FFFFFF"))
+            }
+
+            findViewById<Button>(R.id.btnCrearNuevoUsuario).setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Sin conexión: Se requiere internet para registrar usuarios.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                mostrarDialogoCrearNuevoUsuario()
+            }
+
+            findViewById<FloatingActionButton>(R.id.fabAgregarVetado).setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden agregar vetados sin internet.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                mostrarDialogoVetarCliente(null)
+            }
+
+            findViewById<FloatingActionButton>(R.id.fabAgregarReservaPantalla).setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden agregar reservas sin internet.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                mostrarDialogoNuevaReserva()
+            }
+
+            // Pestañas de auditoría
+            val btnAuditoriaActivos = findViewById<Button>(R.id.btnFiltroAuditoriaActivos)
+            val btnAuditoriaBorrados = findViewById<Button>(R.id.btnFiltroAuditoriaBorrados)
+            val btnAuditoriaTodos = findViewById<Button>(R.id.btnFiltroAuditoriaTodos)
+
+            fun actualizarBotonesAuditoria() {
+                btnAuditoriaActivos.setBackgroundColor(if (modoAuditoria == "ACTIVOS") Color.parseColor("#DEFF9A") else Color.parseColor("#24283B"))
+                btnAuditoriaActivos.setTextColor(if (modoAuditoria == "ACTIVOS") Color.BLACK else Color.WHITE)
+
+                btnAuditoriaBorrados.setBackgroundColor(if (modoAuditoria == "BORRADOS") Color.parseColor("#FF5252") else Color.parseColor("#24283B"))
+                btnAuditoriaBorrados.setTextColor(if (modoAuditoria == "BORRADOS") Color.WHITE else Color.parseColor("#FF5252"))
+
+                btnAuditoriaTodos.setBackgroundColor(if (modoAuditoria == "TODOS") Color.parseColor("#DEFF9A") else Color.parseColor("#24283B"))
+                btnAuditoriaTodos.setTextColor(if (modoAuditoria == "TODOS") Color.BLACK else Color.WHITE)
+            }
+
+            btnAuditoriaActivos.setOnClickListener {
+                modoAuditoria = "ACTIVOS"
+                actualizarBotonesAuditoria()
+                aplicarFiltrosRegistro()
+            }
+
+            btnAuditoriaBorrados.setOnClickListener {
+                modoAuditoria = "BORRADOS"
+                actualizarBotonesAuditoria()
+                aplicarFiltrosRegistro()
+            }
+
+            btnAuditoriaTodos.setOnClickListener {
+                modoAuditoria = "TODOS"
+                actualizarBotonesAuditoria()
+                aplicarFiltrosRegistro()
+            }
+
+            // Checkboxes de filtros
+            val checkboxes = listOf(
+                findViewById<CheckBox>(R.id.cbFiltroCine),
+                findViewById<CheckBox>(R.id.cbFiltroAutitos),
+                findViewById<CheckBox>(R.id.cbFiltroDance),
+                findViewById<CheckBox>(R.id.cbFiltroMostrador),
+                findViewById<CheckBox>(R.id.cbFiltroEfectivo),
+                findViewById<CheckBox>(R.id.cbFiltroQR),
+                findViewById<CheckBox>(R.id.cbFiltroEgresos)
+            )
+            checkboxes.forEach { cb ->
+                cb?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosRegistro() }
+            }
+
+            findViewById<Button>(R.id.btnFiltroFecha).setOnClickListener {
+                val cal = Calendar.getInstance()
+                DatePickerDialog(this, { _, year, month, day ->
+                    fechaFiltroSeleccionada = String.format("%02d/%02d/%d", day, month + 1, year)
+                    aplicarFiltrosRegistro()
+                }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+            }
+
+            findViewById<Button>(R.id.btnFiltroHoraInicio).setOnClickListener {
+                val cal = Calendar.getInstance()
+                TimePickerDialog(this, { _, hourOfDay, minute ->
+                    horaInicioFiltro = String.format("%02d:%02d", hourOfDay, minute)
+                    aplicarFiltrosRegistro()
+                }, cal.get(Calendar.HOUR_OF_DAY), 0, true).show()
+            }
+
+            findViewById<Button>(R.id.btnFiltroHoraFin).setOnClickListener {
+                val cal = Calendar.getInstance()
+                TimePickerDialog(this, { _, hourOfDay, minute ->
+                    horaFinFiltro = String.format("%02d:%02d", hourOfDay, minute)
+                    aplicarFiltrosRegistro()
+                }, cal.get(Calendar.HOUR_OF_DAY), 59, true).show()
+            }
+
+            findViewById<Button>(R.id.btnLimpiarHoras).setOnClickListener {
+                horaInicioFiltro = null
+                horaFinFiltro = null
+                aplicarFiltrosRegistro()
+            }
+
+            findViewById<Button>(R.id.btnLimpiarFecha).setOnClickListener {
+                fechaFiltroSeleccionada = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+                horaInicioFiltro = null
+                horaFinFiltro = null
+                aplicarFiltrosRegistro()
+            }
+
+            findViewById<Button>(R.id.btnExportar).setOnClickListener {
+                if (historialFiltrado.isEmpty()) {
+                    Toast.makeText(this, "No hay datos para exportar", Toast.LENGTH_SHORT).show()
+                } else {
+                    exportarCSV(historialFiltrado)
+                }
+            }
+
+            tvBadgeUsuariosOnline.setOnClickListener {
+                navegarAPantalla("👥 Usuarios en Línea")
+            }
+
+            fabMain.setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Modo sin conexión: Estás en modo de solo lectura.", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                toggleFabMenu()
+            }
+            fabOverlay.setOnClickListener { toggleFabMenu() }
+
+            findViewById<FloatingActionButton>(R.id.fabVenta).setOnClickListener {
+                if (!estaConectadoInternet) {
+                    Toast.makeText(this, "⚠️ Sin conexión: No se pueden registrar ventas sin internet.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                toggleFabMenu()
+                mostrarDialogoVentaDirecta()
+            }
+
+            findViewById<FloatingActionButton>(R.id.fabReservas).setOnClickListener {
+                toggleFabMenu()
+                navegarAPantalla("Reservas")
+            }
+
+            val btnMenuHamburguesa = findViewById<TextView>(R.id.btnMenuHamburguesa)
+            btnMenuHamburguesa.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
+
+            val navigationView = findViewById<NavigationView>(R.id.navigationView)
+            navigationView.menu.add(0, 1, 0, "Just Play (Tablero)").setIcon(android.R.drawable.ic_menu_sort_by_size)
+            navigationView.menu.add(0, 2, 1, "Registro y Auditoría").setIcon(android.R.drawable.ic_menu_recent_history)
+            navigationView.menu.add(0, 3, 2, "Reservas").setIcon(android.R.drawable.ic_menu_today)
+            navigationView.menu.add(0, 4, 3, "Clientes Vetados").setIcon(android.R.drawable.ic_menu_close_clear_cancel)
+            navigationView.menu.add(0, 5, 4, "👥 Usuarios en Línea").setIcon(android.R.drawable.ic_menu_myplaces)
+            navigationView.menu.add(0, 6, 5, "🏗️ Aumentar / Gestionar Salas").setIcon(android.R.drawable.ic_input_add)
+            navigationView.menu.add(0, 7, 6, "🔄 Buscar Actualizaciones").setIcon(android.R.drawable.ic_popup_sync)
+            navigationView.menu.add(0, 8, 7, "🖥️ Terminales POS y Catálogo").setIcon(android.R.drawable.ic_menu_manage)
+            navigationView.menu.add(0, 12, 8, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
+            navigationView.menu.add(0, 13, 9, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
+            navigationView.menu.add(0, 14, 10, "🛡️ Auditoría").setIcon(android.R.drawable.ic_menu_info_details)
+            navigationView.menu.add(0, 15, 11, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
+            navigationView.menu.add(0, 16, 12, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
+            navigationView.menu.add(0, 17, 13, "📁 Gestión de Secciones").setIcon(android.R.drawable.ic_menu_manage)
+
+            navigationView.setNavigationItemSelectedListener { item ->
+                when (item.itemId) {
+                    6 -> mostrarDialogoAdministrarSalas()
+                    7 -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
+                    8 -> posManager.mostrarDialogoGestionPOS()
+                    12 -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
+                    13 -> egresosManager.mostrarDialogoGestionEgresos()
+                    14 -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
+                    15 -> posManager.mostrarDialogoPreciosBase()
+                    16 -> mostrarDialogoTablaTarifasMinicine()
+                    17 -> mostrarDialogoGestionarSecciones()
+                    else -> {
+                        val title = item.title.toString()
+                        when {
+                            title.contains("Gestionar Salas") -> mostrarDialogoAdministrarSalas()
+                            title.contains("Gestión de Secciones") || title.contains("Secciones") -> mostrarDialogoGestionarSecciones()
+                            title.contains("Actualizaciones") -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
+                            title.contains("Terminales POS") -> posManager.mostrarDialogoGestionPOS()
+                            title.contains("Auditoría Productos") -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
+                            title.contains("Egresos") -> egresosManager.mostrarDialogoGestionEgresos()
+                            (title.contains("Auditoría") && !title.contains("Productos")) || title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
+                            title.contains("Precios Base") -> posManager.mostrarDialogoPreciosBase()
+                            title.contains("Tabla de Tarifas") -> mostrarDialogoTablaTarifasMinicine()
+                            else -> navegarAPantalla(title)
+                        }
+                    }
+                }
+                drawerLayout.closeDrawers()
+                true
+            }
+
+            // Relojes
+            runnableRelojes = object : Runnable {
+                override fun run() {
+                    actualizarRelojesReservas()
+                    verificarTiemposSalas()
+                    handlerRelojes.postDelayed(this, 1000)
+                }
+            }
+            handlerRelojes.post(runnableRelojes)
+
+            // 6. INICIAR COMUNICACIÓN CLOUD (SOLO CUANDO TODA LA UI Y ADAPTERS ESTÁN VIVOS)
+            actualizarContadorOcupacion()
+
+            // Monitorear conectividad con Firebase Realtime Database
+            try {
+                FirebaseDatabase.getInstance().getReference(".info/connected").addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        try {
+                            val connected = snapshot.getValue(Boolean::class.java) ?: false
+                            actualizarEstadoConexion(connected)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    override fun onCancelled(error: DatabaseError) {}
+                })
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // Monitorear conectividad de red
+            try {
+                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                val request = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build()
+                cm.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        runOnUiThread { actualizarEstadoConexion(true) }
+                    }
+                    override fun onLost(network: Network) {
+                        runOnUiThread { actualizarEstadoConexion(false) }
+                    }
+                })
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // Presencia
+            try {
+                PresenciaManager.iniciarMonitoreoPresencia(this, "AdminJustPlay", "Administrador")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // Catálogo de productos y solicitudes QR
+            try {
+                iniciarListenerCatalogoProductos()
+                qrValidationHelper.iniciarEscucha()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // Actualizaciones
+            try {
+                AppUpdateManager.verificarActualizacion(this, "AdminJustPlay")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // Sincronización general
+            sincronizarConFirebase()
+
+        } catch (t: Throwable) {
+            android.util.Log.e("AdminJustPlay", "Error fatal en onCreate", t)
+            Thread.getDefaultUncaughtExceptionHandler()?.uncaughtException(Thread.currentThread(), t)
+        }
     }
 
     override fun onDestroy() {
@@ -1038,37 +1051,58 @@ class MainActivity : AppCompatActivity() {
         // 1. ESCUCHAR SALAS
         database.child("salas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val tempSalas = mutableListOf<Sala>()
-                for (snap in snapshot.children) {
-                    val s = snap.getValue(Sala::class.java)
-                    if (s != null) {
-                        s.idFirebase = snap.key ?: ""
-                        if (s.id == 0) {
-                            s.id = snap.key?.toIntOrNull() ?: 0
+                try {
+                    val tempSalas = mutableListOf<Sala>()
+                    for (snap in snapshot.children) {
+                        try {
+                            val s = snap.getValue(Sala::class.java)
+                            if (s != null) {
+                                s.idFirebase = snap.key ?: ""
+                                if (s.id == 0) {
+                                    s.id = snap.key?.toIntOrNull() ?: 0
+                                }
+                                tempSalas.add(s)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parseando sala ${snap.key}", e)
                         }
-                        tempSalas.add(s)
                     }
-                }
 
-                salasMinicine = tempSalas.filter { it.esMinicine() }.sortedBy { it.id }
-                salasAutitos = tempSalas.filter { (it.seccionNombre.equals("Autitos", true) || it.seccionNombre.equals("Volantes", true) || (it.seccionNombre.isBlank() && (it.id in 101..199 || it.nombre.contains("Car", true) || it.nombre.contains("Auto", true) || it.nombre.contains("Volante", true)))) && !it.esMinicine() }.sortedBy { it.id }
-                salasJustDance = tempSalas.filter { (it.seccionNombre.equals("Just Dance", true) || (it.seccionNombre.isBlank() && (it.id >= 200 || it.nombre.contains("Dance", true)))) && !it.esMinicine() }.sortedBy { it.id }
+                    salasMinicine = tempSalas.filter { it.esMinicine() }.sortedBy { it.id }
+                    salasAutitos = tempSalas.filter { (it.seccionNombre.equals("Autitos", true) || it.seccionNombre.equals("Volantes", true) || (it.seccionNombre.isBlank() && (it.id in 101..199 || it.nombre.contains("Car", true) || it.nombre.contains("Auto", true) || it.nombre.contains("Volante", true)))) && !it.esMinicine() }.sortedBy { it.id }
+                    salasJustDance = tempSalas.filter { (it.seccionNombre.equals("Just Dance", true) || (it.seccionNombre.isBlank() && (it.id >= 200 || it.nombre.contains("Dance", true)))) && !it.esMinicine() }.sortedBy { it.id }
 
-                salasDinamicas = tempSalas.filter { it !in salasMinicine && it !in salasAutitos && it !in salasJustDance }.sortedBy { it.id }
+                    salasDinamicas = tempSalas.filter { it !in salasMinicine && it !in salasAutitos && it !in salasJustDance }.sortedBy { it.id }
 
-                adapterSalasMinicine = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasMinicine), salasMinicine, adapterSalasMinicine) { adapterSalasMinicine = it }
-                adapterSalasAutitos = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasAutitos), salasAutitos, adapterSalasAutitos) { adapterSalasAutitos = it }
-                adapterSalasJustDance = actualizarRecyclerViewSalas(findViewById(R.id.rvSalasJustDance), salasJustDance, adapterSalasJustDance) { adapterSalasJustDance = it }
-                renderizarSeccionesDinamicas(salasDinamicas)
-
-                actualizarContadorOcupacion()
-
-                for (sala in tempSalas) {
-                    if (sala.estado == EstadoSala.OCUPADA && sala.endTimeMillis != null && sala.endTimeMillis!! > System.currentTimeMillis()) {
-                        AlarmUtils.programarAlarmaSala(this@MainActivity, sala.id, sala.nombre, sala.cliente, sala.endTimeMillis!!)
-                    } else {
-                        AlarmUtils.cancelarAlarmaSala(this@MainActivity, sala.id)
+                    val rvMinicine = findViewById<RecyclerView>(R.id.rvSalasMinicine)
+                    if (rvMinicine != null) {
+                        adapterSalasMinicine = actualizarRecyclerViewSalas(rvMinicine, salasMinicine, adapterSalasMinicine) { adapterSalasMinicine = it }
                     }
+                    val rvAutitos = findViewById<RecyclerView>(R.id.rvSalasAutitos)
+                    if (rvAutitos != null) {
+                        adapterSalasAutitos = actualizarRecyclerViewSalas(rvAutitos, salasAutitos, adapterSalasAutitos) { adapterSalasAutitos = it }
+                    }
+                    val rvJustDance = findViewById<RecyclerView>(R.id.rvSalasJustDance)
+                    if (rvJustDance != null) {
+                        adapterSalasJustDance = actualizarRecyclerViewSalas(rvJustDance, salasJustDance, adapterSalasJustDance) { adapterSalasJustDance = it }
+                    }
+                    renderizarSeccionesDinamicas(salasDinamicas)
+
+                    actualizarContadorOcupacion()
+
+                    for (sala in tempSalas) {
+                        try {
+                            if (sala.estado == EstadoSala.OCUPADA && sala.endTimeMillis != null && sala.endTimeMillis!! > System.currentTimeMillis()) {
+                                AlarmUtils.programarAlarmaSala(this@MainActivity, sala.id, sala.nombre, sala.cliente, sala.endTimeMillis!!)
+                            } else {
+                                AlarmUtils.cancelarAlarmaSala(this@MainActivity, sala.id)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error procesando alarma sala ${sala.id}", e)
+                        }
+                    }
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de salas", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -1077,18 +1111,26 @@ class MainActivity : AppCompatActivity() {
         // 2. ESCUCHAR AUDITORIA Y REGISTROS HISTORICOS (OPTIMIZADO CON LÍMITE)
         database.child("auditoria_registros").limitToLast(300).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                historialCompleto.clear()
-                for (snap in snapshot.children) {
-                    val reg = snap.getValue(RegistroEntry::class.java)
-                    if (reg != null) {
-                        reg.idFirebase = snap.key ?: ""
-                        historialCompleto.add(reg)
+                try {
+                    historialCompleto.clear()
+                    for (snap in snapshot.children) {
+                        try {
+                            val reg = snap.getValue(RegistroEntry::class.java)
+                            if (reg != null) {
+                                reg.idFirebase = snap.key ?: ""
+                                historialCompleto.add(reg)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parseando registro ${snap.key}", e)
+                        }
                     }
-                }
-                if (historialCompleto.isEmpty()) {
-                    cargarRegistrosLegacy()
-                } else {
-                    aplicarFiltrosRegistro()
+                    if (historialCompleto.isEmpty()) {
+                        cargarRegistrosLegacy()
+                    } else {
+                        aplicarFiltrosRegistro()
+                    }
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de auditoria_registros", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -1097,40 +1139,48 @@ class MainActivity : AppCompatActivity() {
         // 3. ESCUCHAR RESERVAS (CON SOPORTE DE SECCIONES DINÁMICAS)
         database.child("reservas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                listaReservasGlobales.clear()
-                reservasMinicineList.clear()
-                reservasAutitosList.clear()
-                reservasDanceList.clear()
-                reservasDinamicasMap.clear()
+                try {
+                    listaReservasGlobales.clear()
+                    reservasMinicineList.clear()
+                    reservasAutitosList.clear()
+                    reservasDanceList.clear()
+                    reservasDinamicasMap.clear()
 
-                for (snap in snapshot.children) {
-                    val res = snap.getValue(Reserva::class.java)
-                    if (res != null) {
-                        res.idFirebase = snap.key ?: ""
-                        listaReservasGlobales.add(res)
-                        when (res.tipoSala) {
-                            "Minicine" -> reservasMinicineList.add(res)
-                            "Autitos" -> reservasAutitosList.add(res)
-                            "Just Dance" -> reservasDanceList.add(res)
-                            else -> {
-                                val list = reservasDinamicasMap.getOrPut(res.tipoSala) { mutableListOf() }
-                                list.add(res)
+                    for (snap in snapshot.children) {
+                        try {
+                            val res = snap.getValue(Reserva::class.java)
+                            if (res != null) {
+                                res.idFirebase = snap.key ?: ""
+                                listaReservasGlobales.add(res)
+                                when (res.tipoSala) {
+                                    "Minicine" -> reservasMinicineList.add(res)
+                                    "Autitos" -> reservasAutitosList.add(res)
+                                    "Just Dance" -> reservasDanceList.add(res)
+                                    else -> {
+                                        val list = reservasDinamicasMap.getOrPut(res.tipoSala) { mutableListOf() }
+                                        list.add(res)
+                                    }
+                                }
                             }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parseando reserva ${snap.key}", e)
                         }
                     }
-                }
-                listaReservasGlobales.sortBy { it.getSortTimestamp() }
-                reservasMinicineList.sortBy { it.getSortTimestamp() }
-                reservasAutitosList.sortBy { it.getSortTimestamp() }
-                reservasDanceList.sortBy { it.getSortTimestamp() }
-                for (list in reservasDinamicasMap.values) {
-                    list.sortBy { it.getSortTimestamp() }
-                }
+                    listaReservasGlobales.sortBy { it.getSortTimestamp() }
+                    reservasMinicineList.sortBy { it.getSortTimestamp() }
+                    reservasAutitosList.sortBy { it.getSortTimestamp() }
+                    reservasDanceList.sortBy { it.getSortTimestamp() }
+                    for (list in reservasDinamicasMap.values) {
+                        list.sortBy { it.getSortTimestamp() }
+                    }
 
-                adapterResMinicine.notifyDataSetChanged()
-                adapterResAutitos.notifyDataSetChanged()
-                adapterResDance.notifyDataSetChanged()
-                renderizarReservasSeccionesDinamicas()
+                    if (::adapterResMinicine.isInitialized) adapterResMinicine.notifyDataSetChanged()
+                    if (::adapterResAutitos.isInitialized) adapterResAutitos.notifyDataSetChanged()
+                    if (::adapterResDance.isInitialized) adapterResDance.notifyDataSetChanged()
+                    renderizarReservasSeccionesDinamicas()
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de reservas", t)
+                }
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1138,11 +1188,19 @@ class MainActivity : AppCompatActivity() {
         // 4. ESCUCHAR VETADOS
         database.child("vetados").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                listaVetadosGlobal.clear()
-                for (snap in snapshot.children) {
-                    snap.getValue(ClienteVetado::class.java)?.let { listaVetadosGlobal.add(it) }
+                try {
+                    listaVetadosGlobal.clear()
+                    for (snap in snapshot.children) {
+                        try {
+                            snap.getValue(ClienteVetado::class.java)?.let { listaVetadosGlobal.add(it) }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parseando vetado ${snap.key}", e)
+                        }
+                    }
+                    if (::vetadosAdapter.isInitialized) vetadosAdapter.notifyDataSetChanged()
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de vetados", t)
                 }
-                vetadosAdapter.notifyDataSetChanged()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1150,28 +1208,38 @@ class MainActivity : AppCompatActivity() {
         // 5. ESCUCHAR USUARIOS EN LINEA EN TIEMPO REAL
         database.child("presencia_usuarios").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                listaUsuariosOnline.clear()
-                var conectadosContador = 0
+                try {
+                    listaUsuariosOnline.clear()
+                    var conectadosContador = 0
 
-                for (snap in snapshot.children) {
-                    val user = snap.getValue(UsuarioPresencia::class.java)
-                    if (user != null) {
-                        user.id = snap.key ?: ""
-                        listaUsuariosOnline.add(user)
-                        if (user.enLinea) conectadosContador++
+                    for (snap in snapshot.children) {
+                        try {
+                            val user = snap.getValue(UsuarioPresencia::class.java)
+                            if (user != null) {
+                                user.id = snap.key ?: ""
+                                listaUsuariosOnline.add(user)
+                                if (user.enLinea) conectadosContador++
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parseando usuario presencia ${snap.key}", e)
+                        }
                     }
+
+                    listaUsuariosOnline.sortByDescending { it.ultimaConexion }
+                    listaUsuariosOnline.sortByDescending { it.enLinea }
+
+                    if (::usuariosOnlineAdapter.isInitialized) usuariosOnlineAdapter.notifyDataSetChanged()
+
+                    if (::tvBadgeUsuariosOnline.isInitialized) {
+                        tvBadgeUsuariosOnline.text = if (conectadosContador > 0) "🟢 $conectadosContador en línea" else "⚪ 0 en línea"
+                        tvBadgeUsuariosOnline.setBackgroundColor(
+                            if (conectadosContador > 0) Color.parseColor("#1B3E2B") else Color.parseColor("#2A2C39")
+                        )
+                    }
+                    btnTabUsuariosMovilesRef?.text = if (conectadosContador > 0) "📱 Personal Móvil ($conectadosContador🟢)" else "📱 Personal Móvil (${listaUsuariosOnline.size})"
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de presencia_usuarios", t)
                 }
-
-                listaUsuariosOnline.sortByDescending { it.ultimaConexion }
-                listaUsuariosOnline.sortByDescending { it.enLinea }
-
-                usuariosOnlineAdapter.notifyDataSetChanged()
-
-                tvBadgeUsuariosOnline.text = if (conectadosContador > 0) "🟢 $conectadosContador en línea" else "⚪ 0 en línea"
-                tvBadgeUsuariosOnline.setBackgroundColor(
-                    if (conectadosContador > 0) Color.parseColor("#1B3E2B") else Color.parseColor("#2A2C39")
-                )
-                btnTabUsuariosMovilesRef?.text = if (conectadosContador > 0) "📱 Personal Móvil ($conectadosContador🟢)" else "📱 Personal Móvil (${listaUsuariosOnline.size})"
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1179,20 +1247,28 @@ class MainActivity : AppCompatActivity() {
         // 5.1 ESCUCHAR TERMINALES POS (ESCRITORIO) EN TIEMPO REAL
         database.child("terminales_pos").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                listaTerminalesPos.clear()
-                var onlineCount = 0
-                for (snap in snapshot.children) {
-                    val term = snap.getValue(TerminalPos::class.java)
-                    if (term != null) {
-                        listaTerminalesPos.add(term)
-                        if (term.isCurrentlyOnline()) onlineCount++
+                try {
+                    listaTerminalesPos.clear()
+                    var onlineCount = 0
+                    for (snap in snapshot.children) {
+                        try {
+                            val term = snap.getValue(TerminalPos::class.java)
+                            if (term != null) {
+                                listaTerminalesPos.add(term)
+                                if (term.isCurrentlyOnline()) onlineCount++
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parseando terminal_pos ${snap.key}", e)
+                        }
                     }
-                }
-                listaTerminalesPos.sortByDescending { it.lastHeartbeat }
-                listaTerminalesPos.sortByDescending { it.isCurrentlyOnline() }
-                terminalesPosAdapter.notifyDataSetChanged()
+                    listaTerminalesPos.sortByDescending { it.lastHeartbeat }
+                    listaTerminalesPos.sortByDescending { it.isCurrentlyOnline() }
+                    if (::terminalesPosAdapter.isInitialized) terminalesPosAdapter.notifyDataSetChanged()
 
-                btnTabTerminalesPosRef?.text = if (onlineCount > 0) "💻 Terminales POS ($onlineCount🟢)" else "💻 Terminales POS (${listaTerminalesPos.size})"
+                    btnTabTerminalesPosRef?.text = if (onlineCount > 0) "💻 Terminales POS ($onlineCount🟢)" else "💻 Terminales POS (${listaTerminalesPos.size})"
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de terminales_pos", t)
+                }
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1200,8 +1276,12 @@ class MainActivity : AppCompatActivity() {
         // 6. ESCUCHAR CONFIGURACIÓN DE PRECIOS BASE
         database.child("config_precios").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    BasePriceConfig.updateFromSnapshot(snapshot)
+                try {
+                    if (snapshot.exists()) {
+                        BasePriceConfig.updateFromSnapshot(snapshot)
+                    }
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de config_precios", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -1210,18 +1290,26 @@ class MainActivity : AppCompatActivity() {
         // 7. ESCUCHAR SECCIONES DINÁMICAS DE SALAS
         database.child("secciones_salas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                listaSecciones.clear()
-                for (snap in snapshot.children) {
-                    val sec = snap.getValue(SeccionSala::class.java)
-                    if (sec != null) {
-                        sec.id = snap.key ?: sec.id
-                        listaSecciones.add(sec)
-                        BasePriceConfig.preciosDinamicos[sec.id] = sec.precioBaseDefault
-                        BasePriceConfig.preciosDinamicos[sec.nombre] = sec.precioBaseDefault
+                try {
+                    listaSecciones.clear()
+                    for (snap in snapshot.children) {
+                        try {
+                            val sec = snap.getValue(SeccionSala::class.java)
+                            if (sec != null) {
+                                sec.id = snap.key ?: sec.id
+                                listaSecciones.add(sec)
+                                BasePriceConfig.preciosDinamicos[sec.id] = sec.precioBaseDefault
+                                BasePriceConfig.preciosDinamicos[sec.nombre] = sec.precioBaseDefault
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parseando seccion ${snap.key}", e)
+                        }
                     }
+                    actualizarFiltrosSeccionesDinamicas()
+                    renderizarReservasSeccionesDinamicas()
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de secciones_salas", t)
                 }
-                actualizarFiltrosSeccionesDinamicas()
-                renderizarReservasSeccionesDinamicas()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1230,15 +1318,23 @@ class MainActivity : AppCompatActivity() {
     private fun cargarRegistrosLegacy() {
         database.child("registros").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                for (snap in snapshot.children) {
-                    val reg = snap.getValue(RegistroEntry::class.java)
-                    if (reg != null) {
-                        reg.idFirebase = snap.key ?: ""
-                        historialCompleto.add(reg)
-                        database.child("auditoria_registros").child(reg.idFirebase).setValue(reg)
+                try {
+                    for (snap in snapshot.children) {
+                        try {
+                            val reg = snap.getValue(RegistroEntry::class.java)
+                            if (reg != null) {
+                                reg.idFirebase = snap.key ?: ""
+                                historialCompleto.add(reg)
+                                database.child("auditoria_registros").child(reg.idFirebase).setValue(reg)
+                            }
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parseando registro legacy ${snap.key}", e)
+                        }
                     }
+                    aplicarFiltrosRegistro()
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en cargarRegistrosLegacy", t)
                 }
-                aplicarFiltrosRegistro()
             }
             override fun onCancelled(error: DatabaseError) {}
         })
@@ -1683,7 +1779,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun actualizarRecyclerViewSalas(rv: RecyclerView, lista: List<Sala>, adapterExistente: SalasAdapter?, onSetAdapter: (SalasAdapter) -> Unit): SalasAdapter {
+    private fun actualizarRecyclerViewSalas(rv: RecyclerView?, lista: List<Sala>, adapterExistente: SalasAdapter?, onSetAdapter: (SalasAdapter) -> Unit): SalasAdapter? {
+        if (rv == null) return adapterExistente
         return if (adapterExistente != null && rv.adapter == adapterExistente) {
             adapterExistente.actualizarLista(lista)
             adapterExistente
@@ -2578,6 +2675,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun actualizarContadorOcupacion() {
+        if (!::tvMinicineOcupadas.isInitialized || !::tvAutitosOcupados.isInitialized || !::tvJustDanceOcupados.isInitialized) return
         val oCine = salasMinicine.count { it.estado == EstadoSala.OCUPADA }
         tvMinicineOcupadas.text = "$oCine / ${salasMinicine.size}"
 
@@ -2630,6 +2728,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun aplicarFiltrosRegistro() {
+        if (!::registroAdapter.isInitialized) return
         val cbCine = findViewById<CheckBox>(R.id.cbFiltroCine)?.isChecked ?: true
         val cbAutitos = findViewById<CheckBox>(R.id.cbFiltroAutitos)?.isChecked ?: true
         val cbDance = findViewById<CheckBox>(R.id.cbFiltroDance)?.isChecked ?: true
@@ -3875,21 +3974,29 @@ class MainActivity : AppCompatActivity() {
     private fun iniciarListenerCatalogoProductos() {
         database.child("productos_catalogo").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                catalogoProductosCache.clear()
-                nombreAProductoCache.clear()
-                listaProductosCatalogo.clear()
-                for (child in snapshot.children) {
-                    val barcode = child.key ?: continue
-                    val nombre = child.child("nombre").getValue(String::class.java) ?: continue
-                    val precio = child.child("precio_unitario").getValue(Double::class.java)
-                        ?: child.child("precio_unitario").getValue(Long::class.java)?.toDouble() ?: 0.0
-                    val stock = child.child("stock_actual").getValue(Int::class.java)
-                        ?: child.child("stock_actual").getValue(Long::class.java)?.toInt() ?: 0
-                    catalogoProductosCache[barcode] = Pair(precio, stock)
-                    nombreAProductoCache[nombre.trim().lowercase()] = Pair(barcode, stock)
-                    listaProductosCatalogo.add(ProductoItem(barcode, nombre, precio, stock))
+                try {
+                    catalogoProductosCache.clear()
+                    nombreAProductoCache.clear()
+                    listaProductosCatalogo.clear()
+                    for (child in snapshot.children) {
+                        try {
+                            val barcode = child.key ?: continue
+                            val nombre = child.child("nombre").getValue(String::class.java) ?: continue
+                            val precio = child.child("precio_unitario").getValue(Double::class.java)
+                                ?: child.child("precio_unitario").getValue(Long::class.java)?.toDouble() ?: 0.0
+                            val stock = child.child("stock_actual").getValue(Int::class.java)
+                                ?: child.child("stock_actual").getValue(Long::class.java)?.toInt() ?: 0
+                            catalogoProductosCache[barcode] = Pair(precio, stock)
+                            nombreAProductoCache[nombre.trim().lowercase()] = Pair(barcode, stock)
+                            listaProductosCatalogo.add(ProductoItem(barcode, nombre, precio, stock))
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error procesando item producto ${child.key}", e)
+                        }
+                    }
+                    listaProductosCatalogo.sortBy { it.nombre.lowercase() }
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de productos_catalogo", t)
                 }
-                listaProductosCatalogo.sortBy { it.nombre.lowercase() }
             }
             override fun onCancelled(error: DatabaseError) {}
         })

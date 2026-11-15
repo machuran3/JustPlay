@@ -33,6 +33,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".CrashDisplayActivity"
+            android:exported="false"
+            android:process=":crash"
+            android:theme="@style/Theme.AdminJustPlay" />
+
         <receiver
             android:name=".TimerNotificationReceiver"
             android:exported="false" />

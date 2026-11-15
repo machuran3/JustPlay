@@ -2113,7 +2113,13 @@ class MainActivity : AppCompatActivity() {
         val contenedor = findViewById<LinearLayout>(R.id.llFiltrosSeccionesDinamicas) ?: return
         contenedor.removeAllViews()
 
-        val seccionesCustom = listaSecciones.filter { it.activa && it.id.lowercase() !in listOf("minicine", "autitos", "just_dance") }
+        val seccionesCustom = listaSecciones.filter { sec ->
+            val idLower = sec.id.trim().lowercase()
+            val nomLower = sec.nombre.trim().lowercase()
+            sec.activa &&
+            idLower !in listOf("minicine", "autitos", "just_dance", "cine", "cines", "volantes", "salas") &&
+            nomLower !in listOf("minicine", "autitos", "just dance", "just_dance", "cine", "cines", "volantes", "salas", "autitos (simuladores)")
+        }
         for (sec in seccionesCustom) {
             val isChecked = filtrosSeccionesDinamicasEstado.getOrPut(sec.id) { true }
             val cb = CheckBox(this).apply {
@@ -2180,26 +2186,70 @@ class MainActivity : AppCompatActivity() {
             }
 
             // 3. Filtro por Tipo / Categoría (tickeable)
-            val tipo = reg.tipo.lowercase()
-            val nombreEl = reg.nombreElemento.lowercase()
-            val esEgreso = tipo.contains("egreso") || nombreEl.contains("egreso")
+            val tipoLower = reg.tipo.trim().lowercase()
+            val nombreLower = reg.nombreElemento.trim().lowercase()
+            val pedidosLower = reg.pedidos.trim().lowercase()
 
-            val seccionCoincidente = listaSecciones.find { sec ->
-                if (sec.id.lowercase() in listOf("minicine", "autitos", "just_dance")) return@find false
-                val secNom = sec.nombre.lowercase()
-                val secPref = sec.prefijoSala.lowercase()
-                tipo.equals(secNom, ignoreCase = true) ||
-                (secNom.isNotBlank() && (tipo.contains(secNom) || nombreEl.contains(secNom))) ||
-                (secPref.isNotBlank() && nombreEl.contains(secPref))
-            }
+            val esEgreso = tipoLower.contains("egreso") || tipoLower.contains("gasto") ||
+                           nombreLower.contains("egreso") || nombreLower.contains("gasto") ||
+                           pedidosLower.contains("egreso")
+
+            val esMostrador = !esEgreso && (
+                tipoLower.contains("consumo") || tipoLower.contains("mostrador") ||
+                tipoLower.contains("venta directa") || tipoLower.contains("producto") ||
+                tipoLower.contains("snack") || tipoLower.contains("bebida") ||
+                tipoLower.contains("golosina") ||
+                nombreLower.startsWith("consumo") || nombreLower.startsWith("venta")
+            )
+
+            val esCine = !esEgreso && !esMostrador && (
+                tipoLower == "minicine" || tipoLower == "cine" || tipoLower.contains("cine") ||
+                tipoLower == "salas" || tipoLower == "sala" || tipoLower == "alquiler de sala" ||
+                nombreLower.contains("cine") ||
+                (nombreLower.matches(Regex("""(?i)^sala\s*\d+.*""")) &&
+                 !nombreLower.contains("auto") && !nombreLower.contains("volante") &&
+                 !nombreLower.contains("car") && !nombreLower.contains("dance"))
+            )
+
+            val esAutitos = !esEgreso && !esMostrador && !esCine && (
+                tipoLower.contains("auto") || tipoLower.contains("car") ||
+                tipoLower.contains("volante") || tipoLower.contains("simulador") ||
+                nombreLower.contains("auto") || nombreLower.contains("car") ||
+                nombreLower.contains("volante")
+            )
+
+            val esDance = !esEgreso && !esMostrador && !esCine && !esAutitos && (
+                tipoLower.contains("dance") || tipoLower.contains("justplay") ||
+                tipoLower == "just dance" || tipoLower == "just_dance" ||
+                nombreLower.contains("dance")
+            )
+
+            val seccionCoincidente = if (!esEgreso && !esMostrador && !esCine && !esAutitos && !esDance) {
+                listaSecciones.filter { sec ->
+                    val idLower = sec.id.trim().lowercase()
+                    val nomLower = sec.nombre.trim().lowercase()
+                    sec.activa &&
+                    idLower !in listOf("minicine", "autitos", "just_dance", "cine", "cines", "volantes", "salas") &&
+                    nomLower !in listOf("minicine", "autitos", "just dance", "just_dance", "cine", "cines", "volantes", "salas", "autitos (simuladores)")
+                }.find { sec ->
+                    val secNom = sec.nombre.trim().lowercase()
+                    val secId = sec.id.trim().lowercase()
+                    val secPref = sec.prefijoSala.trim().lowercase()
+
+                    tipoLower == secNom || tipoLower == secId ||
+                    (secNom.isNotBlank() && tipoLower.contains(secNom)) ||
+                    (secPref.isNotBlank() && secPref.length >= 2 && nombreLower.startsWith(secPref)) ||
+                    (secNom.isNotBlank() && nombreLower.startsWith(secNom))
+                }
+            } else null
 
             val coincideTipo = when {
                 esEgreso -> incluirEgresos
+                esMostrador -> incluirMostrador
+                esCine -> incluirCine
+                esAutitos -> incluirAutitos
+                esDance -> incluirDance
                 seccionCoincidente != null -> filtrosSeccionesDinamicasEstado.getOrDefault(seccionCoincidente.id, true)
-                tipo.contains("consumo") || tipo.contains("mostrador") || tipo.contains("venta directa") || tipo.contains("producto") || tipo.contains("snack") || tipo.contains("bebida") || tipo.contains("golosina") -> incluirMostrador
-                tipo.contains("cine") || nombreEl.contains("cine") || (nombreEl.contains("sala") && !tipo.contains("consumo") && !nombreEl.contains("consumo")) -> incluirCine
-                tipo.contains("auto") || nombreEl.contains("car") || nombreEl.contains("auto") || nombreEl.contains("volante") -> incluirAutitos
-                tipo.contains("dance") || nombreEl.contains("dance") -> incluirDance
                 else -> incluirMostrador
             }
             if (!coincideTipo) continue

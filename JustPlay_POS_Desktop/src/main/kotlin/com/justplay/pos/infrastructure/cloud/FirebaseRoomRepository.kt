@@ -757,4 +757,68 @@ class FirebaseRoomRepository(
             e.printStackTrace()
         }
     }
+
+    override suspend fun saveReservation(reservation: Reservation): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val payload = mutableMapOf<String, Any?>(
+                "idFirebase" to reservation.idFirebase,
+                "nombre" to reservation.nombre,
+                "celular" to reservation.celular,
+                "fecha" to reservation.fecha,
+                "horaProgramada" to reservation.horaProgramada,
+                "tipoSala" to reservation.tipoSala,
+                "adelanto" to reservation.adelanto,
+                "metodoPagoAdelanto" to reservation.metodoPagoAdelanto,
+                "comprobanteUri" to reservation.comprobanteUri,
+                "duracion" to reservation.duracion,
+                "cantidadVolantes" to reservation.cantidadVolantes,
+                "asistio" to reservation.asistio,
+                "horaLlegada" to reservation.horaLlegada
+            )
+            val jsonBody = gson.toJson(payload).toRequestBody(jsonMediaType)
+            val request = Request.Builder()
+                .url("$baseUrl/reservas/${reservation.idFirebase}.json")
+                .put(jsonBody)
+                .build()
+
+            val ok = client.newCall(request).execute().use { it.isSuccessful }
+            if (ok) {
+                val current = _reservationsFlow.value.toMutableList()
+                val idx = current.indexOfFirst { it.idFirebase == reservation.idFirebase }
+                if (idx >= 0) {
+                    current[idx] = reservation
+                } else {
+                    current.add(reservation)
+                }
+                _reservationsFlow.value = current
+                fetchReservations()
+            }
+            ok
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    override suspend fun deleteReservation(reservationId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("$baseUrl/reservas/$reservationId.json")
+                .delete()
+                .build()
+
+            val ok = client.newCall(request).execute().use { it.isSuccessful }
+            if (ok) {
+                val current = _reservationsFlow.value.toMutableList()
+                current.removeAll { it.idFirebase == reservationId }
+                _reservationsFlow.value = current
+                fetchReservations()
+            }
+            ok
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 }
+

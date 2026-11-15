@@ -41,6 +41,15 @@ data class PosUiState(
     val roomPendingOrders: List<RoomOrder> = emptyList(),
     val roomActionMessage: String? = null,
 
+    // Gestión y Traspaso de Reservas (Estilo Móvil)
+    val isReservationDialogOpen: Boolean = false,
+    val editingReservation: Reservation? = null,
+    val defaultReservationCategory: String = "Minicine",
+    val isAssignReservationDialogOpen: Boolean = false,
+    val reservationToAssign: Reservation? = null,
+    val prefillReservationForRoom: Reservation? = null,
+    val viewReceiptForReservation: String? = null,
+
     // Tablero de Horarios / Cronograma Tipo Excel
     val scheduleSelectedDate: String = "TODAS",
     val scheduleCategoryFilter: String = "TODOS", // "TODOS", "MINICINE", "VOLANTES", "JUST_DANCE"

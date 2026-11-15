@@ -46,6 +46,8 @@ data class Room(
     val seccionId: String = "",
     val seccionNombre: String = ""
 ) {
+    val isAvailable: Boolean get() = estado == RoomState.DISPONIBLE
+
     val categoria: String
         get() {
             if (seccionNombre.isNotBlank()) return seccionNombre

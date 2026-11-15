@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.justplay.pos.core.models.Product
+import com.justplay.pos.core.models.Reservation
 import com.justplay.pos.core.models.Room
 import com.justplay.pos.core.models.RoomOrder
 import com.justplay.pos.core.models.RoomState
@@ -38,6 +39,7 @@ import com.justplay.pos.ui.theme.*
 @Composable
 fun RoomDetailDialog(
     room: Room,
+    prefillReservation: Reservation? = null,
     pendingOrders: List<RoomOrder>,
     catalogProducts: List<Product>,
     lastScannedBarcode: String = "",
@@ -63,15 +65,32 @@ fun RoomDetailDialog(
     var showReceiptViewerForStarting by remember { mutableStateOf(false) }
     var showReceiptViewerForOccupied by remember { mutableStateOf(false) }
 
-    var clientName by remember { mutableStateOf(room.cliente ?: "") }
+    var clientName by remember(room, prefillReservation) {
+        mutableStateOf(if (isOccupied) (room.cliente ?: "") else (prefillReservation?.nombre ?: (room.cliente ?: "")))
+    }
 
-    var clientPhone by remember { mutableStateOf(room.celular ?: "") }
-    var gameOrMovie by remember { mutableStateOf(room.pelicula ?: "") }
-    var manualTimeText by remember { mutableStateOf("") }
-    var selectedDurationPreset by remember { mutableStateOf<Int?>(null) } // Inicialmente ninguno seleccionado
+    var clientPhone by remember(room, prefillReservation) {
+        mutableStateOf(if (isOccupied) (room.celular ?: "") else (prefillReservation?.celular ?: (room.celular ?: "")))
+    }
+    var gameOrMovie by remember(room, prefillReservation) {
+        mutableStateOf(room.pelicula ?: "")
+    }
+    var manualTimeText by remember(room, prefillReservation) {
+        mutableStateOf(if (!isOccupied && prefillReservation != null && prefillReservation.duracion.isNotBlank()) prefillReservation.duracion else "")
+    }
+    var selectedDurationPreset by remember(room, prefillReservation) {
+        mutableStateOf<Int?>(if (!isOccupied && prefillReservation != null) prefillReservation.parseDurationMinutes() else null)
+    }
     // Precio base sugerido: Minicine = 35 Bs, Volantes/Just Dance = 15 Bs
-    var priceText by remember { mutableStateOf(if (isOccupied) room.precioCobrado.toString() else room.precioBaseSugerido.toString()) }
-    var selectedPaymentMethod by remember { mutableStateOf(room.metodoPago.ifBlank { "Efectivo" }) }
+    var priceText by remember(room, prefillReservation) {
+        mutableStateOf(if (isOccupied) room.precioCobrado.toString() else room.precioBaseSugerido.toString())
+    }
+    var selectedPaymentMethod by remember(room, prefillReservation) {
+        mutableStateOf(
+            if (isOccupied) room.metodoPago.ifBlank { "Efectivo" }
+            else (prefillReservation?.metodoPagoAdelanto?.ifBlank { "Efectivo" } ?: room.metodoPago.ifBlank { "Efectivo" })
+        )
+    }
 
     // Estado para modo edición de sala ocupada
     var isEditModeActive by remember { mutableStateOf(false) }
@@ -294,6 +313,37 @@ fun RoomDetailDialog(
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
+
+                if (prefillReservation != null) {
+                    Surface(
+                        color = Color(0xFF1E3A2B),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, AccentLime),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text("📋", fontSize = 22.sp)
+                            Column {
+                                Text(
+                                    "Traspasando Reserva: ${prefillReservation.nombre}",
+                                    color = AccentLime,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                val infoAdelanto = if (prefillReservation.adelanto.isNotBlank()) " | 💰 Adelanto: ${prefillReservation.adelanto} Bs (${prefillReservation.metodoPagoAdelanto})" else ""
+                                Text(
+                                    "Hora Programada: ${prefillReservation.horaProgramada} | Duración: ${prefillReservation.duracion}$infoAdelanto",
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
 
                 // 2. Contenido Principal (2 Columnas amplias)
                 Row(

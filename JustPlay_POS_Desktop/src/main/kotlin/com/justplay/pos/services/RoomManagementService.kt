@@ -134,5 +134,14 @@ class RoomManagementService(
         val updated = existing.copy(comprobanteUri = comprobanteUri)
         return roomRepository.updateRoom(updated)
     }
+
+    suspend fun saveReservation(reservation: Reservation): Boolean {
+        return roomRepository.saveReservation(reservation)
+    }
+
+    suspend fun deleteReservation(reservationId: String): Boolean {
+        return roomRepository.deleteReservation(reservationId)
+    }
 }
+
 

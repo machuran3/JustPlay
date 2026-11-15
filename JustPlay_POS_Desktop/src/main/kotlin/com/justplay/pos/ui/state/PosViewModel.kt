@@ -6,6 +6,7 @@ import com.justplay.pos.core.interfaces.ILocalStorage
 import com.justplay.pos.core.interfaces.ISaleService
 import com.justplay.pos.core.models.PaymentMethod
 import com.justplay.pos.core.models.Product
+import com.justplay.pos.core.models.Reservation
 import com.justplay.pos.core.models.Room
 import com.justplay.pos.core.models.SyncStatus
 import com.justplay.pos.infrastructure.security.DeviceSecurityService
@@ -623,15 +624,16 @@ class PosViewModel(
     }
 
     // GESTIÓN DE SALAS UNIFICADA (CLIC DIRECTO ESTILO MÓVIL)
-    fun openRoomDetail(room: Room) {
+    fun openRoomDetail(room: Room, prefill: Reservation? = null) {
         _uiState.update {
             it.copy(
                 selectedRoomForDetail = room,
+                prefillReservationForRoom = prefill,
                 roomPendingOrders = emptyList(),
                 isWaitingRoomQrValidation = false,
                 roomQrValidationSolicitudId = null,
                 roomQrValidationStatusMessage = null,
-                roomQrComprobanteUrl = null,
+                roomQrComprobanteUrl = prefill?.comprobanteUri,
                 scanErrorMessage = null
             )
         }
@@ -645,6 +647,7 @@ class PosViewModel(
         _uiState.update {
             it.copy(
                 selectedRoomForDetail = null,
+                prefillReservationForRoom = null,
                 roomPendingOrders = emptyList(),
                 isWaitingRoomQrValidation = false,
                 roomQrValidationSolicitudId = null,
@@ -862,7 +865,8 @@ class PosViewModel(
         price: Double,
         paymentMethod: String,
         pedidos: List<com.justplay.pos.core.models.RoomOrder> = emptyList(),
-        receiptImageUrl: String? = null
+        receiptImageUrl: String? = null,
+        associatedReservationId: String? = null
     ) {
         val now = System.currentTimeMillis()
         if (now - lastRoomActionTimestamp < 1500L) return
@@ -873,6 +877,8 @@ class PosViewModel(
             isStartingRoom.set(false)
             return
         }
+
+        val resIdToDelete = associatedReservationId ?: _uiState.value.prefillReservationForRoom?.idFirebase
 
         // CERRAR VENTANA INMEDIATAMENTE para respuesta instantánea de UI
         closeRoomDetail()
@@ -893,6 +899,9 @@ class PosViewModel(
                     receiptImageUrl = finalReceipt
                 )
                 if (ok) {
+                    if (!resIdToDelete.isNullOrBlank()) {
+                        roomManagementService.deleteReservation(resIdToDelete)
+                    }
                     _uiState.update { it.copy(roomActionMessage = "▶ Sala ${room.nombre} iniciada con éxito") }
                 } else {
                     _uiState.update { it.copy(roomActionMessage = "⚠️ No se pudo iniciar la sala ${room.nombre}") }
@@ -1120,6 +1129,143 @@ class PosViewModel(
         _uiState.update { it.copy(masterExportNotification = null) }
     }
 
+    // ==========================================
+    // GESTIÓN COMPLETA DE RESERVAS (DESKTOP)
+    // ==========================================
+
+    fun openNewReservationDialog(defaultCategory: String) {
+        _uiState.update {
+            it.copy(
+                isReservationDialogOpen = true,
+                editingReservation = null,
+                defaultReservationCategory = defaultCategory
+            )
+        }
+    }
+
+    fun openEditReservationDialog(reservation: Reservation) {
+        _uiState.update {
+            it.copy(
+                isReservationDialogOpen = true,
+                editingReservation = reservation,
+                defaultReservationCategory = reservation.tipoSala
+            )
+        }
+    }
+
+    fun closeReservationDialog() {
+        _uiState.update {
+            it.copy(
+                isReservationDialogOpen = false,
+                editingReservation = null
+            )
+        }
+    }
+
+    fun saveReservation(reservation: Reservation) {
+        scope.launch {
+            val ok = roomManagementService.saveReservation(reservation)
+            if (ok) {
+                _uiState.update {
+                    it.copy(
+                        isReservationDialogOpen = false,
+                        editingReservation = null,
+                        roomActionMessage = "✅ Reserva guardada con éxito (${reservation.nombre})"
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(roomActionMessage = "⚠️ No se pudo guardar la reserva en Firebase")
+                }
+            }
+        }
+    }
+
+    fun deleteReservation(reservationId: String) {
+        scope.launch {
+            val ok = roomManagementService.deleteReservation(reservationId)
+            if (ok) {
+                _uiState.update {
+                    it.copy(roomActionMessage = "🗑️ Reserva eliminada")
+                }
+            }
+        }
+    }
+
+    fun markReservationAttendance(reservation: Reservation) {
+        val horaActual = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val updated = reservation.copy(
+            asistio = true,
+            horaLlegada = horaActual
+        )
+        scope.launch {
+            val ok = roomManagementService.saveReservation(updated)
+            if (ok) {
+                _uiState.update {
+                    it.copy(roomActionMessage = "🙋 Asistencia registrada a las $horaActual para ${reservation.nombre}")
+                }
+            }
+        }
+    }
+
+    fun startAssigningReservation(reservation: Reservation) {
+        val availableRooms = _uiState.value.rooms.filter {
+            it.estado == com.justplay.pos.core.models.RoomState.DISPONIBLE && matchesRoomCategory(it, reservation.tipoSala)
+        }
+
+        if (availableRooms.isEmpty()) {
+            _uiState.update {
+                it.copy(roomActionMessage = "⚠️ No hay salas disponibles en este momento para '${reservation.tipoSala}'")
+            }
+            return
+        }
+
+        if (availableRooms.size == 1) {
+            openRoomDetail(availableRooms.first(), prefill = reservation)
+        } else {
+            _uiState.update {
+                it.copy(
+                    isAssignReservationDialogOpen = true,
+                    reservationToAssign = reservation
+                )
+            }
+        }
+    }
+
+    fun closeAssignReservationDialog() {
+        _uiState.update {
+            it.copy(
+                isAssignReservationDialogOpen = false,
+                reservationToAssign = null
+            )
+        }
+    }
+
+    fun assignReservationToRoom(reservation: Reservation, room: Room) {
+        closeAssignReservationDialog()
+        openRoomDetail(room, prefill = reservation)
+    }
+
+    fun viewReservationReceipt(receiptUri: String?) {
+        _uiState.update { it.copy(viewReceiptForReservation = receiptUri) }
+    }
+
+    fun closeReservationReceiptViewer() {
+        _uiState.update { it.copy(viewReceiptForReservation = null) }
+    }
+
+    fun matchesRoomCategory(room: Room, targetCategory: String): Boolean {
+        val cat = targetCategory.trim().lowercase()
+        val roomCat = room.categoria.trim().lowercase()
+        val roomSec = room.seccionNombre.trim().lowercase()
+        return when {
+            cat.contains("cine") || cat.contains("sala") -> roomCat == "minicine"
+            cat.contains("aut") || cat.contains("volante") || cat.contains("car") || cat.contains("simulador") -> roomCat == "autitos"
+            cat.contains("dance") -> roomCat == "just dance"
+            else -> roomCat == cat || roomSec == cat || room.seccionId.equals(cat, ignoreCase = true)
+        }
+    }
+
     private fun filterProducts(all: List<Product>, category: String, query: String): List<Product> {
         val q = query.trim().lowercase()
         return all.filter { p ->
@@ -1129,3 +1275,4 @@ class PosViewModel(
         }
     }
 }
+

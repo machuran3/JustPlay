@@ -275,28 +275,82 @@ fun main() = application {
                             )
                         }
                         "VOLANTES" -> {
-                            RoomDashboardPanel(
-                                rooms = state.rooms,
-                                category = "Autitos",
-                                onRoomClick = { viewModel.openRoomDetail(it) },
-                                onRefreshRooms = { viewModel.refreshRooms() }
-                            )
+                            val availableRooms = remember(state.rooms) {
+                                state.rooms.filter { it.isAvailable && viewModel.matchesRoomCategory(it, "Autitos") }
+                            }
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                                    RoomDashboardPanel(
+                                        rooms = state.rooms,
+                                        category = "Autitos",
+                                        onRoomClick = { viewModel.openRoomDetail(it) },
+                                        onRefreshRooms = { viewModel.refreshRooms() }
+                                    )
+                                }
+                                RoomReservationsSidebar(
+                                    category = "Autitos",
+                                    reservations = state.reservations,
+                                    availableRooms = availableRooms,
+                                    onNewReservation = { viewModel.openNewReservationDialog("Autitos") },
+                                    onEditReservation = { viewModel.openEditReservationDialog(it) },
+                                    onDeleteReservation = { viewModel.deleteReservation(it) },
+                                    onMarkAttendance = { viewModel.markReservationAttendance(it) },
+                                    onPassToRoom = { viewModel.startAssigningReservation(it) },
+                                    onViewReceipt = { viewModel.viewReservationReceipt(it) }
+                                )
+                            }
                         }
                         "JUST_DANCE" -> {
-                            RoomDashboardPanel(
-                                rooms = state.rooms,
-                                category = "Just Dance",
-                                onRoomClick = { viewModel.openRoomDetail(it) },
-                                onRefreshRooms = { viewModel.refreshRooms() }
-                            )
+                            val availableRooms = remember(state.rooms) {
+                                state.rooms.filter { it.isAvailable && viewModel.matchesRoomCategory(it, "Just Dance") }
+                            }
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                                    RoomDashboardPanel(
+                                        rooms = state.rooms,
+                                        category = "Just Dance",
+                                        onRoomClick = { viewModel.openRoomDetail(it) },
+                                        onRefreshRooms = { viewModel.refreshRooms() }
+                                    )
+                                }
+                                RoomReservationsSidebar(
+                                    category = "Just Dance",
+                                    reservations = state.reservations,
+                                    availableRooms = availableRooms,
+                                    onNewReservation = { viewModel.openNewReservationDialog("Just Dance") },
+                                    onEditReservation = { viewModel.openEditReservationDialog(it) },
+                                    onDeleteReservation = { viewModel.deleteReservation(it) },
+                                    onMarkAttendance = { viewModel.markReservationAttendance(it) },
+                                    onPassToRoom = { viewModel.startAssigningReservation(it) },
+                                    onViewReceipt = { viewModel.viewReservationReceipt(it) }
+                                )
+                            }
                         }
                         "SALAS" -> {
-                            RoomDashboardPanel(
-                                rooms = state.rooms,
-                                category = "Minicine",
-                                onRoomClick = { viewModel.openRoomDetail(it) },
-                                onRefreshRooms = { viewModel.refreshRooms() }
-                            )
+                            val availableRooms = remember(state.rooms) {
+                                state.rooms.filter { it.isAvailable && viewModel.matchesRoomCategory(it, "Minicine") }
+                            }
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                                    RoomDashboardPanel(
+                                        rooms = state.rooms,
+                                        category = "Minicine",
+                                        onRoomClick = { viewModel.openRoomDetail(it) },
+                                        onRefreshRooms = { viewModel.refreshRooms() }
+                                    )
+                                }
+                                RoomReservationsSidebar(
+                                    category = "Minicine",
+                                    reservations = state.reservations,
+                                    availableRooms = availableRooms,
+                                    onNewReservation = { viewModel.openNewReservationDialog("Minicine") },
+                                    onEditReservation = { viewModel.openEditReservationDialog(it) },
+                                    onDeleteReservation = { viewModel.deleteReservation(it) },
+                                    onMarkAttendance = { viewModel.markReservationAttendance(it) },
+                                    onPassToRoom = { viewModel.startAssigningReservation(it) },
+                                    onViewReceipt = { viewModel.viewReservationReceipt(it) }
+                                )
+                            }
                         }
                         else -> {
                             val targetCategory = if (state.currentTab.startsWith("SEC_")) {
@@ -304,12 +358,30 @@ fun main() = application {
                             } else {
                                 "Minicine"
                             }
-                            RoomDashboardPanel(
-                                rooms = state.rooms,
-                                category = targetCategory,
-                                onRoomClick = { viewModel.openRoomDetail(it) },
-                                onRefreshRooms = { viewModel.refreshRooms() }
-                            )
+                            val availableRooms = remember(state.rooms, targetCategory) {
+                                state.rooms.filter { it.isAvailable && viewModel.matchesRoomCategory(it, targetCategory) }
+                            }
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                                    RoomDashboardPanel(
+                                        rooms = state.rooms,
+                                        category = targetCategory,
+                                        onRoomClick = { viewModel.openRoomDetail(it) },
+                                        onRefreshRooms = { viewModel.refreshRooms() }
+                                    )
+                                }
+                                RoomReservationsSidebar(
+                                    category = targetCategory,
+                                    reservations = state.reservations,
+                                    availableRooms = availableRooms,
+                                    onNewReservation = { viewModel.openNewReservationDialog(targetCategory) },
+                                    onEditReservation = { viewModel.openEditReservationDialog(it) },
+                                    onDeleteReservation = { viewModel.deleteReservation(it) },
+                                    onMarkAttendance = { viewModel.markReservationAttendance(it) },
+                                    onPassToRoom = { viewModel.startAssigningReservation(it) },
+                                    onViewReceipt = { viewModel.viewReservationReceipt(it) }
+                                )
+                            }
                         }
                     }
                 }
@@ -336,6 +408,7 @@ fun main() = application {
                 if (state.selectedRoomForDetail != null) {
                     RoomDetailDialog(
                         room = state.selectedRoomForDetail!!,
+                        prefillReservation = state.prefillReservationForRoom,
                         pendingOrders = state.roomPendingOrders,
                         catalogProducts = state.productsCatalog,
                         lastScannedBarcode = state.lastScannedBarcode ?: "",
@@ -366,7 +439,17 @@ fun main() = application {
                         onAddTime = { viewModel.confirmAddTime(state.selectedRoomForDetail!!.id, it) },
                         onClearRoom = { viewModel.clearRoom(state.selectedRoomForDetail!!) },
                         onConfirmStart = { client, phone, gameOrMovie, duration, price, method, pedidos, receipt ->
-                            viewModel.confirmStartRoom(client, phone, gameOrMovie, duration, price, method, pedidos, receipt)
+                            viewModel.confirmStartRoom(
+                                client = client,
+                                phone = phone,
+                                gameOrMovie = gameOrMovie,
+                                durationMin = duration,
+                                price = price,
+                                paymentMethod = method,
+                                pedidos = pedidos,
+                                receiptImageUrl = receipt,
+                                associatedReservationId = state.prefillReservationForRoom?.idFirebase
+                            )
                         },
                         onUpdateActiveRoomSession = { client, phone, movie, price, extraMins, method ->
                             viewModel.updateActiveRoomSession(state.selectedRoomForDetail!!.id, client, phone, movie, price, extraMins, method)
@@ -391,6 +474,44 @@ fun main() = application {
                     HistoryDialog(
                         sales = state.recentSales,
                         onDismiss = { viewModel.closeHistoryDialog() }
+                    )
+                }
+
+                // Diálogo de Registro y Edición de Reservas (Estilo Móvil)
+                if (state.isReservationDialogOpen) {
+                    ReservationFormDialog(
+                        initialReservation = state.editingReservation,
+                        defaultCategory = state.defaultReservationCategory,
+                        availableCategories = remember(state.rooms) {
+                            state.rooms.map { it.categoria }.distinct().filter { it.isNotBlank() }
+                        },
+                        onSaveReservation = { viewModel.saveReservation(it) },
+                        onDismiss = { viewModel.closeReservationDialog() }
+                    )
+                }
+
+                // Diálogo de Asignación / Pasar Reserva a Sala Disponible
+                if (state.isAssignReservationDialogOpen && state.reservationToAssign != null) {
+                    val targetRes = state.reservationToAssign!!
+                    val availableRooms = remember(state.rooms, targetRes) {
+                        state.rooms.filter {
+                            it.isAvailable && viewModel.matchesRoomCategory(it, targetRes.tipoSala)
+                        }
+                    }
+                    AssignRoomDialog(
+                        reservation = targetRes,
+                        availableRooms = availableRooms,
+                        onSelectRoom = { room -> viewModel.assignReservationToRoom(targetRes, room) },
+                        onDismiss = { viewModel.closeAssignReservationDialog() }
+                    )
+                }
+
+                // Diálogo para visualización de comprobante de reserva
+                if (!state.viewReceiptForReservation.isNullOrBlank()) {
+                    ReceiptViewerDialog(
+                        receiptString = state.viewReceiptForReservation!!,
+                        title = "Comprobante de Reserva",
+                        onDismiss = { viewModel.closeReservationReceiptViewer() }
                     )
                 }
 

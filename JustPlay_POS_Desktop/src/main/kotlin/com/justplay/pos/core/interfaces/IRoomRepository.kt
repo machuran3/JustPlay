@@ -35,6 +35,8 @@ interface IRoomRepository {
     suspend fun addOrderToRoom(roomId: Int, order: RoomOrder): Boolean
     suspend fun removeOrderFromRoom(roomId: Int, orderIndex: Int): Boolean
     suspend fun updateRoomRecordSession(room: Room): Boolean
+    suspend fun saveReservation(reservation: Reservation): Boolean
+    suspend fun deleteReservation(reservationId: String): Boolean
     suspend fun logRoomAudit(
         actionType: String,
         roomId: String,

@@ -515,7 +515,7 @@ class RoomAuditManager(
             }
         }
 
-        database.child("auditoria_registros").limitToLast(500).addValueEventListener(listener)
+        database.child("auditoria_registros").addValueEventListener(listener)
         dialog.setOnDismissListener {
             database.child("auditoria_registros").removeEventListener(listener)
         }

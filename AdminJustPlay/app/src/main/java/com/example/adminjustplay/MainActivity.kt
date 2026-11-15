@@ -1108,8 +1108,8 @@ class MainActivity : AppCompatActivity() {
             override fun onCancelled(error: DatabaseError) {}
         })
 
-        // 2. ESCUCHAR AUDITORIA Y REGISTROS HISTORICOS (OPTIMIZADO CON LÍMITE)
-        database.child("auditoria_registros").limitToLast(300).addValueEventListener(object : ValueEventListener {
+        // 2. ESCUCHAR AUDITORIA Y REGISTROS HISTORICOS
+        database.child("auditoria_registros").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
                     historialCompleto.clear()

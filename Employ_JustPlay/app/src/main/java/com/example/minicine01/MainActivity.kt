@@ -909,8 +909,8 @@ class MainActivity : AppCompatActivity() {
             override fun onCancelled(error: DatabaseError) {}
         })
 
-        // 2. ESCUCHAR HISTORIAL DE VENTAS (OPTIMIZADO CON LÍMITE)
-        database.child("registros").limitToLast(300).addValueEventListener(object : ValueEventListener {
+        // 2. ESCUCHAR HISTORIAL DE VENTAS
+        database.child("registros").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
                     historialCompleto.clear()

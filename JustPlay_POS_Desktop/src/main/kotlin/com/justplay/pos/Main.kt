@@ -76,11 +76,15 @@ fun main() = application {
         onPreviewKeyEvent = { keyEvent ->
             if (keyEvent.type == KeyEventType.KeyDown) {
                 // Tecla Enter para Flujo Rápido de Cobro y Confirmación (solo si no viene de una pistola de escaneo)
-                if (keyEvent.key == Key.Enter) {
+                if (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter) {
                     val now = System.currentTimeMillis()
                     if (now - barcodeScanner.lastScanTimestamp > 350L) {
-                        // Si hay un diálogo modal abierto, dejar que el diálogo procese su propio evento Enter
-                        if (state.selectedRoomForDetail != null || state.isProductManagerOpen || state.isReservationDialogOpen || state.isAssignReservationDialogOpen || state.isPaymentDialogOpen) {
+                        if (state.isPaymentDialogOpen) {
+                            viewModel.confirmCheckout()
+                            return@Window true
+                        }
+                        // Si hay otro diálogo modal abierto, dejar que el diálogo procese su propio evento Enter
+                        if (state.selectedRoomForDetail != null || state.isProductManagerOpen || state.isReservationDialogOpen || state.isAssignReservationDialogOpen) {
                             return@Window false
                         }
                         viewModel.onEnterKeyPressed()

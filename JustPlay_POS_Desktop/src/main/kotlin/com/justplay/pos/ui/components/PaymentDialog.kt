@@ -24,8 +24,14 @@ import com.justplay.pos.core.utils.ReceiptImageUtils
 import com.justplay.pos.ui.state.PosUiState
 import com.justplay.pos.ui.theme.*
 
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.ImeAction
 
 @Composable
 fun PaymentDialog(
@@ -49,6 +55,18 @@ fun PaymentDialog(
     }
     var showReceiptViewer by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    fun performCheckout() {
+        if (!state.isProcessingSale && !isSubmitting) {
+            isSubmitting = true
+            onConfirmCheckout()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -62,12 +80,11 @@ fun PaymentDialog(
             modifier = Modifier
                 .width(520.dp)
                 .heightIn(max = 720.dp)
+                .focusRequester(focusRequester)
+                .focusable()
                 .onPreviewKeyEvent { event ->
-                    if (event.key == Key.Enter && event.type == KeyEventType.KeyDown) {
-                        if (!state.isProcessingSale && !isSubmitting) {
-                            isSubmitting = true
-                            onConfirmCheckout()
-                        }
+                    if (event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
+                        performCheckout()
                         true
                     } else {
                         false
@@ -254,6 +271,8 @@ fun PaymentDialog(
                             }
                         },
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { performCheckout() }),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = SurfaceDark,
                             unfocusedContainerColor = SurfaceDark,
@@ -263,7 +282,16 @@ fun PaymentDialog(
                             unfocusedTextColor = TextPrimary
                         ),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onPreviewKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
+                                    performCheckout()
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                     )
 
                     // Botones rápidos de billetes comunes
@@ -457,12 +485,7 @@ fun PaymentDialog(
 
                 // Botón Confirmar Cobro (Enter)
                 Button(
-                    onClick = {
-                        if (!state.isProcessingSale && !isSubmitting) {
-                            isSubmitting = true
-                            onConfirmCheckout()
-                        }
-                    },
+                    onClick = { performCheckout() },
                     enabled = !state.isProcessingSale && !isSubmitting,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AccentGreen,

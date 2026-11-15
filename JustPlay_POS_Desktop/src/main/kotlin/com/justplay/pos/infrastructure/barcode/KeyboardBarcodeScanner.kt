@@ -18,7 +18,7 @@ import java.awt.event.KeyEvent
  */
 class KeyboardBarcodeScanner(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
-    private val maxCharIntervalMs: Long = 350L
+    private val maxCharIntervalMs: Long = 75L
 ) : IBarcodeScanner, KeyEventDispatcher {
 
     private val _barcodeScannedFlow = MutableSharedFlow<String>(extraBufferCapacity = 64)
@@ -53,15 +53,15 @@ class KeyboardBarcodeScanner(
         val currentTime = System.currentTimeMillis()
 
         // 1. Manejo de fin de código de barras (ENTER)
-        val isEnter = (e.id == KeyEvent.KEY_PRESSED && e.keyCode == KeyEvent.VK_ENTER) ||
+        val isEnter = (e.id == KeyEvent.KEY_PRESSED && (e.keyCode == KeyEvent.VK_ENTER)) ||
                       (e.id == KeyEvent.KEY_TYPED && (e.keyChar == '\n' || e.keyChar == '\r'))
 
         if (isEnter) {
-            val hadBuffer = buffer.length >= 2
-            val isRecentBurst = (currentTime - lastKeyTimestamp <= maxCharIntervalMs)
+            val hadBuffer = buffer.length >= 3
+            val isRecentBurst = (currentTime - lastKeyTimestamp <= 75L)
 
             if (currentTime - lastEnterTimestamp < 80L) {
-                return hadBuffer
+                return hadBuffer && isRecentBurst
             }
             lastEnterTimestamp = currentTime
 

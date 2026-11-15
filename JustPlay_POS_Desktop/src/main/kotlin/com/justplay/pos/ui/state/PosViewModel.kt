@@ -234,30 +234,23 @@ class PosViewModel(
             val currentState = _uiState.value
 
             // Limpieza defensiva en caso de que algún campo de texto de venta mostrador tuviera el foco
-            val cleanClientName = run {
-                var s = currentState.clientNameInput
-                if (s.endsWith(barcode)) s = s.removeSuffix(barcode)
-                for (len in minOf(4, barcode.length) downTo 1) {
+            fun cleanInput(field: String): String {
+                if (field.isBlank()) return field
+                var s = field.trim()
+                if (s == barcode) return ""
+                if (s.endsWith(barcode)) s = s.removeSuffix(barcode).trimEnd()
+                for (len in minOf(6, barcode.length) downTo 1) {
                     val p = barcode.take(len)
-                    if (s.endsWith(p) && s.length > p.length) {
-                        s = s.removeSuffix(p)
+                    if (s == p) return ""
+                    if (s.endsWith(p)) {
+                        s = s.removeSuffix(p).trimEnd()
                         break
                     }
                 }
-                s.trimEnd()
+                return s
             }
-            val cleanSearchQuery = run {
-                var s = currentState.searchQuery
-                if (s.endsWith(barcode)) s = s.removeSuffix(barcode)
-                for (len in minOf(4, barcode.length) downTo 1) {
-                    val p = barcode.take(len)
-                    if (s.endsWith(p) && s.length > p.length) {
-                        s = s.removeSuffix(p)
-                        break
-                    }
-                }
-                s.trimEnd()
-            }
+            val cleanClientName = cleanInput(currentState.clientNameInput)
+            val cleanSearchQuery = cleanInput(currentState.searchQuery)
 
             if (product != null && product.active) {
                 if (product.currentStock <= 0) {

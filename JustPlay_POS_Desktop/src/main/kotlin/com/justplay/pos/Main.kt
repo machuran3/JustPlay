@@ -79,8 +79,8 @@ fun main() = application {
                 if (keyEvent.key == Key.Enter) {
                     val now = System.currentTimeMillis()
                     if (now - barcodeScanner.lastScanTimestamp > 350L) {
-                        // Si hay un diálogo modal de sala o producto abierto, dejar que el diálogo procese su propio evento Enter
-                        if (state.selectedRoomForDetail != null || state.isProductManagerOpen) {
+                        // Si hay un diálogo modal abierto, dejar que el diálogo procese su propio evento Enter
+                        if (state.selectedRoomForDetail != null || state.isProductManagerOpen || state.isReservationDialogOpen || state.isAssignReservationDialogOpen || state.isPaymentDialogOpen) {
                             return@Window false
                         }
                         viewModel.onEnterKeyPressed()

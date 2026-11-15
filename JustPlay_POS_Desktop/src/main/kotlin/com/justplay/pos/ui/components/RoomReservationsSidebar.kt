@@ -110,11 +110,12 @@ fun RoomReservationsSidebar(
         val res = reservationToDelete!!
         AlertDialog(
             onDismissRequest = { reservationToDelete = null },
-            title = { Text("Eliminar Reserva", color = Color.White, fontWeight = FontWeight.Bold) },
+            title = { Text("Eliminar Reserva", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp) },
             text = {
                 Text(
                     "¿Estás seguro de que deseas eliminar la reserva de '${res.nombre}' para las ${res.horaProgramada} (${res.fecha})?",
-                    color = TextSecondary
+                    color = TextSecondary,
+                    fontSize = 13.sp
                 )
             },
             confirmButton = {
@@ -123,14 +124,20 @@ fun RoomReservationsSidebar(
                         onDeleteReservation(res.idFirebase)
                         reservationToDelete = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = AlertRed, contentColor = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = AlertRed, contentColor = Color.White),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.height(32.dp)
                 ) {
-                    Text("Eliminar", fontWeight = FontWeight.Bold)
+                    Text("Eliminar", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { reservationToDelete = null }) {
-                    Text("Cancelar")
+                OutlinedButton(
+                    onClick = { reservationToDelete = null },
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Text("Cancelar", fontSize = 11.sp)
                 }
             },
             containerColor = SurfaceDark,
@@ -141,17 +148,17 @@ fun RoomReservationsSidebar(
     Surface(
         color = SurfaceDark,
         border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
-        shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+        shape = RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp),
         modifier = modifier
             .fillMaxHeight()
-            .width(380.dp)
+            .width(290.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp)
+                .padding(10.dp)
         ) {
-            // 1. Cabecera con Título y Botón Nueva Reserva
+            // 1. Cabecera con Título y Botón Registrar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -167,13 +174,13 @@ fun RoomReservationsSidebar(
                     Text(
                         text = "$catIcon Reservas (${filteredReservations.size})",
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Sección: $category",
                         color = TextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 10.sp
                     )
                 }
 
@@ -183,22 +190,22 @@ fun RoomReservationsSidebar(
                         containerColor = AccentGreen,
                         contentColor = Color.Black
                     ),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp)
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(28.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Nueva", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Registrar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Add, contentDescription = "Nueva", modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("Registrar", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // 2. Filtros de Fecha Rápidos
+            // 2. Filtros de Fecha Rápidos (Compactos)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 listOf(
                     "HOY" to "Hoy",
@@ -209,7 +216,7 @@ fun RoomReservationsSidebar(
                     FilterChip(
                         selected = isSel,
                         onClick = { selectedDateFilter = key },
-                        label = { Text(label, fontSize = 10.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text(label, fontSize = 9.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AccentLime,
                             selectedLabelColor = Color.Black,
@@ -221,15 +228,15 @@ fun RoomReservationsSidebar(
                             selected = isSel,
                             borderColor = if (isSel) AccentLime else BorderDark
                         ),
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.height(30.dp)
+                        shape = RoundedCornerShape(5.dp),
+                        modifier = Modifier.height(26.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // 3. Lista de Tarjetas de Reserva
+            // 3. Lista de Tarjetas de Reserva (Casillas Reducidas)
             if (filteredReservations.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -239,29 +246,31 @@ fun RoomReservationsSidebar(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text("🗓️", fontSize = 38.sp)
+                        Text("🗓️", fontSize = 26.sp)
                         Text(
-                            text = "No hay reservas para esta sección",
+                            text = "Sin reservas en esta sección",
                             color = TextSecondary,
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
                         OutlinedButton(
                             onClick = onNewReservation,
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentLime),
                             border = androidx.compose.foundation.BorderStroke(1.dp, AccentLime),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            modifier = Modifier.height(28.dp)
                         ) {
-                            Text("➕ Registrar Reserva Ahora", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("➕ Registrar Reserva", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(filteredReservations, key = { it.idFirebase }) { res ->
                         ReservationItemCard(
@@ -292,15 +301,15 @@ private fun ReservationItemCard(
 ) {
     Surface(
         color = BgDark,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(9.dp),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
             if (reservation.asistio) AccentGreen.copy(alpha = 0.6f) else BorderDark
         ),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Fila superior: Hora, Fecha y Badge de tipo
+        Column(modifier = Modifier.padding(8.dp)) {
+            // Fila superior: Hora, Fecha y Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -308,25 +317,25 @@ private fun ReservationItemCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     Surface(
                         color = Color(0xFF2C2F40),
-                        shape = RoundedCornerShape(6.dp)
+                        shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
                             text = "⏰ ${reservation.horaProgramada}",
                             color = AccentLime,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                         )
                     }
 
                     Text(
                         text = "🗓️ ${reservation.fecha}",
                         color = TextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 10.sp
                     )
                 }
 
@@ -337,21 +346,21 @@ private fun ReservationItemCard(
                     Text(
                         text = reservation.tipoSala,
                         color = AccentGreen,
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Nombre del cliente
             Text(
                 text = reservation.nombre,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -359,18 +368,18 @@ private fun ReservationItemCard(
             // Detalles: Celular y Duración
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "📞 ${if (reservation.celular.isNotBlank()) reservation.celular else "Sin celular"}",
+                    text = "📞 ${if (reservation.celular.isNotBlank()) reservation.celular else "S/N"}",
                     color = TextSecondary,
-                    fontSize = 11.sp
+                    fontSize = 10.sp
                 )
                 Text(
                     text = "⏱️ ${reservation.duracion}",
                     color = TextSecondary,
-                    fontSize = 11.sp
+                    fontSize = 10.sp
                 )
             }
 
@@ -380,32 +389,32 @@ private fun ReservationItemCard(
                 reservation.cantidadVolantes > 1
             ) {
                 Text(
-                    text = "🏎️ Volantes reservados: ${reservation.cantidadVolantes}",
+                    text = "🏎️ Volantes: ${reservation.cantidadVolantes}",
                     color = Color(0xFF81D4FA),
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
             // Adelanto (si tiene)
             if (reservation.adelanto.isNotBlank() && reservation.adelanto != "0") {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Surface(
                     color = Color(0xFF262A20),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(5.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4C5432)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val metodo = if (reservation.metodoPagoAdelanto.equals("QR", ignoreCase = true)) "📱 QR" else "💵 Efectivo"
+                        val metodo = if (reservation.metodoPagoAdelanto.equals("QR", ignoreCase = true)) "📱 QR" else "💵 Efec"
                         Text(
                             text = "💰 Adelanto: ${reservation.adelanto} Bs ($metodo)",
                             color = Color(0xFFFFD54F),
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
 
@@ -413,30 +422,30 @@ private fun ReservationItemCard(
                             TextButton(
                                 onClick = { onViewReceipt(reservation.comprobanteUri!!) },
                                 contentPadding = PaddingValues(0.dp),
-                                modifier = Modifier.height(24.dp)
+                                modifier = Modifier.height(20.dp)
                             ) {
-                                Text("🖼️ Ver Foto", fontSize = 10.sp, color = AccentLime, fontWeight = FontWeight.Bold)
+                                Text("🖼️ Foto", fontSize = 9.sp, color = AccentLime, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             // Estado de Asistencia
             if (reservation.asistio) {
                 Surface(
                     color = Color(0xFF1E3A2B),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(5.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "✅ Llegó a las: ${reservation.horaLlegada ?: "Registrado"}",
+                        text = "✅ Llegó: ${reservation.horaLlegada ?: "Registrado"}",
                         color = AccentLime,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
             } else {
@@ -448,16 +457,16 @@ private fun ReservationItemCard(
                         onClick = onMarkAttendance,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF81D4FA)),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF81D4FA).copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(6.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier.height(28.dp)
+                        shape = RoundedCornerShape(5.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 1.dp),
+                        modifier = Modifier.height(24.dp)
                     ) {
-                        Text("🙋 Marcar Llegada", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("🙋 Llegó", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(5.dp))
 
             // Botones de Acción: Pasar a Sala, Editar, Eliminar
             Row(
@@ -471,19 +480,19 @@ private fun ReservationItemCard(
                         containerColor = AccentGreen,
                         contentColor = Color.Black
                     ),
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    modifier = Modifier.height(34.dp)
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    modifier = Modifier.height(28.dp)
                 ) {
-                    Text("🚀 Pasar a Sala", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("🚀 Pasar a Sala", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(26.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = TextSecondary, modifier = Modifier.size(14.dp))
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = AlertRed.copy(alpha = 0.8f), modifier = Modifier.size(16.dp))
+                    IconButton(onClick = onDelete, modifier = Modifier.size(26.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = AlertRed.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
                     }
                 }
             }

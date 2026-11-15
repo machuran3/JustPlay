@@ -133,39 +133,41 @@ fun RoomDetailDialog(
         )
     }
 
-    // Limpieza automática de cualquier dígito o código de barras que se filtre al escanear productos en la sala
+    // Limpieza automática y robusta de cualquier dígito o código de barras filtrado por pistolas lectoras
     LaunchedEffect(lastScannedBarcode, pendingOrders.size, room.pedidos.size) {
         if (lastScannedBarcode.isNotBlank()) {
             val code = lastScannedBarcode.trim()
-            fun sanitizeField(field: String): String {
-                var s = field
+            fun cleanField(field: String): String {
+                if (field.isBlank()) return field
+                var s = field.trim()
+                if (s == code) return ""
                 if (s.endsWith(code)) {
-                    s = s.removeSuffix(code)
+                    s = s.removeSuffix(code).trimEnd()
                 }
-                // Si contiene el código completo o dígitos largos al final
-                if (code.length >= 4 && s.endsWith(code.takeLast(4))) {
-                    s = s.removeSuffix(code.takeLast(4))
-                }
-                // Si se filtró el primer caracter (o primeros caracteres) del código al principio de la ráfaga
-                for (prefixLen in minOf(4, code.length) downTo 1) {
-                    val prefix = code.take(prefixLen)
-                    if (s.endsWith(prefix) && s.length > prefixLen) {
-                        s = s.removeSuffix(prefix)
+                for (len in minOf(6, code.length) downTo 1) {
+                    val prefix = code.take(len)
+                    if (s == prefix) {
+                        return ""
+                    }
+                    if (s.endsWith(prefix)) {
+                        s = s.removeSuffix(prefix).trimEnd()
                         break
                     }
                 }
-                // Limpiar dígitos sueltos al final si vinieron de una ráfaga
-                val trailingDigits = s.takeLastWhile { it.isDigit() }
-                if (trailingDigits.length >= 1 && code.startsWith(trailingDigits) && s.length > trailingDigits.length) {
-                    s = s.dropLast(trailingDigits.length)
-                }
-                return s.trimEnd()
+                return s
             }
 
-            clientName = sanitizeField(clientName)
-            clientPhone = if (!clientPhone.all { it.isDigit() }) sanitizeField(clientPhone) else clientPhone
-            gameOrMovie = sanitizeField(gameOrMovie)
-            manualTimeText = if (manualTimeText.length > 5) sanitizeField(manualTimeText) else manualTimeText
+            clientName = cleanField(clientName)
+            clientPhone = cleanField(clientPhone)
+            gameOrMovie = cleanField(gameOrMovie)
+            manualTimeText = cleanField(manualTimeText)
+            priceText = cleanField(priceText)
+
+            editClientName = cleanField(editClientName)
+            editClientPhone = cleanField(editClientPhone)
+            editGameOrMovie = cleanField(editGameOrMovie)
+            editPriceText = cleanField(editPriceText)
+            editExtraMinutesText = cleanField(editExtraMinutesText)
         }
     }
 
@@ -201,7 +203,8 @@ fun RoomDetailDialog(
     val grandTotal = basePrice + totalConsumos
 
     val performConfirmStart: () -> Unit = {
-        if (!isOccupied && !isActionInProgress && !isSubmittingAction && clientName.isNotBlank()) {
+        if (!isOccupied && !isActionInProgress && !isSubmittingAction) {
+            val finalClientName = if (clientName.trim().isNotBlank()) clientName.trim() else "Cliente ${room.nombre}"
             val price = priceText.toDoubleOrNull() ?: room.precioBaseSugerido
             val duration = parseDurationMinutes(manualTimeText)
             if ((selectedPaymentMethod == "QR" || selectedPaymentMethod == "Mixto") && verifiedReceiptUrl == null) {
@@ -209,7 +212,7 @@ fun RoomDetailDialog(
             } else {
                 isSubmittingAction = true
                 onConfirmStart(
-                    clientName.trim(),
+                    finalClientName,
                     clientPhone.trim(),
                     gameOrMovie.trim(),
                     duration,
@@ -223,12 +226,13 @@ fun RoomDetailDialog(
     }
 
     val performUpdateSession: () -> Unit = {
-        if (isOccupied && isEditModeActive && !isActionInProgress && !isSubmittingAction && editClientName.isNotBlank() && onUpdateActiveRoomSession != null) {
+        if (isOccupied && isEditModeActive && !isActionInProgress && !isSubmittingAction && onUpdateActiveRoomSession != null) {
             isSubmittingAction = true
             val pr = editPriceText.toDoubleOrNull() ?: room.precioCobrado
             val extraMin = editExtraMinutesText.toIntOrNull()
+            val finalName = if (editClientName.trim().isNotBlank()) editClientName.trim() else (room.cliente ?: "Cliente")
             onUpdateActiveRoomSession(
-                editClientName.trim(),
+                finalName,
                 editClientPhone.trim(),
                 editGameOrMovie.trim(),
                 pr,
@@ -258,13 +262,20 @@ fun RoomDetailDialog(
                             return@onPreviewKeyEvent false
                         }
                         if (!isOccupied) {
-                            if (clientName.isNotBlank() && !isActionInProgress && !isSubmittingAction) {
+                            if (!isActionInProgress && !isSubmittingAction) {
                                 performConfirmStart()
                                 return@onPreviewKeyEvent true
                             }
                         } else if (isEditModeActive) {
-                            if (editClientName.isNotBlank() && !isActionInProgress && !isSubmittingAction) {
+                            if (!isActionInProgress && !isSubmittingAction) {
                                 performUpdateSession()
+                                return@onPreviewKeyEvent true
+                            }
+                        } else if (customExtraTimeText.isNotBlank()) {
+                            val mins = customExtraTimeText.toIntOrNull()
+                            if (mins != null && mins > 0) {
+                                onAddTime(mins)
+                                customExtraTimeText = ""
                                 return@onPreviewKeyEvent true
                             }
                         }
@@ -1469,13 +1480,13 @@ fun RoomDetailDialog(
                                     ),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.height(40.dp).widthIn(min = 160.dp),
-                                    enabled = !isActionInProgress && !isSubmittingAction && clientName.isNotBlank()
+                                    enabled = !isActionInProgress && !isSubmittingAction
                                 ) {
                                     if (isActionInProgress || isSubmittingAction) {
                                         CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                         Spacer(modifier = Modifier.width(6.dp))
                                     }
-                                    Text("▶ Iniciar Función", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("▶ Iniciar Función (Enter ↵)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }
                         }

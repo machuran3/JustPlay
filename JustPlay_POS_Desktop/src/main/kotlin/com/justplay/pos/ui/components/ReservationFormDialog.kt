@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -77,6 +78,33 @@ fun ReservationFormDialog(
 
     val scrollState = rememberScrollState()
 
+    val performSave = {
+        if (clientName.trim().isBlank()) {
+            errorMessage = "⚠️ Por favor ingresa el nombre del cliente."
+        } else if (reservationDate.trim().isBlank()) {
+            errorMessage = "⚠️ Por favor ingresa la fecha de la reserva."
+        } else if (reservationTime.trim().isBlank()) {
+            errorMessage = "⚠️ Por favor ingresa la hora programada."
+        } else {
+            val newRes = Reservation(
+                idFirebase = initialReservation?.idFirebase ?: UUID.randomUUID().toString(),
+                nombre = clientName.trim(),
+                celular = clientPhone.trim(),
+                fecha = reservationDate.trim(),
+                horaProgramada = reservationTime.trim(),
+                tipoSala = selectedCategory.trim(),
+                adelanto = adelantoAmount.trim(),
+                metodoPagoAdelanto = adelantoMethod.trim(),
+                comprobanteUri = comprobanteUri,
+                duracion = durationText.trim().ifBlank { "1:00" },
+                cantidadVolantes = if (isAutitos) volantesCount else 1,
+                asistio = initialReservation?.asistio ?: false,
+                horaLlegada = initialReservation?.horaLlegada
+            )
+            onSaveReservation(newRes)
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -89,6 +117,12 @@ fun ReservationFormDialog(
                 .width(580.dp)
                 .heightIn(max = 680.dp)
                 .padding(16.dp)
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.key == Key.Enter && keyEvent.type == KeyEventType.KeyDown) {
+                        performSave()
+                        true
+                    } else false
+                }
         ) {
             Column(
                 modifier = Modifier
@@ -445,37 +479,7 @@ fun ReservationFormDialog(
                     Spacer(modifier = Modifier.width(12.dp))
 
                     Button(
-                        onClick = {
-                            if (clientName.trim().isBlank()) {
-                                errorMessage = "⚠️ Por favor ingresa el nombre del cliente."
-                                return@Button
-                            }
-                            if (reservationDate.trim().isBlank()) {
-                                errorMessage = "⚠️ Por favor ingresa la fecha de la reserva."
-                                return@Button
-                            }
-                            if (reservationTime.trim().isBlank()) {
-                                errorMessage = "⚠️ Por favor ingresa la hora programada."
-                                return@Button
-                            }
-
-                            val newRes = Reservation(
-                                idFirebase = initialReservation?.idFirebase ?: UUID.randomUUID().toString(),
-                                nombre = clientName.trim(),
-                                celular = clientPhone.trim(),
-                                fecha = reservationDate.trim(),
-                                horaProgramada = reservationTime.trim(),
-                                tipoSala = selectedCategory.trim(),
-                                adelanto = adelantoAmount.trim(),
-                                metodoPagoAdelanto = adelantoMethod.trim(),
-                                comprobanteUri = comprobanteUri,
-                                duracion = durationText.trim().ifBlank { "1:00" },
-                                cantidadVolantes = if (isAutitos) volantesCount else 1,
-                                asistio = initialReservation?.asistio ?: false,
-                                horaLlegada = initialReservation?.horaLlegada
-                            )
-                            onSaveReservation(newRes)
-                        },
+                        onClick = performSave,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AccentGreen,
                             contentColor = Color.Black
@@ -483,7 +487,7 @@ fun ReservationFormDialog(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.height(44.dp)
                     ) {
-                        Text(if (isEditing) "💾 Guardar Cambios" else "💾 Registrar Reserva", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(if (isEditing) "💾 Guardar Cambios (Enter ↵)" else "💾 Registrar Reserva (Enter ↵)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }

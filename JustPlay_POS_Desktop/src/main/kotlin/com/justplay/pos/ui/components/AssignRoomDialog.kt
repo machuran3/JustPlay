@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +44,14 @@ fun AssignRoomDialog(
                 .width(520.dp)
                 .wrapContentHeight()
                 .padding(16.dp)
+                .onPreviewKeyEvent { keyEvent ->
+                    if (keyEvent.key == Key.Enter && keyEvent.type == KeyEventType.KeyDown) {
+                        if (availableRooms.isNotEmpty()) {
+                            onSelectRoom(availableRooms.first())
+                            true
+                        } else false
+                    } else false
+                }
         ) {
             Column(modifier = Modifier.padding(22.dp)) {
                 // Cabecera

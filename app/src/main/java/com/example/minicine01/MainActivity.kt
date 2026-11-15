@@ -207,13 +207,17 @@ class MainActivity : AppCompatActivity() {
         llContenedorReservasDash = findViewById(R.id.llContenedorReservasDash)
 
         // Monitorear conectividad con Firebase Realtime Database
-        database.root.child(".info/connected").addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) ?: false
-                actualizarEstadoConexion(connected)
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        })
+        try {
+            FirebaseDatabase.getInstance().getReference(".info/connected").addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val connected = snapshot.getValue(Boolean::class.java) ?: false
+                    actualizarEstadoConexion(connected)
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // Monitorear conectividad a nivel de red Android
         try {

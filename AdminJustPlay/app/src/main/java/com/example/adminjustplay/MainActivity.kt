@@ -301,6 +301,11 @@ class MainActivity : AppCompatActivity() {
         tvAutitosOcupados = findViewById(R.id.tvAutitosOcupados)
         tvJustDanceOcupados = findViewById(R.id.tvJustDanceOcupados)
 
+        fabOverlay = findViewById(R.id.fabOverlay)
+        llFabVenta = findViewById(R.id.llFabVenta)
+        llFabReservas = findViewById(R.id.llFabReservas)
+        fabMain = findViewById(R.id.fabMain)
+
         // PRESENCIA AUTOMÁTICA DEL ADMINISTRADOR
         PresenciaManager.iniciarMonitoreoPresencia(this, "AdminJustPlay", "Administrador")
 
@@ -309,13 +314,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Monitorear conectividad con Firebase Realtime Database
-        database.root.child(".info/connected").addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val connected = snapshot.getValue(Boolean::class.java) ?: false
-                actualizarEstadoConexion(connected)
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        })
+        try {
+            FirebaseDatabase.getInstance().getReference(".info/connected").addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val connected = snapshot.getValue(Boolean::class.java) ?: false
+                    actualizarEstadoConexion(connected)
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // Monitorear conectividad de red
         try {
@@ -334,11 +343,6 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-
-        fabOverlay = findViewById(R.id.fabOverlay)
-        llFabVenta = findViewById(R.id.llFabVenta)
-        llFabReservas = findViewById(R.id.llFabReservas)
-        fabMain = findViewById(R.id.fabMain)
 
         fabMain.setOnClickListener {
             if (!estaConectadoInternet) {
@@ -1667,11 +1671,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun actualizarEstadoConexion(conectado: Boolean) {
         estaConectadoInternet = conectado
-        tvBadgeOffline.visibility = if (conectado) View.GONE else View.VISIBLE
-        if (layoutTablero.visibility == View.VISIBLE && conectado) {
-            fabMain.visibility = View.VISIBLE
-        } else {
-            fabMain.visibility = View.GONE
+        if (::tvBadgeOffline.isInitialized) {
+            tvBadgeOffline.visibility = if (conectado) View.GONE else View.VISIBLE
+        }
+        if (::layoutTablero.isInitialized && ::fabMain.isInitialized) {
+            if (layoutTablero.visibility == View.VISIBLE && conectado) {
+                fabMain.visibility = View.VISIBLE
+            } else {
+                fabMain.visibility = View.GONE
+            }
         }
     }
 

@@ -209,7 +209,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Registro &amp; Auditoría"
+                            android:text="Registro de Sesiones"
                             android:textColor="#FFFFFF"
                             android:textSize="20sp"
                             android:textStyle="bold" />
@@ -222,54 +222,6 @@
                             android:textColor="#000000"
                             android:textStyle="bold"/>
                     </LinearLayout>
-
-                    <!-- PESTAÑAS / FILTRO DE AUDITORIA (ACTIVOS / BORRADOS / TODOS) -->
-                    <HorizontalScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:scrollbars="none"
-                        android:layout_marginBottom="8dp">
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal">
-
-                            <Button
-                                android:id="@+id/btnFiltroAuditoriaActivos"
-                                android:layout_width="wrap_content"
-                                android:layout_height="38dp"
-                                android:text="🟢 Activos"
-                                android:textSize="11sp"
-                                android:backgroundTint="#DEFF9A"
-                                android:textColor="#000000"
-                                android:textStyle="bold"
-                                android:paddingHorizontal="12dp"/>
-
-                            <Button
-                                android:id="@+id/btnFiltroAuditoriaBorrados"
-                                android:layout_width="wrap_content"
-                                android:layout_height="38dp"
-                                android:text="🗑️ Borrados (Papelera)"
-                                android:textSize="11sp"
-                                android:backgroundTint="#24283B"
-                                android:textColor="#FF5252"
-                                android:textStyle="bold"
-                                android:layout_marginStart="6dp"
-                                android:paddingHorizontal="12dp"/>
-
-                            <Button
-                                android:id="@+id/btnFiltroAuditoriaTodos"
-                                android:layout_width="wrap_content"
-                                android:layout_height="38dp"
-                                android:text="📋 Todo el Historial"
-                                android:textSize="11sp"
-                                android:backgroundTint="#24283B"
-                                android:textColor="#FFFFFF"
-                                android:textStyle="bold"
-                                android:layout_marginStart="6dp"
-                                android:paddingHorizontal="12dp"/>
-                        </LinearLayout>
-                    </HorizontalScrollView>
 
                     <!-- TARJETA TOTAL DEL DIA / FILTRADO -->
                     <androidx.cardview.widget.CardView
@@ -488,6 +440,31 @@
                                 android:textSize="12sp"
                                 android:checked="true"
                                 android:layout_marginStart="8dp"/>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="20dp"
+                                android:background="#444"
+                                android:layout_marginHorizontal="10dp"/>
+
+                            <CheckBox
+                                android:id="@+id/cbFiltroBorrados"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🗑️ Ver Borrados"
+                                android:textColor="#FF5252"
+                                android:textSize="12sp"
+                                android:checked="false"/>
+
+                            <CheckBox
+                                android:id="@+id/cbFiltroSoloBorrados"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="⚠️ Solo Papelera"
+                                android:textColor="#FF8A80"
+                                android:textSize="12sp"
+                                android:checked="false"
+                                android:layout_marginStart="8dp"/>
                         </LinearLayout>
                     </HorizontalScrollView>
 
@@ -495,6 +472,211 @@
                         android:id="@+id/rvRegistro"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"/>
+                </LinearLayout>
+
+                <!-- NUEVA PANTALLA: AUDITORIA Y TRAZABILIDAD -->
+                <LinearLayout
+                    android:id="@+id/layoutAuditoria"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:visibility="gone">
+
+                    <!-- CABECERA -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="6dp">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🛡️ Auditoría y Trazabilidad"
+                            android:textColor="#FFFFFF"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/tvAuditoriaContador"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 eventos"
+                            android:textColor="#000000"
+                            android:background="#DEFF9A"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="3dp" />
+                    </LinearLayout>
+
+                    <!-- TARJETA RESUMEN -->
+                    <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        app:cardBackgroundColor="#1A1C29"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="3dp">
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="10dp">
+                            <TextView
+                                android:id="@+id/tvAuditoriaResumen"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="📊 Resumen: 0 acciones registradas"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:textStyle="bold"/>
+                            <TextView
+                                android:id="@+id/tvAuditoriaDesglose"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="🛒 0 Ventas | 🎬 0 Salas | ✏️ 0 Modif. | 🗑️ 0 Borrados"
+                                android:textColor="#A0A0A0"
+                                android:textSize="11sp"
+                                android:layout_marginTop="3dp"/>
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+
+                    <!-- BUSCADOR -->
+                    <EditText
+                        android:id="@+id/etBuscarAuditoria"
+                        android:layout_width="match_parent"
+                        android:layout_height="40dp"
+                        android:background="#24283B"
+                        android:hint="🔍 Buscar usuario, sala, producto, cliente o acción..."
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#777777"
+                        android:textSize="12sp"
+                        android:paddingHorizontal="12dp"
+                        android:layout_marginBottom="8dp"
+                        android:singleLine="true"/>
+
+                    <!-- FILTRO POR FECHA Y RESET -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginBottom="8dp">
+
+                        <Button
+                            android:id="@+id/btnAuditoriaFiltroFecha"
+                            android:layout_width="0dp"
+                            android:layout_height="38dp"
+                            android:layout_weight="1"
+                            android:text="📅 Hoy"
+                            android:backgroundTint="#24283B"
+                            android:textColor="#DEFF9A"
+                            android:textSize="12sp"
+                            android:textStyle="bold"/>
+
+                        <Button
+                            android:id="@+id/btnAuditoriaLimpiarFecha"
+                            android:layout_width="wrap_content"
+                            android:layout_height="38dp"
+                            android:text="🔄 Todas"
+                            android:backgroundTint="#1A1C29"
+                            android:textColor="#A0A0A0"
+                            android:textSize="11sp"
+                            android:layout_marginStart="6dp"/>
+                    </LinearLayout>
+
+                    <!-- CHIPS / BOTONES DE TIPO DE ACCIÓN -->
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:scrollbars="none"
+                        android:layout_marginBottom="8dp">
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <Button
+                                android:id="@+id/btnAuditTipoTodos"
+                                android:layout_width="wrap_content"
+                                android:layout_height="34dp"
+                                android:text="📋 Todas"
+                                android:textSize="11sp"
+                                android:backgroundTint="#DEFF9A"
+                                android:textColor="#000000"
+                                android:textStyle="bold"
+                                android:paddingHorizontal="10dp"/>
+
+                            <Button
+                                android:id="@+id/btnAuditTipoVentas"
+                                android:layout_width="wrap_content"
+                                android:layout_height="34dp"
+                                android:text="🛒 Ventas"
+                                android:textSize="11sp"
+                                android:backgroundTint="#24283B"
+                                android:textColor="#FFFFFF"
+                                android:textStyle="bold"
+                                android:layout_marginStart="6dp"
+                                android:paddingHorizontal="10dp"/>
+
+                            <Button
+                                android:id="@+id/btnAuditTipoSalas"
+                                android:layout_width="wrap_content"
+                                android:layout_height="34dp"
+                                android:text="🎬 Salas Puestas"
+                                android:textSize="11sp"
+                                android:backgroundTint="#24283B"
+                                android:textColor="#FFFFFF"
+                                android:textStyle="bold"
+                                android:layout_marginStart="6dp"
+                                android:paddingHorizontal="10dp"/>
+
+                            <Button
+                                android:id="@+id/btnAuditTipoModif"
+                                android:layout_width="wrap_content"
+                                android:layout_height="34dp"
+                                android:text="✏️ Modificaciones"
+                                android:textSize="11sp"
+                                android:backgroundTint="#24283B"
+                                android:textColor="#FFFFFF"
+                                android:textStyle="bold"
+                                android:layout_marginStart="6dp"
+                                android:paddingHorizontal="10dp"/>
+
+                            <Button
+                                android:id="@+id/btnAuditTipoBorrados"
+                                android:layout_width="wrap_content"
+                                android:layout_height="34dp"
+                                android:text="🗑️ Eliminaciones"
+                                android:textSize="11sp"
+                                android:backgroundTint="#24283B"
+                                android:textColor="#FF5252"
+                                android:textStyle="bold"
+                                android:layout_marginStart="6dp"
+                                android:paddingHorizontal="10dp"/>
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
+                    <!-- RECYCLERVIEW Y MENSAJE VACIO -->
+                    <TextView
+                        android:id="@+id/tvAuditoriaVacio"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="No se encontraron eventos de auditoría para el criterio seleccionado."
+                        android:textColor="#888888"
+                        android:textSize="13sp"
+                        android:gravity="center"
+                        android:padding="24dp"
+                        android:visibility="gone"/>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvAuditoriaEventos"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"/>
                 </LinearLayout>
 
                 <!-- 3. PANTALLA RESERVAS -->

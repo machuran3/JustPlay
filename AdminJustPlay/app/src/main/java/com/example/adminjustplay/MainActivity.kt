@@ -75,6 +75,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var layoutTablero: View
     private lateinit var layoutRegistro: View
+    private lateinit var layoutAuditoria: View
     private lateinit var layoutReservasGenerales: View
     private lateinit var layoutVetados: View
     private lateinit var layoutUsuariosOnline: View
@@ -106,7 +107,15 @@ class MainActivity : AppCompatActivity() {
     private val historialCompleto = mutableListOf<RegistroEntry>()
     private val historialFiltrado = mutableListOf<RegistroEntry>()
     private lateinit var registroAdapter: RegistroAdminAdapter
-    private var modoAuditoria: String = "ACTIVOS" // "ACTIVOS", "BORRADOS", "TODOS"
+
+    // AUDITORIA DEDICADA Y TRAZABILIDAD
+    private val listaAuditoriaEventos = mutableListOf<AuditoriaEvento>()
+    private val listaAuditoriaFiltrada = mutableListOf<AuditoriaEvento>()
+    private val eventosSalasAudit = mutableListOf<AuditoriaEvento>()
+    private lateinit var auditoriaAdapter: AuditoriaAdapter
+    private var auditFiltroTipo: String = "TODAS"
+    private var auditFiltroFecha: String? = null
+    private var auditQueryTexto: String = ""
 
     // RESERVAS
     private val listaReservasGlobales = mutableListOf<Reserva>()
@@ -269,6 +278,7 @@ class MainActivity : AppCompatActivity() {
             drawerLayout = findViewById(R.id.drawerLayout)
             layoutTablero = findViewById(R.id.layoutTablero)
             layoutRegistro = findViewById(R.id.layoutRegistro)
+            layoutAuditoria = findViewById(R.id.layoutAuditoria)
             layoutReservasGenerales = findViewById(R.id.layoutReservasGenerales)
             layoutVetados = findViewById(R.id.layoutVetados)
             layoutUsuariosOnline = findViewById(R.id.layoutUsuariosOnline)
@@ -309,7 +319,7 @@ class MainActivity : AppCompatActivity() {
             })
 
             // 4. INICIALIZAR TODOS LOS ADAPTERS Y ENLAZARLOS A SUS RECYCLERVIEWS
-            // 4.1 Registro & Auditoria
+            // 4.1 Registro
             val rvRegistro = findViewById<RecyclerView>(R.id.rvRegistro)
             rvRegistro.layoutManager = LinearLayoutManager(this)
             registroAdapter = RegistroAdminAdapter(
@@ -318,6 +328,20 @@ class MainActivity : AppCompatActivity() {
                 onRestaurarRegistro = { reg -> restaurarRegistro(reg) }
             )
             rvRegistro.adapter = registroAdapter
+
+            // 4.1.1 Auditoría Dedicada y Trazabilidad
+            val rvAuditoria = findViewById<RecyclerView>(R.id.rvAuditoriaEventos)
+            rvAuditoria.layoutManager = LinearLayoutManager(this)
+            auditoriaAdapter = AuditoriaAdapter(listaAuditoriaFiltrada) { ev ->
+                if (!ev.comprobanteUri.isNullOrEmpty()) {
+                    ImageUtils.mostrarDialogoVerComprobante(
+                        this,
+                        ev.comprobanteUri,
+                        "Comprobante: ${ev.elemento} (${ev.cliente})"
+                    )
+                }
+            }
+            rvAuditoria.adapter = auditoriaAdapter
 
             // 4.2 Reservas
             configurarAdaptersReservas()
@@ -428,41 +452,25 @@ class MainActivity : AppCompatActivity() {
                 mostrarDialogoNuevaReserva()
             }
 
-            // Pestañas de auditoría
-            val btnAuditoriaActivos = findViewById<Button>(R.id.btnFiltroAuditoriaActivos)
-            val btnAuditoriaBorrados = findViewById<Button>(R.id.btnFiltroAuditoriaBorrados)
-            val btnAuditoriaTodos = findViewById<Button>(R.id.btnFiltroAuditoriaTodos)
+            // Filtros de borrados / papelera para Registro (estilo Employ_JustPlay)
+            val cbFiltroBorrados = findViewById<CheckBox>(R.id.cbFiltroBorrados)
+            val cbFiltroSoloBorrados = findViewById<CheckBox>(R.id.cbFiltroSoloBorrados)
 
-            fun actualizarBotonesAuditoria() {
-                btnAuditoriaActivos.setBackgroundColor(if (modoAuditoria == "ACTIVOS") Color.parseColor("#DEFF9A") else Color.parseColor("#24283B"))
-                btnAuditoriaActivos.setTextColor(if (modoAuditoria == "ACTIVOS") Color.BLACK else Color.WHITE)
-
-                btnAuditoriaBorrados.setBackgroundColor(if (modoAuditoria == "BORRADOS") Color.parseColor("#FF5252") else Color.parseColor("#24283B"))
-                btnAuditoriaBorrados.setTextColor(if (modoAuditoria == "BORRADOS") Color.WHITE else Color.parseColor("#FF5252"))
-
-                btnAuditoriaTodos.setBackgroundColor(if (modoAuditoria == "TODOS") Color.parseColor("#DEFF9A") else Color.parseColor("#24283B"))
-                btnAuditoriaTodos.setTextColor(if (modoAuditoria == "TODOS") Color.BLACK else Color.WHITE)
-            }
-
-            btnAuditoriaActivos.setOnClickListener {
-                modoAuditoria = "ACTIVOS"
-                actualizarBotonesAuditoria()
+            cbFiltroSoloBorrados?.setOnCheckedChangeListener { _, isChecked ->
+                if (isChecked) {
+                    cbFiltroBorrados?.isChecked = true
+                }
                 aplicarFiltrosRegistro()
             }
 
-            btnAuditoriaBorrados.setOnClickListener {
-                modoAuditoria = "BORRADOS"
-                actualizarBotonesAuditoria()
+            cbFiltroBorrados?.setOnCheckedChangeListener { _, isChecked ->
+                if (!isChecked && cbFiltroSoloBorrados?.isChecked == true) {
+                    cbFiltroSoloBorrados?.isChecked = false
+                }
                 aplicarFiltrosRegistro()
             }
 
-            btnAuditoriaTodos.setOnClickListener {
-                modoAuditoria = "TODOS"
-                actualizarBotonesAuditoria()
-                aplicarFiltrosRegistro()
-            }
-
-            // Checkboxes de filtros
+            // Checkboxes de filtros de Registro
             val checkboxes = listOf(
                 findViewById<CheckBox>(R.id.cbFiltroCine),
                 findViewById<CheckBox>(R.id.cbFiltroAutitos),
@@ -474,6 +482,61 @@ class MainActivity : AppCompatActivity() {
             )
             checkboxes.forEach { cb ->
                 cb?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosRegistro() }
+            }
+
+            // --- CONTROLES DE LA NUEVA PANTALLA AUDITORIA ---
+            val etBuscarAuditoria = findViewById<EditText>(R.id.etBuscarAuditoria)
+            etBuscarAuditoria?.addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    auditQueryTexto = s?.toString() ?: ""
+                    aplicarFiltrosAuditoria()
+                }
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            })
+
+            val btnAuditoriaFiltroFecha = findViewById<Button>(R.id.btnAuditoriaFiltroFecha)
+            val btnAuditoriaLimpiarFecha = findViewById<Button>(R.id.btnAuditoriaLimpiarFecha)
+
+            btnAuditoriaFiltroFecha?.setOnClickListener {
+                val cal = Calendar.getInstance()
+                DatePickerDialog(this, { _, year, month, day ->
+                    auditFiltroFecha = String.format("%02d/%02d/%d", day, month + 1, year)
+                    btnAuditoriaFiltroFecha.text = "📅 $auditFiltroFecha"
+                    aplicarFiltrosAuditoria()
+                }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show()
+            }
+
+            btnAuditoriaLimpiarFecha?.setOnClickListener {
+                auditFiltroFecha = null
+                btnAuditoriaFiltroFecha?.text = "📅 Fecha: Todas"
+                aplicarFiltrosAuditoria()
+            }
+
+            findViewById<Button>(R.id.btnAuditTipoTodos)?.setOnClickListener {
+                auditFiltroTipo = "TODAS"
+                actualizarEstilosBotonesTipoAuditoria()
+                aplicarFiltrosAuditoria()
+            }
+            findViewById<Button>(R.id.btnAuditTipoVentas)?.setOnClickListener {
+                auditFiltroTipo = "VENTAS"
+                actualizarEstilosBotonesTipoAuditoria()
+                aplicarFiltrosAuditoria()
+            }
+            findViewById<Button>(R.id.btnAuditTipoSalas)?.setOnClickListener {
+                auditFiltroTipo = "SALAS"
+                actualizarEstilosBotonesTipoAuditoria()
+                aplicarFiltrosAuditoria()
+            }
+            findViewById<Button>(R.id.btnAuditTipoModif)?.setOnClickListener {
+                auditFiltroTipo = "MODIF"
+                actualizarEstilosBotonesTipoAuditoria()
+                aplicarFiltrosAuditoria()
+            }
+            findViewById<Button>(R.id.btnAuditTipoBorrados)?.setOnClickListener {
+                auditFiltroTipo = "BORRADOS"
+                actualizarEstilosBotonesTipoAuditoria()
+                aplicarFiltrosAuditoria()
             }
 
             findViewById<Button>(R.id.btnFiltroFecha).setOnClickListener {
@@ -553,41 +616,51 @@ class MainActivity : AppCompatActivity() {
 
             val navigationView = findViewById<NavigationView>(R.id.navigationView)
             navigationView.menu.add(0, 1, 0, "Just Play (Tablero)").setIcon(android.R.drawable.ic_menu_sort_by_size)
-            navigationView.menu.add(0, 2, 1, "Registro y Auditoría").setIcon(android.R.drawable.ic_menu_recent_history)
-            navigationView.menu.add(0, 3, 2, "Reservas").setIcon(android.R.drawable.ic_menu_today)
-            navigationView.menu.add(0, 4, 3, "Clientes Vetados").setIcon(android.R.drawable.ic_menu_close_clear_cancel)
-            navigationView.menu.add(0, 5, 4, "👥 Usuarios en Línea").setIcon(android.R.drawable.ic_menu_myplaces)
-            navigationView.menu.add(0, 6, 5, "🏗️ Aumentar / Gestionar Salas").setIcon(android.R.drawable.ic_input_add)
-            navigationView.menu.add(0, 7, 6, "🔄 Buscar Actualizaciones").setIcon(android.R.drawable.ic_popup_sync)
-            navigationView.menu.add(0, 8, 7, "🖥️ Terminales POS y Catálogo").setIcon(android.R.drawable.ic_menu_manage)
-            navigationView.menu.add(0, 12, 8, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
-            navigationView.menu.add(0, 13, 9, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
-            navigationView.menu.add(0, 14, 10, "🛡️ Auditoría").setIcon(android.R.drawable.ic_menu_info_details)
-            navigationView.menu.add(0, 15, 11, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
-            navigationView.menu.add(0, 16, 12, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
-            navigationView.menu.add(0, 17, 13, "📁 Gestión de Secciones").setIcon(android.R.drawable.ic_menu_manage)
+            navigationView.menu.add(0, 2, 1, "Registro").setIcon(android.R.drawable.ic_menu_recent_history)
+            navigationView.menu.add(0, 3, 2, "Auditoría").setIcon(android.R.drawable.ic_menu_info_details)
+            navigationView.menu.add(0, 4, 3, "Reservas").setIcon(android.R.drawable.ic_menu_today)
+            navigationView.menu.add(0, 5, 4, "Clientes Vetados").setIcon(android.R.drawable.ic_menu_close_clear_cancel)
+            navigationView.menu.add(0, 6, 5, "👥 Usuarios en Línea").setIcon(android.R.drawable.ic_menu_myplaces)
+            navigationView.menu.add(0, 7, 6, "🏗️ Aumentar / Gestionar Salas").setIcon(android.R.drawable.ic_input_add)
+            navigationView.menu.add(0, 8, 7, "🔄 Buscar Actualizaciones").setIcon(android.R.drawable.ic_popup_sync)
+            navigationView.menu.add(0, 9, 8, "🖥️ Terminales POS y Catálogo").setIcon(android.R.drawable.ic_menu_manage)
+            navigationView.menu.add(0, 10, 9, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
+            navigationView.menu.add(0, 11, 10, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
+            navigationView.menu.add(0, 12, 11, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
+            navigationView.menu.add(0, 13, 12, "⏱️ Tabla de Tarifas Minicine").setIcon(android.R.drawable.ic_menu_agenda)
+            navigationView.menu.add(0, 14, 13, "📁 Gestión de Secciones").setIcon(android.R.drawable.ic_menu_manage)
 
             navigationView.setNavigationItemSelectedListener { item ->
                 when (item.itemId) {
-                    6 -> mostrarDialogoAdministrarSalas()
-                    7 -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
-                    8 -> posManager.mostrarDialogoGestionPOS()
-                    12 -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
-                    13 -> egresosManager.mostrarDialogoGestionEgresos()
-                    14 -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
-                    15 -> posManager.mostrarDialogoPreciosBase()
-                    16 -> mostrarDialogoTablaTarifasMinicine()
-                    17 -> mostrarDialogoGestionarSecciones()
+                    1 -> navegarAPantalla("Just Play (Tablero)")
+                    2 -> navegarAPantalla("Registro")
+                    3 -> navegarAPantalla("Auditoría")
+                    4 -> navegarAPantalla("Reservas")
+                    5 -> navegarAPantalla("Clientes Vetados")
+                    6 -> navegarAPantalla("👥 Usuarios en Línea")
+                    7 -> mostrarDialogoAdministrarSalas()
+                    8 -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
+                    9 -> posManager.mostrarDialogoGestionPOS()
+                    10 -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
+                    11 -> egresosManager.mostrarDialogoGestionEgresos()
+                    12 -> posManager.mostrarDialogoPreciosBase()
+                    13 -> mostrarDialogoTablaTarifasMinicine()
+                    14 -> mostrarDialogoGestionarSecciones()
                     else -> {
                         val title = item.title.toString()
                         when {
+                            title.contains("Tablero") -> navegarAPantalla("Just Play (Tablero)")
+                            title.equals("Registro", ignoreCase = true) || title.contains("Registro de Sesiones") -> navegarAPantalla("Registro")
+                            title.contains("Auditoría") && !title.contains("Productos") -> navegarAPantalla("Auditoría")
+                            title.contains("Reservas") -> navegarAPantalla("Reservas")
+                            title.contains("Vetados") -> navegarAPantalla("Clientes Vetados")
+                            title.contains("Usuarios en Línea") -> navegarAPantalla("👥 Usuarios en Línea")
                             title.contains("Gestionar Salas") -> mostrarDialogoAdministrarSalas()
                             title.contains("Gestión de Secciones") || title.contains("Secciones") -> mostrarDialogoGestionarSecciones()
                             title.contains("Actualizaciones") -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
                             title.contains("Terminales POS") -> posManager.mostrarDialogoGestionPOS()
                             title.contains("Auditoría Productos") -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
                             title.contains("Egresos") -> egresosManager.mostrarDialogoGestionEgresos()
-                            (title.contains("Auditoría") && !title.contains("Productos")) || title.contains("Global de Salas") || title.contains("Trazabilidad") -> roomAuditManager.mostrarDialogoHistorialAuditoriaSalas()
                             title.contains("Precios Base") -> posManager.mostrarDialogoPreciosBase()
                             title.contains("Tabla de Tarifas") -> mostrarDialogoTablaTarifasMinicine()
                             else -> navegarAPantalla(title)
@@ -1129,8 +1202,71 @@ class MainActivity : AppCompatActivity() {
                     } else {
                         aplicarFiltrosRegistro()
                     }
+                    cargarYActualizarAuditoria()
                 } catch (t: Throwable) {
                     Log.e("MainActivity", "Error en listener de auditoria_registros", t)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
+        // 2.1 ESCUCHAR AUDITORIA DE ACCIONES EN SALAS
+        database.child("auditoria_salas").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    eventosSalasAudit.clear()
+                    for (snap in snapshot.children) {
+                        try {
+                            val tipoAccion = snap.child("tipo_accion").getValue(String::class.java) ?: ""
+                            val salaNombre = snap.child("sala_nombre").getValue(String::class.java) ?: ""
+                            val categoria = snap.child("categoria").getValue(String::class.java) ?: ""
+                            val usuarioNombre = snap.child("usuario_nombre").getValue(String::class.java) ?: "Personal"
+                            val usuarioRol = snap.child("usuario_rol").getValue(String::class.java) ?: "Empleado"
+                            val dispositivo = snap.child("dispositivo_modelo").getValue(String::class.java) ?: ""
+                            val fechaHora = snap.child("fecha_hora").getValue(String::class.java) ?: ""
+                            val timestamp = snap.child("timestamp").getValue(Long::class.java) ?: 0L
+                            val detalles = snap.child("detalles").getValue(String::class.java) ?: ""
+
+                            val tipoEv = when {
+                                tipoAccion in listOf("EDICION_PARAMETROS", "MODIFICAR_SALA", "EDICION") -> TipoAuditoriaEvento.MODIFICACION
+                                tipoAccion in listOf("ELIMINACION_SALA", "CANCELACION") -> TipoAuditoriaEvento.ELIMINACION
+                                tipoAccion == "FINALIZACION_SALA" -> TipoAuditoriaEvento.FINALIZACION
+                                else -> TipoAuditoriaEvento.SALA_INICIO
+                            }
+                            val badgeTitulo = when (tipoEv) {
+                                TipoAuditoriaEvento.MODIFICACION -> "✏️ MODIF. SALA"
+                                TipoAuditoriaEvento.ELIMINACION -> "🗑️ SALA ELIMINADA"
+                                TipoAuditoriaEvento.FINALIZACION -> "🏁 SALA FINALIZADA"
+                                TipoAuditoriaEvento.SALA_INICIO -> "🎬 SALA PUESTA"
+                                else -> "🛡️ ACCIÓN SALA"
+                            }
+
+                            eventosSalasAudit.add(
+                                AuditoriaEvento(
+                                    id = snap.key ?: "",
+                                    tipo = tipoEv,
+                                    tituloBadge = badgeTitulo,
+                                    usuarioNombre = usuarioNombre,
+                                    usuarioRol = usuarioRol,
+                                    dispositivo = dispositivo,
+                                    fechaHora = fechaHora,
+                                    timestamp = timestamp,
+                                    elemento = if (categoria.isNotBlank()) "$categoria - $salaNombre" else salaNombre,
+                                    cliente = "",
+                                    celular = "",
+                                    monto = 0.0,
+                                    metodoPago = "",
+                                    comprobanteUri = null,
+                                    detalles = detalles
+                                )
+                            )
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error procesando evento auditoria_salas ${snap.key}", e)
+                        }
+                    }
+                    cargarYActualizarAuditoria()
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener auditoria_salas", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -1378,6 +1514,7 @@ class MainActivity : AppCompatActivity() {
     private fun navegarAPantalla(titulo: String) {
         layoutTablero.visibility = View.GONE
         layoutRegistro.visibility = View.GONE
+        layoutAuditoria.visibility = View.GONE
         layoutReservasGenerales.visibility = View.GONE
         layoutVetados.visibility = View.GONE
         layoutUsuariosOnline.visibility = View.GONE
@@ -1388,11 +1525,17 @@ class MainActivity : AppCompatActivity() {
                 tvTituloToolbar.text = "Admin Just Play"
                 PresenciaManager.actualizarSeccion("Tablero")
             }
-            "Registro", "Registro y Auditoría" -> {
+            "Registro", "Registro de Sesiones", "Registro y Auditoría" -> {
                 layoutRegistro.visibility = View.VISIBLE
-                tvTituloToolbar.text = "Registro & Auditoría"
+                tvTituloToolbar.text = "Registro de Sesiones"
                 aplicarFiltrosRegistro()
                 PresenciaManager.actualizarSeccion("Registro")
+            }
+            "Auditoría", "🛡️ Auditoría" -> {
+                layoutAuditoria.visibility = View.VISIBLE
+                tvTituloToolbar.text = "Auditoría de Actividades"
+                cargarYActualizarAuditoria()
+                PresenciaManager.actualizarSeccion("Auditoría")
             }
             "Reservas" -> {
                 layoutReservasGenerales.visibility = View.VISIBLE
@@ -2743,13 +2886,16 @@ class MainActivity : AppCompatActivity() {
         val cbQR = findViewById<CheckBox>(R.id.cbFiltroQR)?.isChecked ?: true
         val cbEgresos = findViewById<CheckBox>(R.id.cbFiltroEgresos)?.isChecked ?: false
 
+        val cbVerBorrados = findViewById<CheckBox>(R.id.cbFiltroBorrados)?.isChecked ?: false
+        val cbSoloBorrados = findViewById<CheckBox>(R.id.cbFiltroSoloBorrados)?.isChecked ?: false
+
         historialFiltrado.clear()
 
         for (reg in historialCompleto) {
-            when (modoAuditoria) {
-                "ACTIVOS" -> if (reg.eliminado) continue
-                "BORRADOS" -> if (!reg.eliminado) continue
-                "TODOS" -> { }
+            if (cbSoloBorrados) {
+                if (!reg.eliminado) continue
+            } else if (!cbVerBorrados) {
+                if (reg.eliminado) continue
             }
 
             if (fechaFiltroSeleccionada.isNotEmpty()) {
@@ -2870,15 +3016,15 @@ class MainActivity : AppCompatActivity() {
         val tvTotalRecaudado = findViewById<TextView>(R.id.tvTotalRecaudado)
         val tvDesgloseTotal = findViewById<TextView>(R.id.tvDesgloseTotal)
 
-        tvTituloTotal?.text = when (modoAuditoria) {
-            "BORRADOS" -> "🗑️ TOTAL BORRADO / ANULADO:"
-            "TODOS" -> "📋 TOTAL REGISTROS (ACTIVOS):"
+        tvTituloTotal?.text = when {
+            cbSoloBorrados -> "🗑️ TOTAL BORRADO / ANULADO:"
+            cbVerBorrados && totalBorrados > 0 -> "💰 TOTAL NETO + PAPELERA:"
             else -> "💰 TOTAL DEL DÍA (HOY):"
         }
 
-        tvTotalRecaudado?.text = if (modoAuditoria == "BORRADOS") "$totalBorrados Bs" else "$totalNeto Bs"
+        tvTotalRecaudado?.text = if (cbSoloBorrados) "$totalBorrados Bs" else "$totalNeto Bs"
         tvTotalRecaudado?.setTextColor(
-            if (modoAuditoria == "BORRADOS") Color.parseColor("#FF5252") else Color.parseColor("#00E676")
+            if (cbSoloBorrados) Color.parseColor("#FF5252") else Color.parseColor("#00E676")
         )
 
         val egresosTexto = if (totalEgresos > 0) " | 💸 Egresos: -$totalEgresos Bs" else ""
@@ -2888,6 +3034,162 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnFiltroFecha)?.text = if (fechaFiltroSeleccionada.isNotEmpty()) "📅 $fechaFiltroSeleccionada" else "📅 Todas"
         findViewById<Button>(R.id.btnFiltroHoraInicio)?.text = if (horaInicioFiltro != null) "⏰ Desde: $horaInicioFiltro" else "⏰ Desde: Inicio"
         findViewById<Button>(R.id.btnFiltroHoraFin)?.text = if (horaFinFiltro != null) "⏰ Hasta: $horaFinFiltro" else "⏰ Hasta: Fin"
+    }
+
+    // ==========================================
+    // LOGICA DE AUDITORIA Y TRAZABILIDAD DEDICADA
+    // ==========================================
+    private fun cargarYActualizarAuditoria() {
+        listaAuditoriaEventos.clear()
+
+        // 1. Eventos directos de salas (inicio, edición de parámetros, finalización, eliminación)
+        listaAuditoriaEventos.addAll(eventosSalasAudit)
+
+        // 2. Eventos desde auditoria_registros (ventas, consumos, sesiones, eliminaciones)
+        for (reg in historialCompleto) {
+            val tipoEv = when {
+                reg.eliminado -> TipoAuditoriaEvento.ELIMINACION
+                reg.tipo.equals("Egreso", ignoreCase = true) || reg.nombreElemento.startsWith("Egreso", ignoreCase = true) -> TipoAuditoriaEvento.EGRESO
+                reg.tipo.equals("Consumo", ignoreCase = true) || reg.tipo.equals("Venta Directa", ignoreCase = true) || reg.nombreElemento.contains("Mostrador", ignoreCase = true) -> TipoAuditoriaEvento.VENTA
+                else -> TipoAuditoriaEvento.SALA_INICIO
+            }
+
+            val badge = when (tipoEv) {
+                TipoAuditoriaEvento.ELIMINACION -> "🗑️ REGISTRO BORRADO"
+                TipoAuditoriaEvento.EGRESO -> "💸 EGRESO"
+                TipoAuditoriaEvento.VENTA -> "🛒 VENTA"
+                TipoAuditoriaEvento.SALA_INICIO -> "🎬 SESIÓN SALA"
+                else -> "📋 REGISTRO"
+            }
+
+            val userResponsable = if (reg.eliminado) {
+                if (!reg.eliminadoPor.isNullOrBlank()) reg.eliminadoPor!! else (reg.creadoPor ?: "Personal")
+            } else {
+                if (!reg.creadoPor.isNullOrBlank()) reg.creadoPor!! else "Personal"
+            }
+
+            val fHora = if (reg.eliminado && !reg.fechaEliminacion.isNullOrBlank()) reg.fechaEliminacion!! else reg.fechaHora
+
+            val det = when {
+                reg.eliminado -> "Registro borrado de BD. ${if (!reg.motivoEliminacion.isNullOrBlank()) "Motivo: ${reg.motivoEliminacion}" else ""}"
+                tipoEv == TipoAuditoriaEvento.EGRESO -> "Egreso registrado: ${reg.cliente}"
+                tipoEv == TipoAuditoriaEvento.VENTA -> reg.pedidos.ifEmpty { "Venta directa mostrador" }
+                else -> "Película/Juego: ${reg.peliculaJuego ?: "N/A"} | Tiempo: ${reg.tiempoConfigurado ?: "N/A"}${if (reg.pedidos.isNotBlank()) " | Consumos: ${reg.pedidos}" else ""}"
+            }
+
+            listaAuditoriaEventos.add(
+                AuditoriaEvento(
+                    id = reg.idFirebase,
+                    tipo = tipoEv,
+                    tituloBadge = badge,
+                    usuarioNombre = userResponsable,
+                    usuarioRol = if (reg.eliminado) "Eliminación" else "Registro",
+                    dispositivo = "",
+                    fechaHora = fHora,
+                    timestamp = reg.timestamp,
+                    elemento = if (reg.tipo.isNotBlank() && !reg.nombreElemento.startsWith(reg.tipo, ignoreCase = true)) "${reg.tipo} - ${reg.nombreElemento}" else reg.nombreElemento,
+                    cliente = reg.cliente,
+                    celular = reg.celular,
+                    monto = reg.totalCobrado,
+                    metodoPago = reg.metodoPago,
+                    comprobanteUri = reg.comprobanteUri,
+                    detalles = det
+                )
+            )
+        }
+
+        // Ordenar cronológicamente descendente
+        listaAuditoriaEventos.sortByDescending {
+            if (it.timestamp > 0L) it.timestamp else {
+                try {
+                    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse(it.fechaHora.take(16))?.time ?: 0L
+                } catch (e: Exception) { 0L }
+            }
+        }
+
+        aplicarFiltrosAuditoria()
+    }
+
+    private fun aplicarFiltrosAuditoria() {
+        if (!::auditoriaAdapter.isInitialized) return
+
+        val q = auditQueryTexto.trim().lowercase()
+        listaAuditoriaFiltrada.clear()
+
+        for (ev in listaAuditoriaEventos) {
+            // 1. Filtro Tipo
+            val coincideTipo = when (auditFiltroTipo) {
+                "VENTAS" -> ev.tipo == TipoAuditoriaEvento.VENTA || ev.tipo == TipoAuditoriaEvento.EGRESO
+                "SALAS" -> ev.tipo == TipoAuditoriaEvento.SALA_INICIO || ev.tipo == TipoAuditoriaEvento.FINALIZACION
+                "MODIF" -> ev.tipo == TipoAuditoriaEvento.MODIFICACION
+                "BORRADOS" -> ev.tipo == TipoAuditoriaEvento.ELIMINACION
+                else -> true
+            }
+            if (!coincideTipo) continue
+
+            // 2. Filtro Fecha
+            if (!auditFiltroFecha.isNullOrEmpty()) {
+                if (!ev.fechaHora.startsWith(auditFiltroFecha!!)) continue
+            }
+
+            // 3. Filtro Búsqueda libre
+            if (q.isNotEmpty()) {
+                val enUser = ev.usuarioNombre.lowercase().contains(q) || ev.usuarioRol.lowercase().contains(q)
+                val enDisp = ev.dispositivo.lowercase().contains(q)
+                val enElem = ev.elemento.lowercase().contains(q)
+                val enCli = ev.cliente.lowercase().contains(q) || (ev.celular ?: "").lowercase().contains(q)
+                val enDet = ev.detalles.lowercase().contains(q) || ev.tituloBadge.lowercase().contains(q)
+                if (!enUser && !enDisp && !enElem && !enCli && !enDet) continue
+            }
+
+            listaAuditoriaFiltrada.add(ev)
+        }
+
+        auditoriaAdapter.notifyDataSetChanged()
+
+        val tvVacio = findViewById<TextView>(R.id.tvAuditoriaVacio)
+        tvVacio?.visibility = if (listaAuditoriaFiltrada.isEmpty()) View.VISIBLE else View.GONE
+
+        val tvContador = findViewById<TextView>(R.id.tvAuditoriaContador)
+        tvContador?.text = "${listaAuditoriaFiltrada.size} eventos"
+
+        val countVentas = listaAuditoriaFiltrada.count { it.tipo == TipoAuditoriaEvento.VENTA || it.tipo == TipoAuditoriaEvento.EGRESO }
+        val countSalas = listaAuditoriaFiltrada.count { it.tipo == TipoAuditoriaEvento.SALA_INICIO || it.tipo == TipoAuditoriaEvento.FINALIZACION }
+        val countModif = listaAuditoriaFiltrada.count { it.tipo == TipoAuditoriaEvento.MODIFICACION }
+        val countBorrados = listaAuditoriaFiltrada.count { it.tipo == TipoAuditoriaEvento.ELIMINACION }
+
+        val tvResumen = findViewById<TextView>(R.id.tvAuditoriaResumen)
+        val fechaText = if (!auditFiltroFecha.isNullOrEmpty()) "del $auditFiltroFecha" else "totales"
+        tvResumen?.text = "📊 ${listaAuditoriaFiltrada.size} acciones registradas ($fechaText)"
+
+        val tvDesglose = findViewById<TextView>(R.id.tvAuditoriaDesglose)
+        tvDesglose?.text = "🛒 $countVentas Ventas | 🎬 $countSalas Salas | ✏️ $countModif Modif. | 🗑️ $countBorrados Eliminados"
+    }
+
+    private fun actualizarEstilosBotonesTipoAuditoria() {
+        val btnTodos = findViewById<Button>(R.id.btnAuditTipoTodos)
+        val btnVentas = findViewById<Button>(R.id.btnAuditTipoVentas)
+        val btnSalas = findViewById<Button>(R.id.btnAuditTipoSalas)
+        val btnModif = findViewById<Button>(R.id.btnAuditTipoModif)
+        val btnBorrados = findViewById<Button>(R.id.btnAuditTipoBorrados)
+
+        val colorActivo = Color.parseColor("#DEFF9A")
+        val colorInactivo = Color.parseColor("#24283B")
+
+        btnTodos?.setBackgroundColor(if (auditFiltroTipo == "TODAS") colorActivo else colorInactivo)
+        btnTodos?.setTextColor(if (auditFiltroTipo == "TODAS") Color.BLACK else Color.WHITE)
+
+        btnVentas?.setBackgroundColor(if (auditFiltroTipo == "VENTAS") colorActivo else colorInactivo)
+        btnVentas?.setTextColor(if (auditFiltroTipo == "VENTAS") Color.BLACK else Color.WHITE)
+
+        btnSalas?.setBackgroundColor(if (auditFiltroTipo == "SALAS") colorActivo else colorInactivo)
+        btnSalas?.setTextColor(if (auditFiltroTipo == "SALAS") Color.BLACK else Color.WHITE)
+
+        btnModif?.setBackgroundColor(if (auditFiltroTipo == "MODIF") colorActivo else colorInactivo)
+        btnModif?.setTextColor(if (auditFiltroTipo == "MODIF") Color.BLACK else Color.WHITE)
+
+        btnBorrados?.setBackgroundColor(if (auditFiltroTipo == "BORRADOS") Color.parseColor("#FF5252") else colorInactivo)
+        btnBorrados?.setTextColor(if (auditFiltroTipo == "BORRADOS") Color.WHITE else Color.parseColor("#FF5252"))
     }
 
     private fun mostrarDialogoSeleccionarSalaLibre(reserva: Reserva) {

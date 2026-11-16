@@ -52,6 +52,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -63,12 +64,19 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+
+private val REGEX_SALA_TITULO = Regex("""(?i)^sala\s*\d+.*""")
 
 class MainActivity : AppCompatActivity() {
 
@@ -102,6 +110,11 @@ class MainActivity : AppCompatActivity() {
     private var adapterSalasMinicine: SalasAdapter? = null
     private var adapterSalasAutitos: SalasAdapter? = null
     private var adapterSalasJustDance: SalasAdapter? = null
+
+    // CONTROL Y OPTIMIZACION DE RENDIMIENTO ASINCRONO
+    private var jobFiltroRegistro: Job? = null
+    private var jobFiltroAuditoria: Job? = null
+    private var auditoriaPendienteActualizar: Boolean = true
 
     // REGISTRO Y AUDITORIA
     private val historialCompleto = mutableListOf<RegistroEntry>()
@@ -490,7 +503,7 @@ class MainActivity : AppCompatActivity() {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                     auditQueryTexto = s?.toString() ?: ""
-                    aplicarFiltrosAuditoria()
+                    ejecutarActualizacionAuditoriaBackground(debounceMs = 250L)
                 }
                 override fun afterTextChanged(s: android.text.Editable?) {}
             })
@@ -1109,10 +1122,42 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun parsearTimestampRegistro(id: String, fechaHora: String): Long {
+        if (id.startsWith("VENTA_PC_")) {
+            val t = id.removePrefix("VENTA_PC_").toLongOrNull()
+            if (t != null && t > 0L) return t
+        }
+        if (id.length >= 8 && (id.startsWith("-") || id.startsWith("_"))) {
+            val chars = "-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
+            var time = 0L
+            var valid = true
+            for (i in 0 until 8) {
+                val c = id[i]
+                val index = chars.indexOf(c)
+                if (index == -1) { valid = false; break }
+                time = time * 64 + index
+            }
+            if (valid && time in 1500000000000L..2500000000000L) {
+                return time
+            }
+        }
+        if (fechaHora.length >= 10) {
+            try {
+                return SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse(fechaHora.take(16))?.time ?: 0L
+            } catch (e: Exception) {
+                try {
+                    return SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(fechaHora.take(10))?.time ?: 0L
+                } catch (e2: Exception) {
+                    return 0L
+                }
+            }
+        }
+        return 0L
+    }
+
     private fun sincronizarConFirebase() {
         try {
             database.child("salas").keepSynced(true)
-            database.child("registros").keepSynced(true)
             database.child("auditoria_registros").keepSynced(true)
             database.child("reservas").keepSynced(true)
             database.child("vetados").keepSynced(true)
@@ -1181,92 +1226,123 @@ class MainActivity : AppCompatActivity() {
             override fun onCancelled(error: DatabaseError) {}
         })
 
-        // 2. ESCUCHAR AUDITORIA Y REGISTROS HISTORICOS
+        // 2. ESCUCHAR AUDITORIA Y REGISTROS HISTORICOS (EN SEGUNDO PLANO)
         database.child("auditoria_registros").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                try {
-                    historialCompleto.clear()
-                    for (snap in snapshot.children) {
-                        try {
-                            val reg = snap.getValue(RegistroEntry::class.java)
-                            if (reg != null) {
-                                reg.idFirebase = snap.key ?: ""
-                                historialCompleto.add(reg)
+                lifecycleScope.launch(Dispatchers.Default) {
+                    try {
+                        val tempList = ArrayList<RegistroEntry>(snapshot.childrenCount.toInt())
+                        for (snap in snapshot.children) {
+                            try {
+                                val reg = snap.getValue(RegistroEntry::class.java)
+                                if (reg != null) {
+                                    reg.idFirebase = snap.key ?: ""
+                                    if (reg.timestamp == 0L) {
+                                        reg.timestamp = parsearTimestampRegistro(reg.idFirebase, reg.fechaHora)
+                                    }
+                                    tempList.add(reg)
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MainActivity", "Error parseando registro ${snap.key}", e)
                             }
-                        } catch (e: Exception) {
-                            Log.e("MainActivity", "Error parseando registro ${snap.key}", e)
                         }
+                        synchronized(historialCompleto) {
+                            historialCompleto.clear()
+                            historialCompleto.addAll(tempList)
+                        }
+
+                        if (tempList.isEmpty()) {
+                            withContext(Dispatchers.Main) {
+                                cargarRegistrosLegacy()
+                            }
+                        } else {
+                            ejecutarFiltroRegistroBackground()
+                        }
+
+                        if (layoutAuditoria.visibility == View.VISIBLE) {
+                            ejecutarActualizacionAuditoriaBackground()
+                        } else {
+                            auditoriaPendienteActualizar = true
+                        }
+                    } catch (t: Throwable) {
+                        Log.e("MainActivity", "Error en listener de auditoria_registros", t)
                     }
-                    if (historialCompleto.isEmpty()) {
-                        cargarRegistrosLegacy()
-                    } else {
-                        aplicarFiltrosRegistro()
-                    }
-                    cargarYActualizarAuditoria()
-                } catch (t: Throwable) {
-                    Log.e("MainActivity", "Error en listener de auditoria_registros", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
         })
 
-        // 2.1 ESCUCHAR AUDITORIA DE ACCIONES EN SALAS
+        // 2.1 ESCUCHAR AUDITORIA DE ACCIONES EN SALAS (EN SEGUNDO PLANO)
         database.child("auditoria_salas").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                try {
-                    eventosSalasAudit.clear()
-                    for (snap in snapshot.children) {
-                        try {
-                            val tipoAccion = snap.child("tipo_accion").getValue(String::class.java) ?: ""
-                            val salaNombre = snap.child("sala_nombre").getValue(String::class.java) ?: ""
-                            val categoria = snap.child("categoria").getValue(String::class.java) ?: ""
-                            val usuarioNombre = snap.child("usuario_nombre").getValue(String::class.java) ?: "Personal"
-                            val usuarioRol = snap.child("usuario_rol").getValue(String::class.java) ?: "Empleado"
-                            val dispositivo = snap.child("dispositivo_modelo").getValue(String::class.java) ?: ""
-                            val fechaHora = snap.child("fecha_hora").getValue(String::class.java) ?: ""
-                            val timestamp = snap.child("timestamp").getValue(Long::class.java) ?: 0L
-                            val detalles = snap.child("detalles").getValue(String::class.java) ?: ""
+                lifecycleScope.launch(Dispatchers.Default) {
+                    try {
+                        val tempSalasAudit = ArrayList<AuditoriaEvento>(snapshot.childrenCount.toInt())
+                        for (snap in snapshot.children) {
+                            try {
+                                val tipoAccion = snap.child("tipo_accion").getValue(String::class.java) ?: ""
+                                val salaNombre = snap.child("sala_nombre").getValue(String::class.java) ?: ""
+                                val categoria = snap.child("categoria").getValue(String::class.java) ?: ""
+                                val usuarioNombre = snap.child("usuario_nombre").getValue(String::class.java) ?: "Personal"
+                                val usuarioRol = snap.child("usuario_rol").getValue(String::class.java) ?: "Empleado"
+                                val dispositivo = snap.child("dispositivo_modelo").getValue(String::class.java) ?: ""
+                                val fechaHora = snap.child("fecha_hora").getValue(String::class.java) ?: ""
+                                var timestamp = snap.child("timestamp").getValue(Long::class.java) ?: 0L
+                                if (timestamp == 0L) {
+                                    timestamp = parsearTimestampRegistro(snap.key ?: "", fechaHora)
+                                }
+                                val detalles = snap.child("detalles").getValue(String::class.java) ?: ""
 
-                            val tipoEv = when {
-                                tipoAccion in listOf("EDICION_PARAMETROS", "MODIFICAR_SALA", "EDICION") -> TipoAuditoriaEvento.MODIFICACION
-                                tipoAccion in listOf("ELIMINACION_SALA", "CANCELACION") -> TipoAuditoriaEvento.ELIMINACION
-                                tipoAccion == "FINALIZACION_SALA" -> TipoAuditoriaEvento.FINALIZACION
-                                else -> TipoAuditoriaEvento.SALA_INICIO
-                            }
-                            val badgeTitulo = when (tipoEv) {
-                                TipoAuditoriaEvento.MODIFICACION -> "✏️ MODIF. SALA"
-                                TipoAuditoriaEvento.ELIMINACION -> "🗑️ SALA ELIMINADA"
-                                TipoAuditoriaEvento.FINALIZACION -> "🏁 SALA FINALIZADA"
-                                TipoAuditoriaEvento.SALA_INICIO -> "🎬 SALA PUESTA"
-                                else -> "🛡️ ACCIÓN SALA"
-                            }
+                                val tipoEv = when {
+                                    tipoAccion in listOf("EDICION_PARAMETROS", "MODIFICAR_SALA", "EDICION") -> TipoAuditoriaEvento.MODIFICACION
+                                    tipoAccion in listOf("ELIMINACION_SALA", "CANCELACION") -> TipoAuditoriaEvento.ELIMINACION
+                                    tipoAccion == "FINALIZACION_SALA" -> TipoAuditoriaEvento.FINALIZACION
+                                    else -> TipoAuditoriaEvento.SALA_INICIO
+                                }
+                                val badgeTitulo = when (tipoEv) {
+                                    TipoAuditoriaEvento.MODIFICACION -> "✏️ MODIF. SALA"
+                                    TipoAuditoriaEvento.ELIMINACION -> "🗑️ SALA ELIMINADA"
+                                    TipoAuditoriaEvento.FINALIZACION -> "🏁 SALA FINALIZADA"
+                                    TipoAuditoriaEvento.SALA_INICIO -> "🎬 SALA PUESTA"
+                                    else -> "🛡️ ACCIÓN SALA"
+                                }
 
-                            eventosSalasAudit.add(
-                                AuditoriaEvento(
-                                    id = snap.key ?: "",
-                                    tipo = tipoEv,
-                                    tituloBadge = badgeTitulo,
-                                    usuarioNombre = usuarioNombre,
-                                    usuarioRol = usuarioRol,
-                                    dispositivo = dispositivo,
-                                    fechaHora = fechaHora,
-                                    timestamp = timestamp,
-                                    elemento = if (categoria.isNotBlank()) "$categoria - $salaNombre" else salaNombre,
-                                    cliente = "",
-                                    celular = "",
-                                    monto = 0.0,
-                                    metodoPago = "",
-                                    comprobanteUri = null,
-                                    detalles = detalles
+                                tempSalasAudit.add(
+                                    AuditoriaEvento(
+                                        id = snap.key ?: "",
+                                        tipo = tipoEv,
+                                        tituloBadge = badgeTitulo,
+                                        usuarioNombre = usuarioNombre,
+                                        usuarioRol = usuarioRol,
+                                        dispositivo = dispositivo,
+                                        fechaHora = fechaHora,
+                                        timestamp = timestamp,
+                                        elemento = if (categoria.isNotBlank()) "$categoria - $salaNombre" else salaNombre,
+                                        cliente = "",
+                                        celular = "",
+                                        monto = 0.0,
+                                        metodoPago = "",
+                                        comprobanteUri = null,
+                                        detalles = detalles
+                                    )
                                 )
-                            )
-                        } catch (e: Exception) {
-                            Log.e("MainActivity", "Error procesando evento auditoria_salas ${snap.key}", e)
+                            } catch (e: Exception) {
+                                Log.e("MainActivity", "Error procesando evento auditoria_salas ${snap.key}", e)
+                            }
                         }
+                        synchronized(eventosSalasAudit) {
+                            eventosSalasAudit.clear()
+                            eventosSalasAudit.addAll(tempSalasAudit)
+                        }
+
+                        if (layoutAuditoria.visibility == View.VISIBLE) {
+                            ejecutarActualizacionAuditoriaBackground()
+                        } else {
+                            auditoriaPendienteActualizar = true
+                        }
+                    } catch (t: Throwable) {
+                        Log.e("MainActivity", "Error en listener auditoria_salas", t)
                     }
-                    cargarYActualizarAuditoria()
-                } catch (t: Throwable) {
-                    Log.e("MainActivity", "Error en listener auditoria_salas", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -1454,22 +1530,32 @@ class MainActivity : AppCompatActivity() {
     private fun cargarRegistrosLegacy() {
         database.child("registros").addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                try {
-                    for (snap in snapshot.children) {
-                        try {
-                            val reg = snap.getValue(RegistroEntry::class.java)
-                            if (reg != null) {
-                                reg.idFirebase = snap.key ?: ""
-                                historialCompleto.add(reg)
-                                database.child("auditoria_registros").child(reg.idFirebase).setValue(reg)
+                lifecycleScope.launch(Dispatchers.Default) {
+                    try {
+                        val tempList = ArrayList<RegistroEntry>(snapshot.childrenCount.toInt())
+                        for (snap in snapshot.children) {
+                            try {
+                                val reg = snap.getValue(RegistroEntry::class.java)
+                                if (reg != null) {
+                                    reg.idFirebase = snap.key ?: ""
+                                    if (reg.timestamp == 0L) {
+                                        reg.timestamp = parsearTimestampRegistro(reg.idFirebase, reg.fechaHora)
+                                    }
+                                    tempList.add(reg)
+                                    database.child("auditoria_registros").child(reg.idFirebase).setValue(reg)
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MainActivity", "Error parseando registro legacy ${snap.key}", e)
                             }
-                        } catch (e: Exception) {
-                            Log.e("MainActivity", "Error parseando registro legacy ${snap.key}", e)
                         }
+                        synchronized(historialCompleto) {
+                            historialCompleto.clear()
+                            historialCompleto.addAll(tempList)
+                        }
+                        ejecutarFiltroRegistroBackground()
+                    } catch (t: Throwable) {
+                        Log.e("MainActivity", "Error en cargarRegistrosLegacy", t)
                     }
-                    aplicarFiltrosRegistro()
-                } catch (t: Throwable) {
-                    Log.e("MainActivity", "Error en cargarRegistrosLegacy", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}
@@ -2888,282 +2974,395 @@ class MainActivity : AppCompatActivity() {
 
         val cbVerBorrados = findViewById<CheckBox>(R.id.cbFiltroBorrados)?.isChecked ?: false
         val cbSoloBorrados = findViewById<CheckBox>(R.id.cbFiltroSoloBorrados)?.isChecked ?: false
+        val fechaFiltro = fechaFiltroSeleccionada
+        val horaIni = horaInicioFiltro
+        val horaFin = horaFinFiltro
 
-        historialFiltrado.clear()
+        val snapshotList = synchronized(historialCompleto) { ArrayList(historialCompleto) }
+        val snapshotSecciones = synchronized(listaSecciones) { ArrayList(listaSecciones) }
+        val mapaFiltrosDinamicos = HashMap(filtrosSeccionesDinamicasEstado)
 
-        for (reg in historialCompleto) {
-            if (cbSoloBorrados) {
-                if (!reg.eliminado) continue
-            } else if (!cbVerBorrados) {
-                if (reg.eliminado) continue
-            }
-
-            if (fechaFiltroSeleccionada.isNotEmpty()) {
-                if (!reg.fechaHora.startsWith(fechaFiltroSeleccionada)) continue
-            }
-
-            if (horaInicioFiltro != null || horaFinFiltro != null) {
-                val horaRegistro = if (reg.fechaHora.length >= 16) reg.fechaHora.substring(11, 16) else ""
-                if (horaRegistro.isNotEmpty()) {
-                    if (horaInicioFiltro != null && horaRegistro < horaInicioFiltro!!) continue
-                    if (horaFinFiltro != null && horaRegistro > horaFinFiltro!!) continue
-                }
-            }
-
-            val tipoLower = reg.tipo.trim().lowercase()
-            val nombreLower = reg.nombreElemento.trim().lowercase()
-            val pedidosLower = reg.pedidos.trim().lowercase()
-
-            val esEgreso = tipoLower.contains("egreso") || tipoLower.contains("gasto") ||
-                           nombreLower.contains("egreso") || nombreLower.contains("gasto") ||
-                           pedidosLower.contains("egreso")
-
-            val esMostrador = !esEgreso && (
-                tipoLower.contains("consumo") || tipoLower.contains("mostrador") ||
-                tipoLower.contains("venta directa") || tipoLower.contains("producto") ||
-                tipoLower.contains("snack") || tipoLower.contains("bebida") ||
-                tipoLower.contains("golosina") ||
-                nombreLower.startsWith("consumo") || nombreLower.startsWith("venta")
-            )
-
-            val esCine = !esEgreso && !esMostrador && (
-                tipoLower == "minicine" || tipoLower == "cine" || tipoLower.contains("cine") ||
-                tipoLower == "salas" || tipoLower == "sala" || tipoLower == "alquiler de sala" ||
-                nombreLower.contains("cine") ||
-                (nombreLower.matches(Regex("""(?i)^sala\s*\d+.*""")) &&
-                 !nombreLower.contains("auto") && !nombreLower.contains("volante") &&
-                 !nombreLower.contains("car") && !nombreLower.contains("dance"))
-            )
-
-            val esAutitos = !esEgreso && !esMostrador && !esCine && (
-                tipoLower.contains("auto") || tipoLower.contains("car") ||
-                tipoLower.contains("volante") || tipoLower.contains("simulador") ||
-                nombreLower.contains("auto") || nombreLower.contains("car") ||
-                nombreLower.contains("volante")
-            )
-
-            val esDance = !esEgreso && !esMostrador && !esCine && !esAutitos && (
-                tipoLower.contains("dance") || tipoLower.contains("justplay") ||
-                tipoLower == "just dance" || tipoLower == "just_dance" ||
-                nombreLower.contains("dance")
-            )
-
-            val seccionCoincidente = if (!esEgreso && !esMostrador && !esCine && !esAutitos && !esDance) {
-                listaSecciones.filter { sec ->
-                    val idLower = sec.id.trim().lowercase()
-                    val nomLower = sec.nombre.trim().lowercase()
-                    sec.activa &&
-                    idLower !in listOf("minicine", "autitos", "just_dance", "cine", "cines", "volantes", "salas") &&
-                    nomLower !in listOf("minicine", "autitos", "just dance", "just_dance", "cine", "cines", "volantes", "salas", "autitos (simuladores)")
-                }.find { sec ->
-                    val secNom = sec.nombre.trim().lowercase()
-                    val secId = sec.id.trim().lowercase()
-                    val secPref = sec.prefijoSala.trim().lowercase()
-
-                    tipoLower == secNom || tipoLower == secId ||
-                    (secNom.isNotBlank() && tipoLower.contains(secNom)) ||
-                    (secPref.isNotBlank() && secPref.length >= 2 && nombreLower.startsWith(secPref)) ||
-                    (secNom.isNotBlank() && nombreLower.startsWith(secNom))
-                }
-            } else null
-
-            val pasaTipo = when {
-                esEgreso -> cbEgresos
-                esMostrador -> cbMostrador
-                esCine -> cbCine
-                esAutitos -> cbAutitos
-                esDance -> cbDance
-                seccionCoincidente != null -> filtrosSeccionesDinamicasEstado.getOrDefault(seccionCoincidente.id, true)
-                else -> cbMostrador
-            }
-            if (!pasaTipo) continue
-
-            val metodo = reg.metodoPago.lowercase()
-            val pasaPago = when {
-                metodo.startsWith("mixto") -> (cbQR && reg.getQRAmount() > 0) || (cbEfectivo && reg.getEfectivoAmount() > 0)
-                metodo.contains("qr") -> cbQR
-                else -> cbEfectivo
-            }
-            if (!pasaPago) continue
-
-            historialFiltrado.add(reg)
-        }
-
-        historialFiltrado.sortByDescending { it.fechaHora }
-        registroAdapter.notifyDataSetChanged()
-
-        val activos = historialFiltrado.filter { !it.eliminado }
-        val borrados = historialFiltrado.filter { it.eliminado }
-
-        val egresosActivos = activos.filter { it.tipo.contains("egreso", true) || it.nombreElemento.contains("egreso", true) }
-        val ingresosActivos = activos.filter { !(it.tipo.contains("egreso", true) || it.nombreElemento.contains("egreso", true)) }
-
-        val totalIngresos = ingresosActivos.sumOf { 
-            (if (cbEfectivo) it.getEfectivoAmount() else 0.0) + (if (cbQR) it.getQRAmount() else 0.0)
-        }
-        val totalEgresos = if (cbEgresos) egresosActivos.sumOf { it.totalCobrado } else 0.0
-        val totalNeto = maxOf(0.0, totalIngresos - totalEgresos)
-
-        val totalBorrados = borrados.sumOf { it.totalCobrado }
-
-        val egresosEfectivo = if (cbEgresos) egresosActivos.filter { !it.metodoPago.contains("QR", true) }.sumOf { it.totalCobrado } else 0.0
-        val egresosQR = if (cbEgresos) egresosActivos.filter { it.metodoPago.contains("QR", true) }.sumOf { it.totalCobrado } else 0.0
-
-        val totalEfectivo = maxOf(0.0, ingresosActivos.sumOf { it.getEfectivoAmount() } - egresosEfectivo)
-        val totalQR = maxOf(0.0, ingresosActivos.sumOf { it.getQRAmount() } - egresosQR)
-
-        val tvTituloTotal = findViewById<TextView>(R.id.tvTituloTotal)
-        val tvTotalRecaudado = findViewById<TextView>(R.id.tvTotalRecaudado)
-        val tvDesgloseTotal = findViewById<TextView>(R.id.tvDesgloseTotal)
-
-        tvTituloTotal?.text = when {
-            cbSoloBorrados -> "🗑️ TOTAL BORRADO / ANULADO:"
-            cbVerBorrados && totalBorrados > 0 -> "💰 TOTAL NETO + PAPELERA:"
-            else -> "💰 TOTAL DEL DÍA (HOY):"
-        }
-
-        tvTotalRecaudado?.text = if (cbSoloBorrados) "$totalBorrados Bs" else "$totalNeto Bs"
-        tvTotalRecaudado?.setTextColor(
-            if (cbSoloBorrados) Color.parseColor("#FF5252") else Color.parseColor("#00E676")
+        ejecutarFiltroRegistroBackground(
+            cbCine = cbCine,
+            cbAutitos = cbAutitos,
+            cbDance = cbDance,
+            cbMostrador = cbMostrador,
+            cbEfectivo = cbEfectivo,
+            cbQR = cbQR,
+            cbEgresos = cbEgresos,
+            cbVerBorrados = cbVerBorrados,
+            cbSoloBorrados = cbSoloBorrados,
+            fechaFiltro = fechaFiltro,
+            horaIni = horaIni,
+            horaFin = horaFin,
+            sourceList = snapshotList,
+            sourceSecciones = snapshotSecciones,
+            sourceFiltrosDinamicos = mapaFiltrosDinamicos
         )
+    }
 
-        val egresosTexto = if (totalEgresos > 0) " | 💸 Egresos: -$totalEgresos Bs" else ""
-        val borradosTexto = if (totalBorrados > 0) " | 🗑️ Borrados: $totalBorrados Bs" else ""
-        tvDesgloseTotal?.text = "💵 Efectivo: $totalEfectivo Bs | 📱 QR: $totalQR Bs$egresosTexto$borradosTexto - (${historialFiltrado.size} reg)"
+    private fun ejecutarFiltroRegistroBackground(
+        cbCine: Boolean? = null,
+        cbAutitos: Boolean? = null,
+        cbDance: Boolean? = null,
+        cbMostrador: Boolean? = null,
+        cbEfectivo: Boolean? = null,
+        cbQR: Boolean? = null,
+        cbEgresos: Boolean? = null,
+        cbVerBorrados: Boolean? = null,
+        cbSoloBorrados: Boolean? = null,
+        fechaFiltro: String? = null,
+        horaIni: String? = null,
+        horaFin: String? = null,
+        sourceList: List<RegistroEntry>? = null,
+        sourceSecciones: List<SeccionSala>? = null,
+        sourceFiltrosDinamicos: Map<String, Boolean>? = null
+    ) {
+        jobFiltroRegistro?.cancel()
+        jobFiltroRegistro = lifecycleScope.launch(Dispatchers.Default) {
+            val cine = cbCine ?: (findViewById<CheckBox>(R.id.cbFiltroCine)?.isChecked ?: true)
+            val autitos = cbAutitos ?: (findViewById<CheckBox>(R.id.cbFiltroAutitos)?.isChecked ?: true)
+            val dance = cbDance ?: (findViewById<CheckBox>(R.id.cbFiltroDance)?.isChecked ?: true)
+            val mostrador = cbMostrador ?: (findViewById<CheckBox>(R.id.cbFiltroMostrador)?.isChecked ?: true)
+            val efectivo = cbEfectivo ?: (findViewById<CheckBox>(R.id.cbFiltroEfectivo)?.isChecked ?: true)
+            val qr = cbQR ?: (findViewById<CheckBox>(R.id.cbFiltroQR)?.isChecked ?: true)
+            val egresos = cbEgresos ?: (findViewById<CheckBox>(R.id.cbFiltroEgresos)?.isChecked ?: false)
+            val verBorrados = cbVerBorrados ?: (findViewById<CheckBox>(R.id.cbFiltroBorrados)?.isChecked ?: false)
+            val soloBorrados = cbSoloBorrados ?: (findViewById<CheckBox>(R.id.cbFiltroSoloBorrados)?.isChecked ?: false)
+            val fFiltro = fechaFiltro ?: fechaFiltroSeleccionada
+            val hIni = horaIni ?: horaInicioFiltro
+            val hFin = horaFin ?: horaFinFiltro
 
-        findViewById<Button>(R.id.btnFiltroFecha)?.text = if (fechaFiltroSeleccionada.isNotEmpty()) "📅 $fechaFiltroSeleccionada" else "📅 Todas"
-        findViewById<Button>(R.id.btnFiltroHoraInicio)?.text = if (horaInicioFiltro != null) "⏰ Desde: $horaInicioFiltro" else "⏰ Desde: Inicio"
-        findViewById<Button>(R.id.btnFiltroHoraFin)?.text = if (horaFinFiltro != null) "⏰ Hasta: $horaFinFiltro" else "⏰ Hasta: Fin"
+            val records = sourceList ?: synchronized(historialCompleto) { ArrayList(historialCompleto) }
+            val secciones = sourceSecciones ?: synchronized(listaSecciones) { ArrayList(listaSecciones) }
+            val filtrosDinamicos = sourceFiltrosDinamicos ?: HashMap(filtrosSeccionesDinamicasEstado)
+
+            val seccionesValidas = secciones.filter { sec ->
+                val idLower = sec.id.trim().lowercase()
+                val nomLower = sec.nombre.trim().lowercase()
+                sec.activa &&
+                idLower !in listOf("minicine", "autitos", "just_dance", "cine", "cines", "volantes", "salas") &&
+                nomLower !in listOf("minicine", "autitos", "just dance", "just_dance", "cine", "cines", "volantes", "salas", "autitos (simuladores)")
+            }
+
+            val resultado = ArrayList<RegistroEntry>(records.size)
+
+            for (reg in records) {
+                if (soloBorrados) {
+                    if (!reg.eliminado) continue
+                } else if (!verBorrados) {
+                    if (reg.eliminado) continue
+                }
+
+                if (fFiltro.isNotEmpty()) {
+                    if (!reg.fechaHora.startsWith(fFiltro)) continue
+                }
+
+                if (hIni != null || hFin != null) {
+                    val horaRegistro = if (reg.fechaHora.length >= 16) reg.fechaHora.substring(11, 16) else ""
+                    if (horaRegistro.isNotEmpty()) {
+                        if (hIni != null && horaRegistro < hIni) continue
+                        if (hFin != null && horaRegistro > hFin) continue
+                    }
+                }
+
+                val tipoLower = reg.tipo.trim().lowercase()
+                val nombreLower = reg.nombreElemento.trim().lowercase()
+                val pedidosLower = reg.pedidos.trim().lowercase()
+
+                val esEgreso = tipoLower.contains("egreso") || tipoLower.contains("gasto") ||
+                               nombreLower.contains("egreso") || nombreLower.contains("gasto") ||
+                               pedidosLower.contains("egreso")
+
+                val esMostrador = !esEgreso && (
+                    tipoLower.contains("consumo") || tipoLower.contains("mostrador") ||
+                    tipoLower.contains("venta directa") || tipoLower.contains("producto") ||
+                    tipoLower.contains("snack") || tipoLower.contains("bebida") ||
+                    tipoLower.contains("golosina") ||
+                    nombreLower.startsWith("consumo") || nombreLower.startsWith("venta")
+                )
+
+                val esCine = !esEgreso && !esMostrador && (
+                    tipoLower == "minicine" || tipoLower == "cine" || tipoLower.contains("cine") ||
+                    tipoLower == "salas" || tipoLower == "sala" || tipoLower == "alquiler de sala" ||
+                    nombreLower.contains("cine") ||
+                    (REGEX_SALA_TITULO.matches(nombreLower) &&
+                     !nombreLower.contains("auto") && !nombreLower.contains("volante") &&
+                     !nombreLower.contains("car") && !nombreLower.contains("dance"))
+                )
+
+                val esAutitos = !esEgreso && !esMostrador && !esCine && (
+                    tipoLower.contains("auto") || tipoLower.contains("car") ||
+                    tipoLower.contains("volante") || tipoLower.contains("simulador") ||
+                    nombreLower.contains("auto") || nombreLower.contains("car") ||
+                    nombreLower.contains("volante")
+                )
+
+                val esDance = !esEgreso && !esMostrador && !esCine && !esAutitos && (
+                    tipoLower.contains("dance") || tipoLower.contains("justplay") ||
+                    tipoLower == "just dance" || tipoLower == "just_dance" ||
+                    nombreLower.contains("dance")
+                )
+
+                val seccionCoincidente = if (!esEgreso && !esMostrador && !esCine && !esAutitos && !esDance) {
+                    seccionesValidas.find { sec ->
+                        val secNom = sec.nombre.trim().lowercase()
+                        val secId = sec.id.trim().lowercase()
+                        val secPref = sec.prefijoSala.trim().lowercase()
+
+                        tipoLower == secNom || tipoLower == secId ||
+                        (secNom.isNotBlank() && tipoLower.contains(secNom)) ||
+                        (secPref.isNotBlank() && secPref.length >= 2 && nombreLower.startsWith(secPref)) ||
+                        (secNom.isNotBlank() && nombreLower.startsWith(secNom))
+                    }
+                } else null
+
+                val pasaTipo = when {
+                    esEgreso -> egresos
+                    esMostrador -> mostrador
+                    esCine -> cine
+                    esAutitos -> autitos
+                    esDance -> dance
+                    seccionCoincidente != null -> filtrosDinamicos.getOrDefault(seccionCoincidente.id, true)
+                    else -> mostrador
+                }
+                if (!pasaTipo) continue
+
+                val metodo = reg.metodoPago.lowercase()
+                val pasaPago = when {
+                    metodo.startsWith("mixto") -> (qr && reg.getQRAmount() > 0) || (efectivo && reg.getEfectivoAmount() > 0)
+                    metodo.contains("qr") -> qr
+                    else -> efectivo
+                }
+                if (!pasaPago) continue
+
+                resultado.add(reg)
+            }
+
+            // Ordenamiento por timestamp Long descendente (instantáneo)
+            resultado.sortByDescending {
+                if (it.timestamp > 0L) it.timestamp else {
+                    it.fechaHora.hashCode().toLong()
+                }
+            }
+
+            var totalIngresosCalc = 0.0
+            var totalEgresosCalc = 0.0
+            var totalBorradosCalc = 0.0
+            var egresosEfectivoCalc = 0.0
+            var egresosQRCalc = 0.0
+            var ingresosEfectivoCalc = 0.0
+            var ingresosQRCalc = 0.0
+
+            for (it in resultado) {
+                if (it.eliminado) {
+                    totalBorradosCalc += it.totalCobrado
+                } else {
+                    val esEg = it.tipo.contains("egreso", true) || it.nombreElemento.contains("egreso", true)
+                    if (esEg) {
+                        if (egresos) {
+                            totalEgresosCalc += it.totalCobrado
+                            if (it.metodoPago.contains("QR", true)) {
+                                egresosQRCalc += it.totalCobrado
+                            } else {
+                                egresosEfectivoCalc += it.totalCobrado
+                            }
+                        }
+                    } else {
+                        val efec = if (efectivo) it.getEfectivoAmount() else 0.0
+                        val qram = if (qr) it.getQRAmount() else 0.0
+                        totalIngresosCalc += efec + qram
+                        ingresosEfectivoCalc += efec
+                        ingresosQRCalc += qram
+                    }
+                }
+            }
+
+            val totalNetoCalc = maxOf(0.0, totalIngresosCalc - totalEgresosCalc)
+            val totalEfectivoCalc = maxOf(0.0, ingresosEfectivoCalc - egresosEfectivoCalc)
+            val totalQRCalc = maxOf(0.0, ingresosQRCalc - egresosQRCalc)
+
+            withContext(Dispatchers.Main) {
+                historialFiltrado.clear()
+                historialFiltrado.addAll(resultado)
+                registroAdapter.notifyDataSetChanged()
+
+                val tvTituloTotal = findViewById<TextView>(R.id.tvTituloTotal)
+                val tvTotalRecaudado = findViewById<TextView>(R.id.tvTotalRecaudado)
+                val tvDesgloseTotal = findViewById<TextView>(R.id.tvDesgloseTotal)
+
+                tvTituloTotal?.text = when {
+                    soloBorrados -> "🗑️ TOTAL BORRADO / ANULADO:"
+                    verBorrados && totalBorradosCalc > 0 -> "💰 TOTAL NETO + PAPELERA:"
+                    else -> "💰 TOTAL DEL DÍA (HOY):"
+                }
+
+                tvTotalRecaudado?.text = if (soloBorrados) "$totalBorradosCalc Bs" else "$totalNetoCalc Bs"
+                tvTotalRecaudado?.setTextColor(
+                    if (soloBorrados) Color.parseColor("#FF5252") else Color.parseColor("#00E676")
+                )
+
+                val egresosTexto = if (totalEgresosCalc > 0) " | 💸 Egresos: -$totalEgresosCalc Bs" else ""
+                val borradosTexto = if (verBorrados && totalBorradosCalc > 0) " | 🗑️ Borrados: $totalBorradosCalc Bs" else ""
+                tvDesgloseTotal?.text = "💵 Efectivo: $totalEfectivoCalc Bs | 📱 QR: $totalQRCalc Bs$egresosTexto$borradosTexto - (${resultado.size} reg)"
+
+                findViewById<Button>(R.id.btnFiltroFecha)?.text = if (fFiltro.isNotEmpty()) "📅 $fFiltro" else "📅 Todas"
+                findViewById<Button>(R.id.btnFiltroHoraInicio)?.text = if (hIni != null) "⏰ Desde: $hIni" else "⏰ Desde: Inicio"
+                findViewById<Button>(R.id.btnFiltroHoraFin)?.text = if (hFin != null) "⏰ Hasta: $hFin" else "⏰ Hasta: Fin"
+            }
+        }
     }
 
     // ==========================================
     // LOGICA DE AUDITORIA Y TRAZABILIDAD DEDICADA
     // ==========================================
     private fun cargarYActualizarAuditoria() {
-        listaAuditoriaEventos.clear()
-
-        // 1. Eventos directos de salas (inicio, edición de parámetros, finalización, eliminación)
-        listaAuditoriaEventos.addAll(eventosSalasAudit)
-
-        // 2. Eventos desde auditoria_registros (ventas, consumos, sesiones, eliminaciones)
-        for (reg in historialCompleto) {
-            val tipoEv = when {
-                reg.eliminado -> TipoAuditoriaEvento.ELIMINACION
-                reg.tipo.equals("Egreso", ignoreCase = true) || reg.nombreElemento.startsWith("Egreso", ignoreCase = true) -> TipoAuditoriaEvento.EGRESO
-                reg.tipo.equals("Consumo", ignoreCase = true) || reg.tipo.equals("Venta Directa", ignoreCase = true) || reg.nombreElemento.contains("Mostrador", ignoreCase = true) -> TipoAuditoriaEvento.VENTA
-                else -> TipoAuditoriaEvento.SALA_INICIO
-            }
-
-            val badge = when (tipoEv) {
-                TipoAuditoriaEvento.ELIMINACION -> "🗑️ REGISTRO BORRADO"
-                TipoAuditoriaEvento.EGRESO -> "💸 EGRESO"
-                TipoAuditoriaEvento.VENTA -> "🛒 VENTA"
-                TipoAuditoriaEvento.SALA_INICIO -> "🎬 SESIÓN SALA"
-                else -> "📋 REGISTRO"
-            }
-
-            val userResponsable = if (reg.eliminado) {
-                if (!reg.eliminadoPor.isNullOrBlank()) reg.eliminadoPor!! else (reg.creadoPor ?: "Personal")
-            } else {
-                if (!reg.creadoPor.isNullOrBlank()) reg.creadoPor!! else "Personal"
-            }
-
-            val fHora = if (reg.eliminado && !reg.fechaEliminacion.isNullOrBlank()) reg.fechaEliminacion!! else reg.fechaHora
-
-            val det = when {
-                reg.eliminado -> "Registro borrado de BD. ${if (!reg.motivoEliminacion.isNullOrBlank()) "Motivo: ${reg.motivoEliminacion}" else ""}"
-                tipoEv == TipoAuditoriaEvento.EGRESO -> "Egreso registrado: ${reg.cliente}"
-                tipoEv == TipoAuditoriaEvento.VENTA -> reg.pedidos.ifEmpty { "Venta directa mostrador" }
-                else -> "Película/Juego: ${reg.peliculaJuego ?: "N/A"} | Tiempo: ${reg.tiempoConfigurado ?: "N/A"}${if (reg.pedidos.isNotBlank()) " | Consumos: ${reg.pedidos}" else ""}"
-            }
-
-            listaAuditoriaEventos.add(
-                AuditoriaEvento(
-                    id = reg.idFirebase,
-                    tipo = tipoEv,
-                    tituloBadge = badge,
-                    usuarioNombre = userResponsable,
-                    usuarioRol = if (reg.eliminado) "Eliminación" else "Registro",
-                    dispositivo = "",
-                    fechaHora = fHora,
-                    timestamp = reg.timestamp,
-                    elemento = if (reg.tipo.isNotBlank() && !reg.nombreElemento.startsWith(reg.tipo, ignoreCase = true)) "${reg.tipo} - ${reg.nombreElemento}" else reg.nombreElemento,
-                    cliente = reg.cliente,
-                    celular = reg.celular,
-                    monto = reg.totalCobrado,
-                    metodoPago = reg.metodoPago,
-                    comprobanteUri = reg.comprobanteUri,
-                    detalles = det
-                )
-            )
-        }
-
-        // Ordenar cronológicamente descendente
-        listaAuditoriaEventos.sortByDescending {
-            if (it.timestamp > 0L) it.timestamp else {
-                try {
-                    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse(it.fechaHora.take(16))?.time ?: 0L
-                } catch (e: Exception) { 0L }
-            }
-        }
-
-        aplicarFiltrosAuditoria()
+        ejecutarActualizacionAuditoriaBackground(debounceMs = 0L)
     }
 
     private fun aplicarFiltrosAuditoria() {
+        ejecutarActualizacionAuditoriaBackground(debounceMs = 0L)
+    }
+
+    private fun ejecutarActualizacionAuditoriaBackground(debounceMs: Long = 0L) {
         if (!::auditoriaAdapter.isInitialized) return
-
-        val q = auditQueryTexto.trim().lowercase()
-        listaAuditoriaFiltrada.clear()
-
-        for (ev in listaAuditoriaEventos) {
-            // 1. Filtro Tipo
-            val coincideTipo = when (auditFiltroTipo) {
-                "VENTAS" -> ev.tipo == TipoAuditoriaEvento.VENTA || ev.tipo == TipoAuditoriaEvento.EGRESO
-                "SALAS" -> ev.tipo == TipoAuditoriaEvento.SALA_INICIO || ev.tipo == TipoAuditoriaEvento.FINALIZACION
-                "MODIF" -> ev.tipo == TipoAuditoriaEvento.MODIFICACION
-                "BORRADOS" -> ev.tipo == TipoAuditoriaEvento.ELIMINACION
-                else -> true
-            }
-            if (!coincideTipo) continue
-
-            // 2. Filtro Fecha
-            if (!auditFiltroFecha.isNullOrEmpty()) {
-                if (!ev.fechaHora.startsWith(auditFiltroFecha!!)) continue
+        jobFiltroAuditoria?.cancel()
+        jobFiltroAuditoria = lifecycleScope.launch(Dispatchers.Default) {
+            if (debounceMs > 0L) {
+                delay(debounceMs)
             }
 
-            // 3. Filtro Búsqueda libre
-            if (q.isNotEmpty()) {
-                val enUser = ev.usuarioNombre.lowercase().contains(q) || ev.usuarioRol.lowercase().contains(q)
-                val enDisp = ev.dispositivo.lowercase().contains(q)
-                val enElem = ev.elemento.lowercase().contains(q)
-                val enCli = ev.cliente.lowercase().contains(q) || (ev.celular ?: "").lowercase().contains(q)
-                val enDet = ev.detalles.lowercase().contains(q) || ev.tituloBadge.lowercase().contains(q)
-                if (!enUser && !enDisp && !enElem && !enCli && !enDet) continue
+            val q = auditQueryTexto.trim().lowercase()
+            val tipoFiltro = auditFiltroTipo
+            val fechaFiltro = auditFiltroFecha
+
+            val eventosSalasSnapshot = synchronized(eventosSalasAudit) { ArrayList(eventosSalasAudit) }
+            val historialSnapshot = synchronized(historialCompleto) { ArrayList(historialCompleto) }
+
+            val eventos = ArrayList<AuditoriaEvento>(eventosSalasSnapshot.size + historialSnapshot.size)
+            eventos.addAll(eventosSalasSnapshot)
+
+            for (reg in historialSnapshot) {
+                val tipoEv = when {
+                    reg.eliminado -> TipoAuditoriaEvento.ELIMINACION
+                    reg.tipo.equals("Egreso", ignoreCase = true) || reg.nombreElemento.startsWith("Egreso", ignoreCase = true) -> TipoAuditoriaEvento.EGRESO
+                    reg.tipo.equals("Consumo", ignoreCase = true) || reg.tipo.equals("Venta Directa", ignoreCase = true) || reg.nombreElemento.contains("Mostrador", ignoreCase = true) -> TipoAuditoriaEvento.VENTA
+                    else -> TipoAuditoriaEvento.SALA_INICIO
+                }
+
+                val badge = when (tipoEv) {
+                    TipoAuditoriaEvento.ELIMINACION -> "🗑️ REGISTRO BORRADO"
+                    TipoAuditoriaEvento.EGRESO -> "💸 EGRESO"
+                    TipoAuditoriaEvento.VENTA -> "🛒 VENTA"
+                    TipoAuditoriaEvento.SALA_INICIO -> "🎬 SESIÓN SALA"
+                    else -> "📋 REGISTRO"
+                }
+
+                val userResponsable = if (reg.eliminado) {
+                    if (!reg.eliminadoPor.isNullOrBlank()) reg.eliminadoPor!! else (reg.creadoPor ?: "Personal")
+                } else {
+                    if (!reg.creadoPor.isNullOrBlank()) reg.creadoPor!! else "Personal"
+                }
+
+                val fHora = if (reg.eliminado && !reg.fechaEliminacion.isNullOrBlank()) reg.fechaEliminacion!! else reg.fechaHora
+
+                val det = when {
+                    reg.eliminado -> "Registro borrado de BD. ${if (!reg.motivoEliminacion.isNullOrBlank()) "Motivo: ${reg.motivoEliminacion}" else ""}"
+                    tipoEv == TipoAuditoriaEvento.EGRESO -> "Egreso registrado: ${reg.cliente}"
+                    tipoEv == TipoAuditoriaEvento.VENTA -> reg.pedidos.ifEmpty { "Venta directa mostrador" }
+                    else -> "Película/Juego: ${reg.peliculaJuego ?: "N/A"} | Tiempo: ${reg.tiempoConfigurado ?: "N/A"}${if (reg.pedidos.isNotBlank()) " | Consumos: ${reg.pedidos}" else ""}"
+                }
+
+                eventos.add(
+                    AuditoriaEvento(
+                        id = reg.idFirebase,
+                        tipo = tipoEv,
+                        tituloBadge = badge,
+                        usuarioNombre = userResponsable,
+                        usuarioRol = if (reg.eliminado) "Eliminación" else "Registro",
+                        dispositivo = "",
+                        fechaHora = fHora,
+                        timestamp = reg.timestamp,
+                        elemento = if (reg.tipo.isNotBlank() && !reg.nombreElemento.startsWith(reg.tipo, ignoreCase = true)) "${reg.tipo} - ${reg.nombreElemento}" else reg.nombreElemento,
+                        cliente = reg.cliente,
+                        celular = reg.celular,
+                        monto = reg.totalCobrado,
+                        metodoPago = reg.metodoPago,
+                        comprobanteUri = reg.comprobanteUri,
+                        detalles = det
+                    )
+                )
             }
 
-            listaAuditoriaFiltrada.add(ev)
+            // Ordenar por timestamp Long descendente (instantáneo, sin instanciar SimpleDateFormat)
+            eventos.sortByDescending { it.timestamp }
+
+            val filtrados = ArrayList<AuditoriaEvento>(eventos.size)
+            var countVentas = 0
+            var countSalas = 0
+            var countModif = 0
+            var countBorrados = 0
+
+            for (ev in eventos) {
+                // 1. Filtro Tipo
+                val coincideTipo = when (tipoFiltro) {
+                    "VENTAS" -> ev.tipo == TipoAuditoriaEvento.VENTA || ev.tipo == TipoAuditoriaEvento.EGRESO
+                    "SALAS" -> ev.tipo == TipoAuditoriaEvento.SALA_INICIO || ev.tipo == TipoAuditoriaEvento.FINALIZACION
+                    "MODIF" -> ev.tipo == TipoAuditoriaEvento.MODIFICACION
+                    "BORRADOS" -> ev.tipo == TipoAuditoriaEvento.ELIMINACION
+                    else -> true
+                }
+                if (!coincideTipo) continue
+
+                // 2. Filtro Fecha
+                if (!fechaFiltro.isNullOrEmpty()) {
+                    if (!ev.fechaHora.startsWith(fechaFiltro)) continue
+                }
+
+                // 3. Filtro Búsqueda libre
+                if (q.isNotEmpty()) {
+                    val enUser = ev.usuarioNombre.lowercase().contains(q) || ev.usuarioRol.lowercase().contains(q)
+                    val enDisp = ev.dispositivo.lowercase().contains(q)
+                    val enElem = ev.elemento.lowercase().contains(q)
+                    val enCli = ev.cliente.lowercase().contains(q) || (ev.celular ?: "").lowercase().contains(q)
+                    val enDet = ev.detalles.lowercase().contains(q) || ev.tituloBadge.lowercase().contains(q)
+                    if (!enUser && !enDisp && !enElem && !enCli && !enDet) continue
+                }
+
+                filtrados.add(ev)
+
+                when (ev.tipo) {
+                    TipoAuditoriaEvento.VENTA, TipoAuditoriaEvento.EGRESO -> countVentas++
+                    TipoAuditoriaEvento.SALA_INICIO, TipoAuditoriaEvento.FINALIZACION -> countSalas++
+                    TipoAuditoriaEvento.MODIFICACION -> countModif++
+                    TipoAuditoriaEvento.ELIMINACION -> countBorrados++
+                    else -> {}
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                listaAuditoriaEventos.clear()
+                listaAuditoriaEventos.addAll(eventos)
+                listaAuditoriaFiltrada.clear()
+                listaAuditoriaFiltrada.addAll(filtrados)
+                auditoriaAdapter.notifyDataSetChanged()
+
+                val tvVacio = findViewById<TextView>(R.id.tvAuditoriaVacio)
+                tvVacio?.visibility = if (filtrados.isEmpty()) View.VISIBLE else View.GONE
+
+                val tvContador = findViewById<TextView>(R.id.tvAuditoriaContador)
+                tvContador?.text = "${filtrados.size} eventos"
+
+                val tvResumen = findViewById<TextView>(R.id.tvAuditoriaResumen)
+                val fechaText = if (!fechaFiltro.isNullOrEmpty()) "del $fechaFiltro" else "totales"
+                tvResumen?.text = "📊 ${filtrados.size} acciones registradas ($fechaText)"
+
+                val tvDesglose = findViewById<TextView>(R.id.tvAuditoriaDesglose)
+                tvDesglose?.text = "🛒 $countVentas Ventas | 🎬 $countSalas Salas | ✏️ $countModif Modif. | 🗑️ $countBorrados Eliminados"
+
+                auditoriaPendienteActualizar = false
+            }
         }
-
-        auditoriaAdapter.notifyDataSetChanged()
-
-        val tvVacio = findViewById<TextView>(R.id.tvAuditoriaVacio)
-        tvVacio?.visibility = if (listaAuditoriaFiltrada.isEmpty()) View.VISIBLE else View.GONE
-
-        val tvContador = findViewById<TextView>(R.id.tvAuditoriaContador)
-        tvContador?.text = "${listaAuditoriaFiltrada.size} eventos"
-
-        val countVentas = listaAuditoriaFiltrada.count { it.tipo == TipoAuditoriaEvento.VENTA || it.tipo == TipoAuditoriaEvento.EGRESO }
-        val countSalas = listaAuditoriaFiltrada.count { it.tipo == TipoAuditoriaEvento.SALA_INICIO || it.tipo == TipoAuditoriaEvento.FINALIZACION }
-        val countModif = listaAuditoriaFiltrada.count { it.tipo == TipoAuditoriaEvento.MODIFICACION }
-        val countBorrados = listaAuditoriaFiltrada.count { it.tipo == TipoAuditoriaEvento.ELIMINACION }
-
-        val tvResumen = findViewById<TextView>(R.id.tvAuditoriaResumen)
-        val fechaText = if (!auditFiltroFecha.isNullOrEmpty()) "del $auditFiltroFecha" else "totales"
-        tvResumen?.text = "📊 ${listaAuditoriaFiltrada.size} acciones registradas ($fechaText)"
-
-        val tvDesglose = findViewById<TextView>(R.id.tvAuditoriaDesglose)
-        tvDesglose?.text = "🛒 $countVentas Ventas | 🎬 $countSalas Salas | ✏️ $countModif Modif. | 🗑️ $countBorrados Eliminados"
     }
 
     private fun actualizarEstilosBotonesTipoAuditoria() {

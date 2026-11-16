@@ -12,6 +12,11 @@ data class Pedido(
     fun subtotal(): Double = cantidad * precioUnidad
 }
 
+private val REGEX_EFEC_1 = Regex("""(?i)(?:efec|ef|💵)\s*:?\s*([\d.]+)""")
+private val REGEX_EFEC_2 = Regex("""(?i)([\d.]+)\s*(?:efec|ef|💵|bs)""")
+private val REGEX_QR_1 = Regex("""(?i)(?:qr|📱)\s*:?\s*([\d.]+)""")
+private val REGEX_QR_2 = Regex("""(?i)([\d.]+)\s*(?:qr|📱)""")
+
 data class Sala(
     var id: Int = 0,
     var idFirebase: String = "",
@@ -45,13 +50,11 @@ data class Sala(
         // 2. Si es Mixto, calcular porción de efectivo
         if (cleanMetodo.startsWith("mixto") || cleanMetodo.contains("mixto")) {
             if (montoEfectivo > 0.0) return montoEfectivo
-            val regex1 = Regex("""(?i)(?:efec|ef|💵)\s*:?\s*([\d.]+)""")
-            val match1 = regex1.find(metodoPago)
+            val match1 = REGEX_EFEC_1.find(metodoPago)
             if (match1 != null) {
                 return match1.groupValues[1].toDoubleOrNull() ?: (total / 2)
             }
-            val regex2 = Regex("""(?i)([\d.]+)\s*(?:efec|ef|💵|bs)""")
-            val match2 = regex2.find(metodoPago)
+            val match2 = REGEX_EFEC_2.find(metodoPago)
             if (match2 != null) {
                 return match2.groupValues[1].toDoubleOrNull() ?: (total / 2)
             }
@@ -72,13 +75,11 @@ data class Sala(
         // 2. Si es Mixto, calcular porción de QR
         if (cleanMetodo.startsWith("mixto") || cleanMetodo.contains("mixto")) {
             if (montoQR > 0.0) return montoQR
-            val regex1 = Regex("""(?i)(?:qr|📱)\s*:?\s*([\d.]+)""")
-            val match1 = regex1.find(metodoPago)
+            val match1 = REGEX_QR_1.find(metodoPago)
             if (match1 != null) {
                 return match1.groupValues[1].toDoubleOrNull() ?: maxOf(0.0, total - getEfectivoAmount())
             }
-            val regex2 = Regex("""(?i)([\d.]+)\s*(?:qr|📱)""")
-            val match2 = regex2.find(metodoPago)
+            val match2 = REGEX_QR_2.find(metodoPago)
             if (match2 != null) {
                 return match2.groupValues[1].toDoubleOrNull() ?: maxOf(0.0, total - getEfectivoAmount())
             }
@@ -150,13 +151,11 @@ data class RegistroEntry(
         // 2. Si es Mixto, calcular porción de efectivo
         if (cleanMetodo.startsWith("mixto") || cleanMetodo.contains("mixto")) {
             if (montoEfectivo > 0.0) return montoEfectivo
-            val regex1 = Regex("""(?i)(?:efec|ef|💵)\s*:?\s*([\d.]+)""")
-            val match1 = regex1.find(metodoPago)
+            val match1 = REGEX_EFEC_1.find(metodoPago)
             if (match1 != null) {
                 return match1.groupValues[1].toDoubleOrNull() ?: (totalCobrado / 2)
             }
-            val regex2 = Regex("""(?i)([\d.]+)\s*(?:efec|ef|💵|bs)""")
-            val match2 = regex2.find(metodoPago)
+            val match2 = REGEX_EFEC_2.find(metodoPago)
             if (match2 != null) {
                 return match2.groupValues[1].toDoubleOrNull() ?: (totalCobrado / 2)
             }
@@ -176,13 +175,11 @@ data class RegistroEntry(
         // 2. Si es Mixto, calcular porción de QR
         if (cleanMetodo.startsWith("mixto") || cleanMetodo.contains("mixto")) {
             if (montoQR > 0.0) return montoQR
-            val regex1 = Regex("""(?i)(?:qr|📱)\s*:?\s*([\d.]+)""")
-            val match1 = regex1.find(metodoPago)
+            val match1 = REGEX_QR_1.find(metodoPago)
             if (match1 != null) {
                 return match1.groupValues[1].toDoubleOrNull() ?: maxOf(0.0, totalCobrado - getEfectivoAmount())
             }
-            val regex2 = Regex("""(?i)([\d.]+)\s*(?:qr|📱)""")
-            val match2 = regex2.find(metodoPago)
+            val match2 = REGEX_QR_2.find(metodoPago)
             if (match2 != null) {
                 return match2.groupValues[1].toDoubleOrNull() ?: maxOf(0.0, totalCobrado - getEfectivoAmount())
             }

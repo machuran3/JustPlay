@@ -777,20 +777,20 @@ class PosViewModel(
         val currentRoom = _uiState.value.selectedRoomForDetail ?: return
         if (product.currentStock <= 0) {
             _uiState.update {
-                it.copy(roomActionMessage = "⚠️ PRODUCTO AGOTADO: '${product.name}' (Stock: 0). No se puede vender.")
+                it.copy(roomActionMessage = "⚠️ PRODUCTO AGOTADO: '${product.displayName}' (Stock: 0). No se puede vender.")
             }
             return
         }
 
         val existingInRoom = if (currentRoom.estado == com.justplay.pos.core.models.RoomState.OCUPADA) {
-            currentRoom.pedidos.filter { it.nombre.equals(product.name, ignoreCase = true) }.sumOf { it.cantidad }
+            currentRoom.pedidos.filter { it.nombre.equals(product.displayName, ignoreCase = true) || it.nombre.equals(product.name, ignoreCase = true) }.sumOf { it.cantidad }
         } else {
-            _uiState.value.roomPendingOrders.filter { it.nombre.equals(product.name, ignoreCase = true) }.sumOf { it.cantidad }
+            _uiState.value.roomPendingOrders.filter { it.nombre.equals(product.displayName, ignoreCase = true) || it.nombre.equals(product.name, ignoreCase = true) }.sumOf { it.cantidad }
         }
 
         if (existingInRoom + quantity > product.currentStock) {
             _uiState.update {
-                it.copy(roomActionMessage = "⚠️ Stock insuficiente de '${product.name}' (Stock: ${product.currentStock}, ya agregados: $existingInRoom).")
+                it.copy(roomActionMessage = "⚠️ Stock insuficiente de '${product.displayName}' (Stock: ${product.currentStock}, ya agregados: $existingInRoom).")
             }
             return
         }
@@ -798,7 +798,7 @@ class PosViewModel(
         val newOrder = com.justplay.pos.core.models.RoomOrder(
             idFirebase = "ORD_${System.currentTimeMillis()}",
             cantidad = quantity,
-            nombre = product.name,
+            nombre = product.displayName,
             precioUnidad = product.unitPrice,
             estaEntregado = true
         )
@@ -812,7 +812,7 @@ class PosViewModel(
                         val updatedList = currentRoom.pedidos + newOrder
                         it.copy(
                             selectedRoomForDetail = currentRoom.copy(pedidos = updatedList),
-                            roomActionMessage = "🍿 Consumo agregado: ${product.name}"
+                            roomActionMessage = "🍿 Consumo agregado: ${product.displayName}"
                         )
                     }
                 }
@@ -822,7 +822,7 @@ class PosViewModel(
             _uiState.update {
                 it.copy(
                     roomPendingOrders = it.roomPendingOrders + newOrder,
-                    roomActionMessage = "🍿 Consumo pre-agregado: ${product.name}"
+                    roomActionMessage = "🍿 Consumo pre-agregado: ${product.displayName}"
                 )
             }
         }
@@ -1263,7 +1263,11 @@ class PosViewModel(
         val q = query.trim().lowercase()
         return all.filter { p ->
             val matchCat = category == "Todos" || p.category.equals(category, ignoreCase = true)
-            val matchQuery = q.isEmpty() || p.name.lowercase().contains(q) || p.barcode.contains(q)
+            val matchQuery = q.isEmpty() ||
+                    p.name.lowercase().contains(q) ||
+                    p.displayName.lowercase().contains(q) ||
+                    p.barcode.contains(q) ||
+                    p.gramaje.lowercase().contains(q)
             matchCat && matchQuery && p.active
         }
     }

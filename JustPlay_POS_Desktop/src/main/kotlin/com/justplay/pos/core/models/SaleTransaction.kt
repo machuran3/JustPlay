@@ -28,7 +28,7 @@ data class SaleTransaction(
      * Ejemplo: "2x Coca Cola 500ml (20.0 Bs), 1x Pipocas Grandes (15.0 Bs)"
      */
     val formattedSummary: String
-        get() = items.joinToString(", ") { "${it.quantity}x ${it.product.name} (${it.subtotal} Bs)" }
+        get() = items.joinToString(", ") { "${it.quantity}x ${it.product.displayName} (${it.subtotal} Bs)" }
 }
 
 enum class SyncStatus {

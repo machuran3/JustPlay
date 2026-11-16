@@ -99,12 +99,20 @@ fun ProductManagerDialog(
                 (initialProduct == null || !cleanBarcode.equals(initialProduct.barcode.trim(), ignoreCase = true))
     }
 
-    val isDuplicateName = cleanName.isNotBlank() && existingProducts.any {
+    fun normalizeGramaje(g: String) = g.trim().replace("\\s+".toRegex(), "").lowercase()
+
+    val isDuplicateNameAndGramaje = cleanName.isNotBlank() && existingProducts.any {
+        it.barcode.trim() != (initialProduct?.barcode?.trim() ?: "") &&
+                it.name.trim().equals(cleanName, ignoreCase = true) &&
+                normalizeGramaje(it.gramaje) == normalizeGramaje(effectiveGramaje)
+    }
+
+    val hasSameNameDifferentGramaje = cleanName.isNotBlank() && !isDuplicateNameAndGramaje && existingProducts.any {
         it.barcode.trim() != (initialProduct?.barcode?.trim() ?: "") &&
                 it.name.trim().equals(cleanName, ignoreCase = true)
     }
 
-    val canSave = cleanBarcode.isNotBlank() && cleanName.isNotBlank() && !isDuplicateBarcode && !isDuplicateName && !isCostInvalid && parsedPrice > 0.0
+    val canSave = cleanBarcode.isNotBlank() && cleanName.isNotBlank() && !isDuplicateBarcode && !isDuplicateNameAndGramaje && !isCostInvalid && parsedPrice > 0.0
 
     val performSave: () -> Unit = {
         if (canSave && !isSaving) {
@@ -202,13 +210,13 @@ fun ProductManagerDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Nombre del Producto", fontSize = 12.sp) },
-                    isError = isDuplicateName,
+                    isError = isDuplicateNameAndGramaje,
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = SurfaceDark,
                         unfocusedContainerColor = SurfaceDark,
-                        focusedBorderColor = if (isDuplicateName) AlertRed else AccentLime,
-                        unfocusedBorderColor = if (isDuplicateName) AlertRed else BorderDark,
+                        focusedBorderColor = if (isDuplicateNameAndGramaje) AlertRed else AccentLime,
+                        unfocusedBorderColor = if (isDuplicateNameAndGramaje) AlertRed else BorderDark,
                         errorBorderColor = AlertRed,
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary
@@ -216,10 +224,23 @@ fun ProductManagerDialog(
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
-                if (isDuplicateName) {
+                if (isDuplicateNameAndGramaje) {
+                    val duplicateMsg = if (effectiveGramaje.isNotBlank()) {
+                        "❌ Ya existe otro producto registrado con el mismo nombre y gramaje/volumen ($cleanName $effectiveGramaje)."
+                    } else {
+                        "❌ Ya existe un producto con el nombre '$cleanName'. Ingresa el gramaje/volumen para diferenciarlo (ej: 500 ml, 2 L)."
+                    }
                     Text(
-                        text = "❌ Ya existe otro producto registrado con este nombre.",
+                        text = duplicateMsg,
                         color = AlertRed,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                    )
+                } else if (hasSameNameDifferentGramaje) {
+                    Text(
+                        text = "ℹ️ Se registrará como variante de presentación de '$cleanName' (${effectiveGramaje.ifBlank { "otra presentación" }}).",
+                        color = AccentLime,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(start = 4.dp, top = 2.dp)

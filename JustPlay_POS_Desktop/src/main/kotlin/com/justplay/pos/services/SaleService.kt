@@ -98,7 +98,7 @@ class SaleService(
             }
             val outOfStockItems = current.filter { it.product.currentStock <= 0 || it.quantity > it.product.currentStock }
             if (outOfStockItems.isNotEmpty()) {
-                val names = outOfStockItems.joinToString(", ") { "${it.product.name} (Stock: ${it.product.currentStock})" }
+                val names = outOfStockItems.joinToString(", ") { "${it.product.displayName} (Stock: ${it.product.currentStock})" }
                 return Result.failure(IllegalStateException("No se puede cobrar: productos sin stock suficiente: $names (evita venta fantasma)"))
             }
             items = current.toList()
@@ -165,7 +165,7 @@ class SaleService(
                     val order = RoomOrder(
                         idFirebase = "ORD_${System.currentTimeMillis()}_${item.product.barcode}",
                         cantidad = item.quantity,
-                        nombre = item.product.name,
+                        nombre = item.product.displayName,
                         precioUnidad = item.product.unitPrice,
                         estaEntregado = true
                     )

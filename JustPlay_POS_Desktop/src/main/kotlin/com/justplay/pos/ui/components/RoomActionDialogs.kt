@@ -192,7 +192,7 @@ fun RoomDetailDialog(
             catalogProducts.take(8)
         } else {
             catalogProducts.filter {
-                it.name.lowercase().contains(q) || it.barcode.contains(q) || it.category.lowercase().contains(q)
+                it.name.lowercase().contains(q) || it.displayName.lowercase().contains(q) || it.gramaje.lowercase().contains(q) || it.barcode.contains(q) || it.category.lowercase().contains(q)
             }.take(8)
         }
     }
@@ -1303,7 +1303,7 @@ fun RoomDetailDialog(
                                         .weight(1f)
                                         .onKeyEvent { keyEvent ->
                                             if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Enter) {
-                                                val found = catalogProducts.find { it.barcode == barcodeSearchInput.trim() || it.name.equals(barcodeSearchInput.trim(), ignoreCase = true) }
+                                                val found = catalogProducts.find { it.barcode == barcodeSearchInput.trim() || it.displayName.equals(barcodeSearchInput.trim(), ignoreCase = true) || it.name.equals(barcodeSearchInput.trim(), ignoreCase = true) }
                                                 if (found != null) {
                                                     onAddProduct(found)
                                                     barcodeSearchInput = ""
@@ -1324,7 +1324,7 @@ fun RoomDetailDialog(
 
                                 Button(
                                     onClick = {
-                                        val found = catalogProducts.find { it.barcode == barcodeSearchInput.trim() || it.name.equals(barcodeSearchInput.trim(), ignoreCase = true) }
+                                        val found = catalogProducts.find { it.barcode == barcodeSearchInput.trim() || it.displayName.equals(barcodeSearchInput.trim(), ignoreCase = true) || it.name.equals(barcodeSearchInput.trim(), ignoreCase = true) }
                                             ?: filteredCatalog.firstOrNull()
                                         if (found != null) {
                                             onAddProduct(found)
@@ -1366,7 +1366,7 @@ fun RoomDetailDialog(
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     Column(modifier = Modifier.weight(1f)) {
-                                                        Text(prod.name, color = if (isProdOut) TextMuted else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        Text(prod.displayName, color = if (isProdOut) TextMuted else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                                         Text(if (isProdOut) "🚫 Agotado (0)" else "${prod.unitPrice} Bs (${prod.currentStock} disp.)", color = if (isProdOut) AlertRed else AccentLime, fontSize = 10.sp)
                                                     }
                                                     if (!isProdOut) {

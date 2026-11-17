@@ -1504,11 +1504,20 @@ class MainActivity : AppCompatActivity() {
         database.child("config_pos").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 try {
-                    val minVer = snapshot.child("min_app_version_desktop").getValue(String::class.java) ?: "1.0.0"
+                    val minVer = snapshot.child("min_app_version").getValue(String::class.java)
+                        ?: snapshot.child("min_app_version_mobile").getValue(String::class.java)
+                        ?: snapshot.child("min_app_version_desktop").getValue(String::class.java)
+                        ?: "1.0.0"
+
+                    val versionActual = AppUpdateManager.obtenerVersionAppActual(this@MainActivity)
+                    if (AppUpdateManager.esVersionSuperior(minVer, versionActual)) {
+                        AppUpdateManager.verificarActualizacion(this@MainActivity, "AdminJustPlay", forzarObligatoria = true)
+                    }
+
                     val permitirTodas = snapshot.child("permitir_todas_las_pc").getValue(Boolean::class.java)
                         ?: snapshot.child("habilitado").getValue(Boolean::class.java) ?: true
 
-                    findViewById<TextView>(R.id.tvVersionMinimaPos)?.text = "Versión mínima requerida actual: v$minVer"
+                    findViewById<TextView>(R.id.tvVersionMinimaPos)?.text = "Versión mínima requerida (Desktop y Celular): v$minVer"
                     findViewById<androidx.appcompat.widget.SwitchCompat>(R.id.switchPermitirVentasTodasPc)?.let { sw ->
                         sw.setOnCheckedChangeListener(null)
                         sw.isChecked = permitirTodas

@@ -60,7 +60,7 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe
             )
             packageName = "JustPlayPOS"
-            packageVersion = "1.0.3"
+            packageVersion = "1.0.4"
             description = "JustPlay POS Scanner & Sales Desktop App"
             copyright = "© 2026 Just Play System"
             vendor = "Just Play"

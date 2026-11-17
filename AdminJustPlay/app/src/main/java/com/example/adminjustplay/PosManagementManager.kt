@@ -215,25 +215,41 @@ class PosManagementManager(
 
     fun mostrarDialogoCambiarVersionMinima() {
         val etVersion = EditText(context).apply {
-            hint = "Ej: 1.0.0 o 1.1.0"
+            hint = "Ej: 1.0.4"
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
         }
 
-        database.child("config_pos").child("min_app_version_desktop").get().addOnSuccessListener { snap ->
-            val v = snap.getValue(String::class.java) ?: "1.0.0"
+        database.child("config_pos").get().addOnSuccessListener { snap ->
+            val v = snap.child("min_app_version").getValue(String::class.java)
+                ?: snap.child("min_app_version_desktop").getValue(String::class.java)
+                ?: snap.child("min_app_version_mobile").getValue(String::class.java)
+                ?: "1.0.0"
             etVersion.setText(v)
         }
 
         AlertDialog.Builder(context)
-            .setTitle("🛡️ Establecer Versión Mínima (Force Update)")
-            .setMessage("Las versiones de Desktop inferiores a esta versión serán bloqueadas automáticamente con error HTTP 426.")
+            .setTitle("🛡️ Versión Mínima Requerida (Desktop y Celular)")
+            .setMessage("Las aplicaciones de Celular (Admin y Empleado) y terminales Desktop con versiones inferiores a esta serán bloqueadas obligatoriamente hasta que se actualicen.")
             .setView(etVersion)
             .setPositiveButton("Guardar") { _, _ ->
                 val newVer = etVersion.text.toString().trim()
                 if (newVer.isNotEmpty()) {
-                    database.child("config_pos").child("min_app_version_desktop").setValue(newVer)
-                    Toast.makeText(context, "Versión mínima establecida en v$newVer", Toast.LENGTH_SHORT).show()
+                    val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
+                    val updates = mapOf<String, Any>(
+                        "min_app_version" to newVer,
+                        "min_app_version_desktop" to newVer,
+                        "min_app_version_mobile" to newVer,
+                        "ultima_modificacion_version" to fecha,
+                        "modificado_por" to "Admin (${DeviceInfoProvider.getDeviceModel()})"
+                    )
+                    database.child("config_pos").updateChildren(updates)
+                    // Sincronizar también con config_actualizaciones
+                    database.child("config_actualizaciones").child("AdminJustPlay").child("minVersion").setValue(newVer)
+                    database.child("config_actualizaciones").child("AdminJustPlay").child("esObligatoria").setValue(true)
+                    database.child("config_actualizaciones").child("Employ_JustPlay").child("minVersion").setValue(newVer)
+                    database.child("config_actualizaciones").child("Employ_JustPlay").child("esObligatoria").setValue(true)
+                    Toast.makeText(context, "Versión mínima v$newVer guardada para Desktop y Celular", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancelar", null)

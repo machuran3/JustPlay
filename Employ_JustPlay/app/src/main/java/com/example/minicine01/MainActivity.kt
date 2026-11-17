@@ -646,6 +646,28 @@ class MainActivity : AppCompatActivity() {
             }
 
             try {
+                FirebaseDatabase.getInstance().getReference("config_pos").addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        try {
+                            val minVer = snapshot.child("min_app_version").getValue(String::class.java)
+                                ?: snapshot.child("min_app_version_mobile").getValue(String::class.java)
+                                ?: snapshot.child("min_app_version_desktop").getValue(String::class.java)
+                                ?: "1.0.0"
+                            val versionActual = AppUpdateManager.obtenerVersionAppActual(this@MainActivity)
+                            if (AppUpdateManager.esVersionSuperior(minVer, versionActual)) {
+                                AppUpdateManager.verificarActualizacion(this@MainActivity, "Employ_JustPlay", forzarObligatoria = true)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                    override fun onCancelled(error: DatabaseError) {}
+                })
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            try {
                 PresenciaManager.iniciarMonitoreoPresencia(this, "Employ_JustPlay", "Empleado")
             } catch (e: Exception) {
                 e.printStackTrace()

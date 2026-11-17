@@ -891,7 +891,7 @@
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="🛡️ Versión Mínima Obligatoria (Desktop)"
+                                    android:text="🛡️ Versión Mínima Obligatoria (Desktop y Celular)"
                                     android:textColor="#DEFF9A"
                                     android:textSize="13sp"
                                     android:textStyle="bold" />
@@ -900,7 +900,7 @@
                                     android:id="@+id/tvVersionMinimaPos"
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:text="Versión mínima requerida: Consultando..."
+                                    android:text="Versión mínima requerida (Desktop y Celular): Consultando..."
                                     android:textColor="#FFFFFF"
                                     android:textSize="12sp"
                                     android:layout_marginTop="4dp"

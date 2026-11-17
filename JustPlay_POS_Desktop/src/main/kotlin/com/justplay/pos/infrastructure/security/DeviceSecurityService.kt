@@ -17,6 +17,7 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+import com.justplay.pos.services.AutoUpdaterService
 
 data class DeviceIdentity(
     val deviceId: String,
@@ -37,7 +38,7 @@ class UnauthorizedException(message: String) : RuntimeException(message)
  */
 class DeviceSecurityService(
     private var baseUrl: String = "https://justplay-a081e-default-rtdb.firebaseio.com",
-    private val appVersion: String = "1.0.0",
+    private val appVersion: String = AutoUpdaterService.CURRENT_APP_VERSION,
     private val configDir: File = File(System.getProperty("user.home"), ".justplay_pos"),
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) {

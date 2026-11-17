@@ -36,6 +36,8 @@ object AppUpdateManager {
         val esObligatoria: Boolean = false
     )
 
+    private var dialogoActual: AlertDialog? = null
+
     /**
      * Comprueba si hay una nueva versión disponible consultando Firebase Realtime Database
      * o la API de GitHub Releases.
@@ -44,59 +46,102 @@ object AppUpdateManager {
         activity: Activity,
         nombreApp: String = "Employ_JustPlay",
         githubOwnerRepo: String? = "machuran3/JustPlay",
-        mostrarToastSiNoHay: Boolean = false
+        mostrarToastSiNoHay: Boolean = false,
+        forzarObligatoria: Boolean = false
     ) {
         val versionActual = obtenerVersionAppActual(activity)
 
-        // 1. Primero intentar consultar Firebase Realtime Database
-        val dbRef = FirebaseDatabase.getInstance().getReference("config_actualizaciones").child(nombreApp)
-        dbRef.addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    val versionNueva = snapshot.child("versionName").getValue(String::class.java) ?: ""
-                    val urlApk = snapshot.child("apkUrl").getValue(String::class.java) ?: ""
-                    val novedades = snapshot.child("novedades").getValue(String::class.java) ?: "Mejoras de estabilidad y nuevas funciones."
-                    val esObligatoria = snapshot.child("esObligatoria").getValue(Boolean::class.java) ?: false
-                    val repoGitHub = snapshot.child("githubOwnerRepo").getValue(String::class.java) ?: githubOwnerRepo
+        // 1. Consultar primero la configuración de versión mínima global (Desktop y Celular)
+        val configPosRef = FirebaseDatabase.getInstance().getReference("config_pos")
+        configPosRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(posSnap: DataSnapshot) {
+                val minVerPos = posSnap.child("min_app_version").getValue(String::class.java)
+                    ?: posSnap.child("min_app_version_mobile").getValue(String::class.java)
+                    ?: posSnap.child("min_app_version_desktop").getValue(String::class.java)
+                    ?: "1.0.0"
 
-                    if (versionNueva.isNotEmpty() && esVersionSuperior(versionNueva, versionActual)) {
-                        val info = ActualizacionInfo(
-                            hayNuevaVersion = true,
-                            versionActual = versionActual,
-                            versionNueva = versionNueva,
-                            novedades = novedades,
-                            urlDescargaApk = urlApk,
-                            esObligatoria = esObligatoria
-                        )
-                        activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
-                        return
+                val esInferiorAMinima = esVersionSuperior(minVerPos, versionActual) || forzarObligatoria
+
+                // 2. Consultar config_actualizaciones para la app específica
+                val dbRef = FirebaseDatabase.getInstance().getReference("config_actualizaciones").child(nombreApp)
+                dbRef.addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        if (snapshot.exists()) {
+                            val versionNueva = snapshot.child("versionName").getValue(String::class.java) ?: ""
+                            val urlApk = snapshot.child("apkUrl").getValue(String::class.java) ?: ""
+                            val novedades = snapshot.child("novedades").getValue(String::class.java) ?: "Mejoras de estabilidad y nuevas funciones."
+                            val esObligatoriaDb = snapshot.child("esObligatoria").getValue(Boolean::class.java) ?: false
+                            val minVerApp = snapshot.child("minVersion").getValue(String::class.java) ?: ""
+                            val esObligatoria = esInferiorAMinima || esObligatoriaDb || (minVerApp.isNotEmpty() && esVersionSuperior(minVerApp, versionActual))
+                            val repoGitHub = snapshot.child("githubOwnerRepo").getValue(String::class.java) ?: githubOwnerRepo
+
+                            if (versionNueva.isNotEmpty() && esVersionSuperior(versionNueva, versionActual)) {
+                                val info = ActualizacionInfo(
+                                    hayNuevaVersion = true,
+                                    versionActual = versionActual,
+                                    versionNueva = versionNueva,
+                                    novedades = novedades,
+                                    urlDescargaApk = urlApk,
+                                    esObligatoria = esObligatoria
+                                )
+                                activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
+                                return
+                            }
+
+                            if (!repoGitHub.isNullOrEmpty()) {
+                                consultarGitHubReleases(activity, repoGitHub, versionActual, mostrarToastSiNoHay, esObligatoria, minVerPos)
+                                return
+                            }
+                        } else if (!githubOwnerRepo.isNullOrEmpty()) {
+                            consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay, esInferiorAMinima, minVerPos)
+                            return
+                        }
+
+                        if (esInferiorAMinima) {
+                            val info = ActualizacionInfo(
+                                hayNuevaVersion = true,
+                                versionActual = versionActual,
+                                versionNueva = minVerPos,
+                                novedades = "⚠️ Tu versión actual (v$versionActual) ha quedado obsoleta.\nLa versión mínima requerida es v$minVerPos. Debes actualizar la aplicación para continuar.",
+                                urlDescargaApk = if (!githubOwnerRepo.isNullOrEmpty()) "https://github.com/$githubOwnerRepo/releases" else "",
+                                esObligatoria = true
+                            )
+                            activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
+                            return
+                        }
+
+                        if (mostrarToastSiNoHay) {
+                            activity.runOnUiThread {
+                                Toast.makeText(activity, "✅ Tu aplicación está actualizada (v$versionActual)", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
 
-                    // Si en Firebase hay un repositorio GitHub configurado, consultar también GitHub Releases
-                    if (!repoGitHub.isNullOrEmpty()) {
-                        consultarGitHubReleases(activity, repoGitHub, versionActual, mostrarToastSiNoHay)
-                        return
+                    override fun onCancelled(error: DatabaseError) {
+                        if (!githubOwnerRepo.isNullOrEmpty()) {
+                            consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay, esInferiorAMinima, minVerPos)
+                        } else if (esInferiorAMinima) {
+                            val info = ActualizacionInfo(
+                                hayNuevaVersion = true,
+                                versionActual = versionActual,
+                                versionNueva = minVerPos,
+                                novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión mínima requerida (v$minVerPos).",
+                                urlDescargaApk = if (!githubOwnerRepo.isNullOrEmpty()) "https://github.com/$githubOwnerRepo/releases" else "",
+                                esObligatoria = true
+                            )
+                            activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
+                        } else if (mostrarToastSiNoHay) {
+                            activity.runOnUiThread {
+                                Toast.makeText(activity, "No se pudo comprobar actualizaciones en este momento.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
-                } else if (!githubOwnerRepo.isNullOrEmpty()) {
-                    // Si no está en Firebase, consultar GitHub directamente
-                    consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay)
-                    return
-                }
-
-                if (mostrarToastSiNoHay) {
-                    activity.runOnUiThread {
-                        Toast.makeText(activity, "✅ Tu aplicación está actualizada (v$versionActual)", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                })
             }
 
             override fun onCancelled(error: DatabaseError) {
                 if (!githubOwnerRepo.isNullOrEmpty()) {
-                    consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay)
-                } else if (mostrarToastSiNoHay) {
-                    activity.runOnUiThread {
-                        Toast.makeText(activity, "No se pudo comprobar actualizaciones en este momento.", Toast.LENGTH_SHORT).show()
-                    }
+                    consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay, forzarObligatoria, "")
                 }
             }
         })
@@ -109,11 +154,13 @@ object AppUpdateManager {
         activity: Activity,
         githubOwnerRepo: String,
         versionActual: String,
-        mostrarToastSiNoHay: Boolean = false
+        mostrarToastSiNoHay: Boolean = false,
+        forzarObligatoria: Boolean = false,
+        versionMinimaRequerida: String = ""
     ) {
+        val cleanRepo = githubOwnerRepo.replace("https://github.com/", "").trim().removeSuffix("/")
         Thread {
             try {
-                val cleanRepo = githubOwnerRepo.replace("https://github.com/", "").trim().removeSuffix("/")
                 val apiUrl = "https://api.github.com/repos/$cleanRepo/releases/latest"
                 val url = URL(apiUrl)
                 val conn = url.openConnection() as HttpURLConnection
@@ -160,6 +207,8 @@ object AppUpdateManager {
                         apkDownloadUrl = htmlUrl
                     }
 
+                    val esObligatoria = forzarObligatoria || (versionMinimaRequerida.isNotEmpty() && esVersionSuperior(versionMinimaRequerida, versionActual))
+
                     if (tagName.isNotEmpty() && esVersionSuperior(tagName, versionActual)) {
                         val info = ActualizacionInfo(
                             hayNuevaVersion = true,
@@ -167,11 +216,35 @@ object AppUpdateManager {
                             versionNueva = tagName,
                             novedades = body,
                             urlDescargaApk = apkDownloadUrl,
-                            esObligatoria = false
+                            esObligatoria = esObligatoria
                         )
                         activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                         return@Thread
                     }
+
+                    if (esObligatoria) {
+                        val info = ActualizacionInfo(
+                            hayNuevaVersion = true,
+                            versionActual = versionActual,
+                            versionNueva = if (tagName.isNotEmpty()) tagName else versionMinimaRequerida,
+                            novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión mínima requerida (v$versionMinimaRequerida).\nDebes actualizar la aplicación para continuar.",
+                            urlDescargaApk = apkDownloadUrl.ifEmpty { htmlUrl.ifEmpty { "https://github.com/$cleanRepo/releases" } },
+                            esObligatoria = true
+                        )
+                        activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
+                        return@Thread
+                    }
+                } else if (forzarObligatoria || (versionMinimaRequerida.isNotEmpty() && esVersionSuperior(versionMinimaRequerida, versionActual))) {
+                    val info = ActualizacionInfo(
+                        hayNuevaVersion = true,
+                        versionActual = versionActual,
+                        versionNueva = versionMinimaRequerida,
+                        novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión mínima requerida (v$versionMinimaRequerida).\nDebes actualizar la aplicación para continuar.",
+                        urlDescargaApk = "https://github.com/$cleanRepo/releases",
+                        esObligatoria = true
+                    )
+                    activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
+                    return@Thread
                 }
 
                 if (mostrarToastSiNoHay) {
@@ -181,6 +254,18 @@ object AppUpdateManager {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                if (forzarObligatoria || (versionMinimaRequerida.isNotEmpty() && esVersionSuperior(versionMinimaRequerida, versionActual))) {
+                    val info = ActualizacionInfo(
+                        hayNuevaVersion = true,
+                        versionActual = versionActual,
+                        versionNueva = versionMinimaRequerida,
+                        novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión mínima requerida (v$versionMinimaRequerida).\nDebes actualizar la aplicación para continuar.",
+                        urlDescargaApk = "https://github.com/$cleanRepo/releases",
+                        esObligatoria = true
+                    )
+                    activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
+                    return@Thread
+                }
                 if (mostrarToastSiNoHay) {
                     activity.runOnUiThread {
                         Toast.makeText(activity, "No se pudo conectar con el servidor de actualizaciones.", Toast.LENGTH_SHORT).show()
@@ -196,12 +281,26 @@ object AppUpdateManager {
     fun mostrarDialogoActualizacion(activity: Activity, info: ActualizacionInfo) {
         if (activity.isFinishing || activity.isDestroyed) return
 
+        try {
+            if (dialogoActual?.isShowing == true) {
+                dialogoActual?.dismiss()
+            }
+        } catch (_: Exception) {}
+
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_actualizacion_app, null)
         val dialog = AlertDialog.Builder(activity)
             .setView(dialogView)
             .setCancelable(!info.esObligatoria)
             .create()
 
+        if (info.esObligatoria) {
+            dialog.setCanceledOnTouchOutside(false)
+            dialog.setOnKeyListener { _, keyCode, _ ->
+                keyCode == android.view.KeyEvent.KEYCODE_BACK
+            }
+        }
+
+        dialogoActual = dialog
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
         val tvVersiones = dialogView.findViewById<TextView>(R.id.tvUpdateVersiones)
@@ -365,9 +464,9 @@ object AppUpdateManager {
     fun obtenerVersionAppActual(context: Context): String {
         return try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.3"
+            pInfo.versionName ?: "1.0.4"
         } catch (e: Exception) {
-            "1.0.3"
+            "1.0.4"
         }
     }
 

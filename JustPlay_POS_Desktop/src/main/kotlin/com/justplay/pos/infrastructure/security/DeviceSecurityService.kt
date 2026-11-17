@@ -214,19 +214,31 @@ class DeviceSecurityService(
 
     private suspend fun verifyTerminalAuthorization() = withContext(Dispatchers.IO) {
         try {
-            // 1. Verificar Interruptor Maestro Global de AdminJustPlay (/config_pos/habilitado o pos_habilitado)
+            // 1. Obtener configuración global de config_pos
             val globalReq = Request.Builder()
-                .url("$baseUrl/config_pos/habilitado.json")
+                .url("$baseUrl/config_pos.json")
                 .get()
                 .build()
+
+            var posHabilitadoGlobal = true
+            var permitirTodasLasPc = true
+
             client.newCall(globalReq).execute().use { gResp ->
                 if (gResp.isSuccessful) {
                     val gBody = gResp.body?.string()?.trim()
-                    if (gBody == "false") {
-                        _isDeviceRevokedFlow.value = true
-                        return@withContext
+                    if (gBody != null && gBody != "null") {
+                        val mapType = object : TypeToken<Map<String, Any?>>() {}.type
+                        val configMap: Map<String, Any?> = gson.fromJson(gBody, mapType) ?: emptyMap()
+                        posHabilitadoGlobal = configMap["habilitado"] as? Boolean
+                            ?: configMap["pos_habilitado"] as? Boolean ?: true
+                        permitirTodasLasPc = configMap["permitir_todas_las_pc"] as? Boolean ?: true
                     }
                 }
+            }
+
+            if (!posHabilitadoGlobal) {
+                _isDeviceRevokedFlow.value = true
+                return@withContext
             }
 
             // 2. Verificar autorización de esta terminal individual
@@ -243,10 +255,17 @@ class DeviceSecurityService(
                         val data: Map<String, Any?> = gson.fromJson(body, mapType) ?: emptyMap()
 
                         val auth = data["autorizado"] as? Boolean ?: true
+                        val ventasHabilitadas = data["ventasHabilitadas"] as? Boolean ?: auth
                         val estado = data["estadoConexion"] as? String ?: "ONLINE"
                         val remoteToken = data["sessionToken"] as? String ?: ""
 
-                        if (!auth || estado == "DESVINCULADO" || (remoteToken.isNotBlank() && remoteToken != identity.sessionToken)) {
+                        val isPermitted = if (permitirTodasLasPc) {
+                            auth && estado != "DESVINCULADO"
+                        } else {
+                            auth && ventasHabilitadas && estado != "DESVINCULADO"
+                        }
+
+                        if (!isPermitted || (remoteToken.isNotBlank() && remoteToken != identity.sessionToken)) {
                             _isDeviceRevokedFlow.value = true
                             identity.isAuthorized = false
                             saveIdentity(identity)

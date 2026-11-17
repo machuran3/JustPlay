@@ -15,8 +15,10 @@ import java.util.Locale
 
 class TerminalesPosAdapter(
     private val listaTerminales: List<TerminalPos>,
+    var permitirTodasLasPc: Boolean = true,
     private val onRenombrar: (TerminalPos) -> Unit,
-    private val onToggleAutorizar: (TerminalPos) -> Unit
+    private val onToggleAutorizar: (TerminalPos) -> Unit,
+    private val onToggleVentasHabilitadas: (TerminalPos, Boolean) -> Unit
 ) : RecyclerView.Adapter<TerminalesPosAdapter.TerminalViewHolder>() {
 
     class TerminalViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -28,6 +30,8 @@ class TerminalesPosAdapter(
         val tvHostnameIP: TextView = view.findViewById(R.id.tvHostnameIP)
         val tvOSVersion: TextView = view.findViewById(R.id.tvOSVersion)
         val tvUltimoHeartbeat: TextView = view.findViewById(R.id.tvUltimoHeartbeat)
+        val tvPermisoVentasLabel: TextView = view.findViewById(R.id.tvPermisoVentasLabel)
+        val switchPermitirVentasPc: androidx.appcompat.widget.SwitchCompat = view.findViewById(R.id.switchPermitirVentasPc)
         val btnRenombrarTerminal: Button = view.findViewById(R.id.btnRenombrarTerminal)
         val btnToggleAutorizarTerminal: Button = view.findViewById(R.id.btnToggleAutorizarTerminal)
     }
@@ -87,6 +91,25 @@ class TerminalesPosAdapter(
             holder.cardTerminalPos.setCardBackgroundColor(Color.parseColor("#1A1C29"))
             holder.btnToggleAutorizarTerminal.text = "🚫 Revocar"
             holder.btnToggleAutorizarTerminal.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#D32F2F"))
+        }
+
+        // Configuración de Permiso de Ventas en esta PC
+        if (permitirTodasLasPc) {
+            holder.tvPermisoVentasLabel.text = "🛒 Ventas: Habilitadas (Todas las PC)"
+            holder.tvPermisoVentasLabel.setTextColor(Color.parseColor("#00E676"))
+            holder.switchPermitirVentasPc.setOnCheckedChangeListener(null)
+            holder.switchPermitirVentasPc.isChecked = true
+            holder.switchPermitirVentasPc.isEnabled = false
+        } else {
+            val ventasActivas = terminal.ventasHabilitadas && terminal.autorizado
+            holder.tvPermisoVentasLabel.text = if (ventasActivas) "🛒 Ventas: PERMITIDAS en esta PC" else "⛔ Ventas: BLOQUEADAS en esta PC"
+            holder.tvPermisoVentasLabel.setTextColor(if (ventasActivas) Color.parseColor("#00E676") else Color.parseColor("#FF5252"))
+            holder.switchPermitirVentasPc.setOnCheckedChangeListener(null)
+            holder.switchPermitirVentasPc.isChecked = terminal.ventasHabilitadas
+            holder.switchPermitirVentasPc.isEnabled = terminal.autorizado
+            holder.switchPermitirVentasPc.setOnCheckedChangeListener { _, isChecked ->
+                onToggleVentasHabilitadas(terminal, isChecked)
+            }
         }
 
         holder.btnRenombrarTerminal.setOnClickListener { onRenombrar(terminal) }

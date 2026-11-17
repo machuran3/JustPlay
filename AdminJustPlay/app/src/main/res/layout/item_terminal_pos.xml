@@ -121,6 +121,33 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
+            <!-- CONTROL INDIVIDUAL DE VENTAS -->
+            <LinearLayout
+                android:id="@+id/layoutPermisoVentasPc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="#1E2235"
+                android:padding="8dp"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:id="@+id/tvPermisoVentasLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="🛒 Permitir ventas en esta PC:"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchPermitirVentasPc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
             <!-- BOTONES DE ACCION RÁPIDA -->
             <LinearLayout
                 android:layout_width="match_parent"

@@ -28,7 +28,7 @@ class AutoUpdaterService(
         .build()
 ) {
     companion object {
-        const val CURRENT_APP_VERSION = "1.0.2"
+        const val CURRENT_APP_VERSION = "1.0.3"
     }
 
     /**

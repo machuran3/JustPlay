@@ -389,8 +389,14 @@ class MainActivity : AppCompatActivity() {
             btnTabTerminalesPosRef = btnTabTerminalesPos
             btnTabUsuariosMovilesRef = btnTabUsuariosMoviles
 
+            val btnCambiarVersionMinimaPos = findViewById<Button>(R.id.btnCambiarVersionMinimaPos)
+            btnCambiarVersionMinimaPos?.setOnClickListener {
+                posManager.mostrarDialogoCambiarVersionMinima()
+            }
+
             terminalesPosAdapter = TerminalesPosAdapter(
                 listaTerminalesPos,
+                permitirTodasLasPc = true,
                 onRenombrar = { terminal -> mostrarDialogoRenombrarTerminal(terminal) },
                 onToggleAutorizar = { terminal ->
                     val nuevoEstado = !terminal.autorizado
@@ -399,6 +405,14 @@ class MainActivity : AppCompatActivity() {
                         "sessionToken" to if (!nuevoEstado) "" else terminal.sessionToken
                     )
                     database.child("terminales_pos").child(terminal.deviceId).updateChildren(updates)
+                },
+                onToggleVentasHabilitadas = { terminal, isChecked ->
+                    database.child("terminales_pos").child(terminal.deviceId).child("ventasHabilitadas").setValue(isChecked)
+                    Toast.makeText(
+                        this,
+                        if (isChecked) "✅ Ventas habilitadas en ${terminal.nombre}" else "⛔ Ventas bloqueadas en ${terminal.nombre}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             )
             rvTerminalesPos.layoutManager = LinearLayoutManager(this)
@@ -636,7 +650,7 @@ class MainActivity : AppCompatActivity() {
             navigationView.menu.add(0, 6, 5, "👥 Usuarios en Línea").setIcon(android.R.drawable.ic_menu_myplaces)
             navigationView.menu.add(0, 7, 6, "🏗️ Aumentar / Gestionar Salas").setIcon(android.R.drawable.ic_input_add)
             navigationView.menu.add(0, 8, 7, "🔄 Buscar Actualizaciones").setIcon(android.R.drawable.ic_popup_sync)
-            navigationView.menu.add(0, 9, 8, "🖥️ Terminales POS y Catálogo").setIcon(android.R.drawable.ic_menu_manage)
+            navigationView.menu.add(0, 9, 8, "📦 Productos").setIcon(android.R.drawable.ic_menu_agenda)
             navigationView.menu.add(0, 10, 9, "📦 Auditoría Productos / Catálogo").setIcon(android.R.drawable.ic_menu_agenda)
             navigationView.menu.add(0, 11, 10, "💸 Control de Egresos y Gastos").setIcon(android.R.drawable.ic_menu_save)
             navigationView.menu.add(0, 12, 11, "💲 Precios Base de Salas").setIcon(android.R.drawable.ic_menu_edit)
@@ -653,7 +667,7 @@ class MainActivity : AppCompatActivity() {
                     6 -> navegarAPantalla("👥 Usuarios en Línea")
                     7 -> mostrarDialogoAdministrarSalas()
                     8 -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
-                    9 -> posManager.mostrarDialogoGestionPOS()
+                    9 -> posManager.mostrarDialogoProductos()
                     10 -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
                     11 -> egresosManager.mostrarDialogoGestionEgresos()
                     12 -> posManager.mostrarDialogoPreciosBase()
@@ -671,7 +685,8 @@ class MainActivity : AppCompatActivity() {
                             title.contains("Gestionar Salas") -> mostrarDialogoAdministrarSalas()
                             title.contains("Gestión de Secciones") || title.contains("Secciones") -> mostrarDialogoGestionarSecciones()
                             title.contains("Actualizaciones") -> AppUpdateManager.verificarActualizacion(this, "AdminJustPlay", mostrarToastSiNoHay = true)
-                            title.contains("Terminales POS") -> posManager.mostrarDialogoGestionPOS()
+                            title.contains("Productos") -> posManager.mostrarDialogoProductos()
+                            title.contains("Terminales POS") -> posManager.mostrarDialogoProductos()
                             title.contains("Auditoría Productos") -> productAuditManager.mostrarDialogoHistorialAuditoriaProductos()
                             title.contains("Egresos") -> egresosManager.mostrarDialogoGestionEgresos()
                             title.contains("Precios Base") -> posManager.mostrarDialogoPreciosBase()
@@ -1480,6 +1495,60 @@ class MainActivity : AppCompatActivity() {
                     btnTabTerminalesPosRef?.text = if (onlineCount > 0) "💻 Terminales POS ($onlineCount🟢)" else "💻 Terminales POS (${listaTerminalesPos.size})"
                 } catch (t: Throwable) {
                     Log.e("MainActivity", "Error en listener de terminales_pos", t)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+
+        // 5.2 ESCUCHAR CONFIGURACIÓN GLOBAL POS (VERSIÓN MÍNIMA Y PERMITIR VENTAS EN TODAS LAS PC)
+        database.child("config_pos").addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                try {
+                    val minVer = snapshot.child("min_app_version_desktop").getValue(String::class.java) ?: "1.0.0"
+                    val permitirTodas = snapshot.child("permitir_todas_las_pc").getValue(Boolean::class.java)
+                        ?: snapshot.child("habilitado").getValue(Boolean::class.java) ?: true
+
+                    findViewById<TextView>(R.id.tvVersionMinimaPos)?.text = "Versión mínima requerida actual: v$minVer"
+                    findViewById<androidx.appcompat.widget.SwitchCompat>(R.id.switchPermitirVentasTodasPc)?.let { sw ->
+                        sw.setOnCheckedChangeListener(null)
+                        sw.isChecked = permitirTodas
+                        sw.setOnCheckedChangeListener { _, isChecked ->
+                            val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
+                            database.child("config_pos").child("permitir_todas_las_pc").setValue(isChecked)
+                            database.child("config_pos").child("habilitado").setValue(true)
+                            database.child("config_pos").child("ultima_modificacion").setValue(fecha)
+                            database.child("config_pos").child("modificado_por").setValue("Admin JustPlay (${DeviceInfoProvider.getDeviceModel()})")
+
+                            val tvEstado = findViewById<TextView>(R.id.tvEstadoPermisoVentasPc)
+                            if (isChecked) {
+                                tvEstado?.text = "✅ Ventas permitidas en todas las computadoras vinculadas"
+                                tvEstado?.setTextColor(Color.parseColor("#00E676"))
+                            } else {
+                                tvEstado?.text = "⚠️ Modo selección manual: Elige abajo qué computadoras tienen permiso"
+                                tvEstado?.setTextColor(Color.parseColor("#FFA726"))
+                            }
+                            if (::terminalesPosAdapter.isInitialized) {
+                                terminalesPosAdapter.permitirTodasLasPc = isChecked
+                                terminalesPosAdapter.notifyDataSetChanged()
+                            }
+                        }
+                    }
+
+                    val tvEstado = findViewById<TextView>(R.id.tvEstadoPermisoVentasPc)
+                    if (permitirTodas) {
+                        tvEstado?.text = "✅ Ventas permitidas en todas las computadoras vinculadas"
+                        tvEstado?.setTextColor(Color.parseColor("#00E676"))
+                    } else {
+                        tvEstado?.text = "⚠️ Modo selección manual: Elige abajo qué computadoras tienen permiso"
+                        tvEstado?.setTextColor(Color.parseColor("#FFA726"))
+                    }
+
+                    if (::terminalesPosAdapter.isInitialized) {
+                        terminalesPosAdapter.permitirTodasLasPc = permitirTodas
+                        terminalesPosAdapter.notifyDataSetChanged()
+                    }
+                } catch (t: Throwable) {
+                    Log.e("MainActivity", "Error en listener de config_pos", t)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}

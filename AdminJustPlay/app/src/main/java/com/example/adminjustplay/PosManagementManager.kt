@@ -26,6 +26,7 @@ data class TerminalPos(
     val osName: String = "",
     val sessionToken: String = "",
     val autorizado: Boolean = true,
+    val ventasHabilitadas: Boolean = true,
     val estadoConexion: String = "OFFLINE", // "ONLINE", "OFFLINE", "DESVINCULADO"
     val lastHeartbeat: Long = 0L,
     val lastHeartbeatStr: String = "",
@@ -51,7 +52,7 @@ class PosManagementManager(
 ) {
     private val productAuditManager = ProductAuditManager(context, database)
 
-    fun mostrarDialogoGestionPOS() {
+    fun mostrarDialogoProductos() {
         val scrollView = ScrollView(context)
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -69,9 +70,10 @@ class PosManagementManager(
         val header = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, 16)
         }
         val tvTitulo = TextView(context).apply {
-            text = "🖥️ Gestión de Terminales POS & Seguridad"
+            text = "📦 Catálogo de Productos"
             setTextColor(Color.WHITE)
             textSize = 18f
             setTypeface(null, Typeface.BOLD)
@@ -87,362 +89,6 @@ class PosManagementManager(
         header.addView(tvTitulo)
         header.addView(btnCerrar)
         container.addView(header)
-
-        // 1. TARJETA DE VERSIÓN MÍNIMA OBLIGATORIA (Force Update)
-        val cardVersion = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(20, 18, 20, 18)
-            setBackgroundColor(Color.parseColor("#24283B"))
-            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            lp.setMargins(0, 16, 0, 16)
-            layoutParams = lp
-        }
-
-        val tvSubVersion = TextView(context).apply {
-            text = "🛡️ Control de Versión Mínima Obligatoria (Force Update)"
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-        }
-
-        val tvDescVersion = TextView(context).apply {
-            text = "Bloquea terminales con versiones obsoletas con error HTTP 426 (Upgrade Required)."
-            setTextColor(Color.parseColor("#A0A0A0"))
-            textSize = 11f
-            setPadding(0, 4, 0, 8)
-        }
-
-        val tvVersionActual = TextView(context).apply {
-            text = "Versión mínima requerida: Consultando..."
-            setTextColor(Color.WHITE)
-            textSize = 12f
-            setTypeface(null, Typeface.BOLD)
-        }
-
-        val btnConfigVersion = Button(context).apply {
-            text = "⚙️ Cambiar Versión Mínima"
-            setBackgroundColor(Color.parseColor("#1A1C29"))
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 11f
-            setOnClickListener {
-                mostrarDialogoCambiarVersionMinima()
-            }
-        }
-
-        val versionListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val minVer = snapshot.getValue(String::class.java) ?: "1.0.0"
-                tvVersionActual.text = "Versión mínima requerida actual: v$minVer"
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        database.child("config_pos").child("min_app_version_desktop").addValueEventListener(versionListener)
-
-        cardVersion.addView(tvSubVersion)
-        cardVersion.addView(tvDescVersion)
-        cardVersion.addView(tvVersionActual)
-        cardVersion.addView(btnConfigVersion)
-        container.addView(cardVersion)
-
-        // 2. TARJETA MASTER SWITCH DE HABILITACIÓN POS
-        val cardPermiso = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(20, 18, 20, 18)
-            setBackgroundColor(Color.parseColor("#24283B"))
-            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            lp.setMargins(0, 0, 0, 16)
-            layoutParams = lp
-        }
-
-        val tvSubPermiso = TextView(context).apply {
-            text = "🔐 Interruptor Maestro de Terminales POS"
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-        }
-
-        val switchPermiso = SwitchCompat(context).apply {
-            text = "Permitir ventas en todas las PC:"
-            setTextColor(Color.WHITE)
-            textSize = 13f
-        }
-
-        val tvEstadoPermiso = TextView(context).apply {
-            text = "Consultando estado..."
-            textSize = 12f
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, 4, 0, 0)
-        }
-
-        val permisoListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val habilitado = snapshot.getValue(Boolean::class.java) ?: true
-                switchPermiso.isChecked = habilitado
-                if (habilitado) {
-                    tvEstadoPermiso.text = "✅ SERVICIO POS ACTIVO"
-                    tvEstadoPermiso.setTextColor(Color.parseColor("#00E676"))
-                } else {
-                    tvEstadoPermiso.text = "⛔ SERVICIO POS SUSPENDIDO GLOBALMENTE"
-                    tvEstadoPermiso.setTextColor(Color.parseColor("#FF5252"))
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-
-        database.child("config_pos").child("habilitado").addValueEventListener(permisoListener)
-
-        switchPermiso.setOnCheckedChangeListener { _, isChecked ->
-            val fecha = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
-            database.child("config_pos").child("habilitado").setValue(isChecked)
-            database.child("config_pos").child("pos_habilitado").setValue(isChecked)
-            database.child("config_pos").child("ultima_modificacion").setValue(fecha)
-            database.child("config_pos").child("modificado_por").setValue("Admin JustPlay (${DeviceInfoProvider.getDeviceModel()})")
-            
-            // Registro de auditoría de seguridad
-            val auditKey = database.child("auditoria_seguridad").push().key ?: ""
-            if (auditKey.isNotEmpty()) {
-                val auditData = mapOf(
-                    "id" to auditKey,
-                    "evento" to if (isChecked) "HABILITAR_POS_DESKTOP" else "DESACTIVAR_POS_DESKTOP",
-                    "detalles" to if (isChecked) "Admin activó el servicio POS Desktop" else "Admin suspendió remotamente el servicio POS Desktop",
-                    "usuario" to "Administrador",
-                    "dispositivo" to DeviceInfoProvider.getDeviceModel(),
-                    "fechaHora" to fecha,
-                    "timestamp" to System.currentTimeMillis()
-                )
-                database.child("auditoria_seguridad").child(auditKey).setValue(auditData)
-            }
-            
-            Toast.makeText(context, if (isChecked) "✅ Terminales POS Habilitadas" else "⛔ Terminales POS Desactivadas Remotamente", Toast.LENGTH_SHORT).show()
-        }
-
-        cardPermiso.addView(tvSubPermiso)
-        cardPermiso.addView(switchPermiso)
-        cardPermiso.addView(tvEstadoPermiso)
-        container.addView(cardPermiso)
-
-        // 2.5 TARJETA DE GESTIÓN DE PRECIOS BASE DE SALAS
-        val cardPrecios = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(20, 18, 20, 18)
-            setBackgroundColor(Color.parseColor("#24283B"))
-            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            lp.setMargins(0, 0, 0, 16)
-            layoutParams = lp
-        }
-
-        val tvSubPrecios = TextView(context).apply {
-            text = "💲 Precios Base de Salas & Simuladores"
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-        }
-
-        val tvDescPrecios = TextView(context).apply {
-            text = "Tarifas base por 1 hora para Minicine, Volantes y Just Dance. Sincronizadas globalmente."
-            setTextColor(Color.parseColor("#A0A0A0"))
-            textSize = 11f
-            setPadding(0, 4, 0, 8)
-        }
-
-        val btnConfigPrecios = Button(context).apply {
-            text = "⚙️ Editar Precios Base"
-            setBackgroundColor(Color.parseColor("#1A1C29"))
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 11f
-            setOnClickListener {
-                mostrarDialogoPreciosBase()
-            }
-        }
-
-        cardPrecios.addView(tvSubPrecios)
-        cardPrecios.addView(tvDescPrecios)
-        cardPrecios.addView(btnConfigPrecios)
-        container.addView(cardPrecios)
-
-        // 3. TARJETA DE DISPOSITIVOS POS VINCULADOS (Device Management & Heartbeat)
-        val tvHeaderDevices = TextView(context).apply {
-            text = "💻 Terminales POS Vinculadas (Heartbeat & Sesión)"
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, 8, 0, 8)
-        }
-        container.addView(tvHeaderDevices)
-
-        val llListaDispositivos = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, 16)
-        }
-        container.addView(llListaDispositivos)
-
-        val devicesListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                llListaDispositivos.removeAllViews()
-                if (!snapshot.exists() || !snapshot.hasChildren()) {
-                    val tvVacio = TextView(context).apply {
-                        text = "No hay computadoras registradas aún.\nAl iniciar JustPlay POS en la PC se registrará automáticamente."
-                        setTextColor(Color.parseColor("#888888"))
-                        textSize = 12f
-                        setPadding(12, 12, 12, 12)
-                    }
-                    llListaDispositivos.addView(tvVacio)
-                    return
-                }
-
-                for (snap in snapshot.children) {
-                    val devId = snap.child("deviceId").getValue(String::class.java) ?: snap.key ?: ""
-                    val hwUuid = snap.child("hardwareUuid").getValue(String::class.java) ?: ""
-                    val nombre = snap.child("nombre").getValue(String::class.java) ?: "PC Terminal"
-                    val hostname = snap.child("hostname").getValue(String::class.java) ?: ""
-                    val osName = snap.child("osName").getValue(String::class.java) ?: ""
-                    val token = snap.child("sessionToken").getValue(String::class.java) ?: ""
-                    val auth = snap.child("autorizado").getValue(Boolean::class.java) ?: false
-                    val estado = snap.child("estadoConexion").getValue(String::class.java) ?: "OFFLINE"
-                    val lastHb = snap.child("lastHeartbeat").getValue(Long::class.java) ?: 0L
-                    val lastHbStr = snap.child("lastHeartbeatStr").getValue(String::class.java) ?: ""
-                    val appVer = snap.child("appVersion").getValue(String::class.java) ?: "1.0.0"
-                    val ip = snap.child("ipAddress").getValue(String::class.java) ?: ""
-                    val fechaVinc = snap.child("fechaVinculacion").getValue(String::class.java) ?: ""
-
-                    val terminal = TerminalPos(
-                        deviceId = devId,
-                        hardwareUuid = hwUuid,
-                        nombre = nombre,
-                        hostname = hostname,
-                        osName = osName,
-                        sessionToken = token,
-                        autorizado = auth,
-                        estadoConexion = estado,
-                        lastHeartbeat = lastHb,
-                        lastHeartbeatStr = lastHbStr,
-                        appVersion = appVer,
-                        ipAddress = ip,
-                        fechaVinculacion = fechaVinc
-                    )
-
-                    val card = LinearLayout(context).apply {
-                        orientation = LinearLayout.VERTICAL
-                        setPadding(16, 14, 16, 14)
-                        setBackgroundColor(Color.parseColor("#24283B"))
-                        val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                        lp.setMargins(0, 0, 0, 10)
-                        layoutParams = lp
-                    }
-
-                    val headerDev = LinearLayout(context).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        gravity = android.view.Gravity.CENTER_VERTICAL
-                    }
-
-                    val tvNombrePc = TextView(context).apply {
-                        text = "🖥️ $nombre"
-                        setTextColor(Color.WHITE)
-                        textSize = 14f
-                        setTypeface(null, Typeface.BOLD)
-                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                    }
-
-                    val isOnline = terminal.isCurrentlyOnline()
-                    val badgeEstado = TextView(context).apply {
-                        if (!terminal.autorizado || terminal.estadoConexion == "DESVINCULADO") {
-                            text = "⛔ DESVINCULADA"
-                            setTextColor(Color.parseColor("#FF5252"))
-                        } else if (isOnline) {
-                            text = "🟢 ONLINE"
-                            setTextColor(Color.parseColor("#00E676"))
-                        } else {
-                            text = "🔴 OFFLINE"
-                            setTextColor(Color.parseColor("#FFA726"))
-                        }
-                        textSize = 11f
-                        setTypeface(null, Typeface.BOLD)
-                        setPadding(8, 2, 8, 2)
-                    }
-
-                    headerDev.addView(tvNombrePc)
-                    headerDev.addView(badgeEstado)
-                    card.addView(headerDev)
-
-                    val diffMin = if (lastHb > 0) (System.currentTimeMillis() - lastHb) / 60000 else -1
-                    val lastSeenText = when {
-                        isOnline -> "En línea y sincronizando (Pulso activo)"
-                        diffMin >= 0 -> "Último pulso: hace $diffMin min ($lastHbStr)"
-                        else -> "Sin registro de pulso"
-                    }
-
-                    val tvDetalles = TextView(context).apply {
-                        val tokenPreview = if (token.length > 8) "${token.take(8)}..." else if (token.isEmpty()) "Invalido / Revocado" else token
-                        text = "• SO: $osName | Host: $hostname\n• App: v$appVer | IP: ${if (ip.isNotEmpty()) ip else "Local"}\n• ID: $devId\n• Token Sesión: $tokenPreview\n• $lastSeenText"
-                        setTextColor(Color.parseColor("#B0B3C6"))
-                        textSize = 11f
-                        setPadding(0, 4, 0, 8)
-                    }
-                    card.addView(tvDetalles)
-
-                    val btnRowDev = LinearLayout(context).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                    }
-
-                    if (terminal.autorizado && terminal.estadoConexion != "DESVINCULADO") {
-                        val btnDesvincular = Button(context).apply {
-                            text = "🔌 Desvincular"
-                            setBackgroundColor(Color.parseColor("#FF5252"))
-                            setTextColor(Color.WHITE)
-                            textSize = 11f
-                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                                setMargins(0, 0, 6, 0)
-                            }
-                            setOnClickListener {
-                                desvincularTerminal(terminal)
-                            }
-                        }
-                        btnRowDev.addView(btnDesvincular)
-                    } else {
-                        val btnAutorizar = Button(context).apply {
-                            text = "✅ Autorizar y Vincular"
-                            setBackgroundColor(Color.parseColor("#00E676"))
-                            setTextColor(Color.BLACK)
-                            textSize = 11f
-                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                                setMargins(0, 0, 6, 0)
-                            }
-                            setOnClickListener {
-                                autorizarTerminal(terminal)
-                            }
-                        }
-                        btnRowDev.addView(btnAutorizar)
-                    }
-
-                    val btnEliminar = Button(context).apply {
-                        text = "🗑️ Eliminar"
-                        setBackgroundColor(Color.parseColor("#1A1C29"))
-                        setTextColor(Color.parseColor("#FF8A80"))
-                        textSize = 11f
-                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                        setOnClickListener {
-                            eliminarTerminal(terminal)
-                        }
-                    }
-                    btnRowDev.addView(btnEliminar)
-                    card.addView(btnRowDev)
-
-                    llListaDispositivos.addView(card)
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        database.child("terminales_pos").addValueEventListener(devicesListener)
-
-        // 4. Catálogo de Productos & Inventario
-        val tvHeaderCat = TextView(context).apply {
-            text = "📦 Catálogo de Productos & Inventario"
-            setTextColor(Color.parseColor("#DEFF9A"))
-            textSize = 14f
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, 10, 0, 10)
-        }
-        container.addView(tvHeaderCat)
 
         val btnRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -560,15 +206,14 @@ class PosManagementManager(
         database.child("productos_catalogo").addValueEventListener(productosListener)
         dialog.setOnDismissListener {
             database.child("productos_catalogo").removeEventListener(productosListener)
-            database.child("config_pos").child("habilitado").removeEventListener(permisoListener)
-            database.child("config_pos").child("min_app_version_desktop").removeEventListener(versionListener)
-            database.child("terminales_pos").removeEventListener(devicesListener)
         }
 
         dialog.show()
     }
 
-    private fun mostrarDialogoCambiarVersionMinima() {
+    fun mostrarDialogoGestionPOS() = mostrarDialogoProductos()
+
+    fun mostrarDialogoCambiarVersionMinima() {
         val etVersion = EditText(context).apply {
             hint = "Ej: 1.0.0 o 1.1.0"
             setTextColor(Color.WHITE)

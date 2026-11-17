@@ -7,7 +7,8 @@ data class Pedido(
     var cantidad: Int = 0,
     var nombre: String = "",
     var precioUnidad: Double = 0.0,
-    var estaEntregado: Boolean = false
+    var estaEntregado: Boolean = false,
+    var barcode: String = ""
 ) {
     fun subtotal(): Double = cantidad * precioUnidad
 }

@@ -159,7 +159,7 @@ class SaleService(
                 productCatalogService.updateStock(item.product.barcode, item.quantity)
             }
 
-            // 3. Si el destino es una sala, agregar consumo a la sala
+            // 3. Si el destino es una sala, agregar consumo a la sala (sin duplicar registro de venta)
             if (destinationType == "SALA" && targetRoomId != null && roomManagementService != null) {
                 for (item in items) {
                     val order = RoomOrder(
@@ -167,9 +167,10 @@ class SaleService(
                         cantidad = item.quantity,
                         nombre = item.product.displayName,
                         precioUnidad = item.product.unitPrice,
-                        estaEntregado = true
+                        estaEntregado = true,
+                        barcode = item.product.barcode
                     )
-                    roomManagementService.addOrderToRoom(targetRoomId, order)
+                    roomManagementService.addOrderToRoom(targetRoomId, order, shouldRegisterInVentas = false)
                 }
             }
 

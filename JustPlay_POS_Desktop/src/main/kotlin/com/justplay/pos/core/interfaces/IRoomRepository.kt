@@ -32,7 +32,7 @@ interface IRoomRepository {
     ): Boolean
     suspend fun addTimeToRoom(roomId: Int, extraMinutes: Int): Boolean
     suspend fun clearRoom(roomId: Int): Boolean
-    suspend fun addOrderToRoom(roomId: Int, order: RoomOrder): Boolean
+    suspend fun addOrderToRoom(roomId: Int, order: RoomOrder, shouldRegisterInVentas: Boolean = true): Boolean
     suspend fun removeOrderFromRoom(roomId: Int, orderIndex: Int): Boolean
     suspend fun updateRoomRecordSession(room: Room): Boolean
     suspend fun saveReservation(reservation: Reservation): Boolean

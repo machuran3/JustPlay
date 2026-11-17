@@ -105,7 +105,8 @@ fun main() = application {
                             onHistoryClick = { viewModel.openHistoryDialog() },
                             onNewProductClick = { viewModel.openProductManager(null) },
                             onExportMasterClick = { viewModel.exportMasterReport() },
-                            onDismissExportNotification = { viewModel.dismissMasterExportNotification() }
+                            onDismissExportNotification = { viewModel.dismissMasterExportNotification() },
+                            onCheckUpdatesClick = { viewModel.checkForUpdates(silent = false) }
                         )
 
                         // Selector de Pestañas Principales (Minicine, Volantes, Just Dance, Tablero Reservas)
@@ -516,6 +517,21 @@ fun main() = application {
                         receiptString = state.viewReceiptForReservation!!,
                         title = "Comprobante de Reserva",
                         onDismiss = { viewModel.closeReservationReceiptViewer() }
+                    )
+                }
+
+                // Diálogo de Actualización Remota (GitHub Releases)
+                if (state.availableUpdate != null) {
+                    UpdateDialog(
+                        release = state.availableUpdate!!,
+                        currentVersion = state.currentAppVersion,
+                        isDownloading = state.isDownloadingUpdate,
+                        downloadProgress = state.updateDownloadProgress,
+                        isDownloaded = state.isUpdateDownloaded,
+                        statusMessage = state.updateStatusMessage,
+                        onStartDownload = { viewModel.startUpdateDownload() },
+                        onApplyUpdate = { viewModel.applyDownloadedUpdate() },
+                        onDismiss = { viewModel.dismissUpdateDialog() }
                     )
                 }
 

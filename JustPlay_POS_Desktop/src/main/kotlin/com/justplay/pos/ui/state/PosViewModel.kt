@@ -13,6 +13,7 @@ import com.justplay.pos.infrastructure.security.DeviceSecurityService
 import com.justplay.pos.core.utils.ReceiptImageUtils
 import com.justplay.pos.services.ProductCatalogService
 import com.justplay.pos.services.RoomManagementService
+import com.justplay.pos.services.AutoUpdaterService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -45,6 +46,8 @@ class PosViewModel(
     )
     val uiState: StateFlow<PosUiState> = _uiState.asStateFlow()
 
+    private val autoUpdaterService: AutoUpdaterService = AutoUpdaterService()
+
     private val isCheckingOut = java.util.concurrent.atomic.AtomicBoolean(false)
     private var lastCheckoutTimestamp = 0L
 
@@ -52,6 +55,12 @@ class PosViewModel(
     private var lastRoomActionTimestamp = 0L
 
     init {
+        // Verificar actualizaciones de versión en GitHub Releases en segundo plano
+        scope.launch {
+            kotlinx.coroutines.delay(4000L)
+            checkForUpdates(silent = true)
+        }
+
         // Escuchar escaneos globales de la pistola de códigos de barras
         scope.launch {
             barcodeScanner.barcodeScannedFlow.collect { scannedBarcode ->
@@ -800,14 +809,15 @@ class PosViewModel(
             cantidad = quantity,
             nombre = product.displayName,
             precioUnidad = product.unitPrice,
-            estaEntregado = true
+            estaEntregado = true,
+            barcode = product.barcode
         )
 
         if (currentRoom.estado == com.justplay.pos.core.models.RoomState.OCUPADA) {
             scope.launch {
                 val ok = roomManagementService.addOrderToRoom(currentRoom.id, newOrder)
                 if (ok) {
-                    productCatalogService.updateStock(product.barcode, -quantity)
+                    productCatalogService.updateStock(product.barcode, quantity)
                     _uiState.update {
                         val updatedList = currentRoom.pedidos + newOrder
                         it.copy(
@@ -831,13 +841,32 @@ class PosViewModel(
     fun removeProductFromOpenRoom(index: Int) {
         val currentRoom = _uiState.value.selectedRoomForDetail ?: return
         if (currentRoom.estado == com.justplay.pos.core.models.RoomState.OCUPADA) {
+            val orderToRemove = currentRoom.pedidos.getOrNull(index)
             scope.launch {
                 val ok = roomManagementService.removeOrderFromRoom(currentRoom.id, index)
                 if (ok) {
+                    // Restaurar stock del producto eliminado en el inventario local y nube
+                    if (orderToRemove != null) {
+                        val barcodeToRestore = if (orderToRemove.barcode.isNotBlank()) {
+                            orderToRemove.barcode
+                        } else {
+                            _uiState.value.productsCatalog.find {
+                                it.displayName.equals(orderToRemove.nombre, ignoreCase = true) ||
+                                        it.name.equals(orderToRemove.nombre, ignoreCase = true)
+                            }?.barcode
+                        }
+                        if (barcodeToRestore != null) {
+                            productCatalogService.updateStock(barcodeToRestore, -orderToRemove.cantidad)
+                        }
+                    }
+
                     val updatedList = currentRoom.pedidos.toMutableList()
                     if (index in updatedList.indices) updatedList.removeAt(index)
                     _uiState.update {
-                        it.copy(selectedRoomForDetail = currentRoom.copy(pedidos = updatedList))
+                        it.copy(
+                            selectedRoomForDetail = currentRoom.copy(pedidos = updatedList),
+                            roomActionMessage = "🗑️ Consumo retirado y stock restablecido: ${orderToRemove?.nombre ?: ""}"
+                        )
                     }
                 }
             }
@@ -1271,5 +1300,85 @@ class PosViewModel(
             matchCat && matchQuery && p.active
         }
     }
+
+    fun checkForUpdates(silent: Boolean = false) {
+        if (_uiState.value.isCheckingForUpdate || _uiState.value.isDownloadingUpdate) return
+        _uiState.update { it.copy(isCheckingForUpdate = true, updateStatusMessage = if (!silent) "Buscando actualizaciones en GitHub..." else null) }
+        scope.launch {
+            val result = autoUpdaterService.checkForUpdates(_uiState.value.currentAppVersion)
+            result.fold(
+                onSuccess = { release ->
+                    _uiState.update {
+                        it.copy(
+                            isCheckingForUpdate = false,
+                            availableUpdate = release,
+                            updateStatusMessage = if (release != null) "¡Nueva versión ${release.tagName} disponible!" else if (!silent) "Tu aplicación está actualizada a la última versión." else null
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isCheckingForUpdate = false,
+                            updateStatusMessage = if (!silent) "No se pudo verificar actualizaciones: ${err.message}" else null
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun dismissUpdateDialog() {
+        _uiState.update { it.copy(availableUpdate = null, updateStatusMessage = null) }
+    }
+
+    fun startUpdateDownload() {
+        val release = _uiState.value.availableUpdate ?: return
+        if (_uiState.value.isDownloadingUpdate) return
+
+        _uiState.update {
+            it.copy(
+                isDownloadingUpdate = true,
+                updateDownloadProgress = 0f,
+                updateStatusMessage = "Descargando versión ${release.tagName}..."
+            )
+        }
+
+        scope.launch {
+            val appDir = java.io.File(System.getProperty("user.home"), ".justplay_pos/updates")
+            val targetFile = java.io.File(appDir, release.assetName.ifBlank { "JustPlayPOS_update.jar" })
+
+            val result = autoUpdaterService.downloadAsset(release.downloadUrl, targetFile) { progress ->
+                _uiState.update { it.copy(updateDownloadProgress = progress) }
+            }
+
+            result.fold(
+                onSuccess = { file ->
+                    _uiState.update {
+                        it.copy(
+                            isDownloadingUpdate = false,
+                            isUpdateDownloaded = true,
+                            downloadedUpdateFile = file,
+                            updateStatusMessage = "Descarga completada: ${file.name}"
+                        )
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isDownloadingUpdate = false,
+                            updateStatusMessage = "Error en la descarga: ${err.message}"
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun applyDownloadedUpdate() {
+        val file = _uiState.value.downloadedUpdateFile ?: return
+        autoUpdaterService.openOrInstallUpdate(file)
+    }
 }
+
 

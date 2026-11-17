@@ -78,5 +78,14 @@ data class PosUiState(
     val isProcessingSale: Boolean = false,
     val isRoomActionInProgress: Boolean = false,
     val isExportingMaster: Boolean = false,
-    val masterExportNotification: String? = null
+    val masterExportNotification: String? = null,
+
+    // Actualizaciones automáticas remotas (GitHub Releases)
+    val availableUpdate: com.justplay.pos.services.ReleaseInfo? = null,
+    val isCheckingForUpdate: Boolean = false,
+    val isDownloadingUpdate: Boolean = false,
+    val updateDownloadProgress: Float = 0f,
+    val updateStatusMessage: String? = null,
+    val isUpdateDownloaded: Boolean = false,
+    val downloadedUpdateFile: java.io.File? = null
 )

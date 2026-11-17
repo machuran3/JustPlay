@@ -1,0 +1,76 @@
+name: Build and Release JustPlay
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build JustPlay Apps and Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make Gradle executable
+        run: |
+          chmod +x gradlew
+          chmod +x JustPlay_POS_Desktop/gradlew
+
+      - name: Build Desktop fatJar
+        run: |
+          cd JustPlay_POS_Desktop
+          ./gradlew :fatJar --no-daemon
+
+      - name: Build Android Apps
+        run: |
+          ./gradlew :AdminJustPlay:assembleRelease :Employ_JustPlay:assembleRelease --no-daemon
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p release_assets
+          TAG_NAME="${{ github.ref_name }}"
+          
+          # Desktop Jar
+          cp JustPlay_POS_Desktop/build/libs/JustPlayPOS.jar release_assets/JustPlayPOS-${TAG_NAME}.jar
+          cp JustPlay_POS_Desktop/build/libs/JustPlayPOS.jar release_assets/JustPlayPOS.jar
+          
+          # Admin APK
+          cp AdminJustPlay/app/build/outputs/apk/release/AdminJustPlay-release.apk release_assets/AdminJustPlay-${TAG_NAME}.apk
+          cp AdminJustPlay/app/build/outputs/apk/release/AdminJustPlay-release.apk release_assets/AdminJustPlay.apk
+          
+          # Employ APK
+          cp Employ_JustPlay/app/build/outputs/apk/release/Employ_JustPlay-release.apk release_assets/Employ_JustPlay-${TAG_NAME}.apk
+          cp Employ_JustPlay/app/build/outputs/apk/release/Employ_JustPlay-release.apk release_assets/Employ_JustPlay.apk
+          
+          ls -lh release_assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release_assets/*
+          name: JustPlay ${{ github.ref_name }}
+          body: |
+            ## Novedades de JustPlay ${{ github.ref_name }}
+            
+            - **JustPlay POS (Desktop)**: Corrección en control de inventario, stock en salas, persistencia offline y buscador de actualizaciones automático.
+            - **Admin JustPlay (Android)**: Soporte para nombres idénticos con diferente gramaje/volumen y auto-actualización in-app desde GitHub.
+            - **Empleado JustPlay (Android)**: Soporte para nombres con diferente gramaje/volumen y auto-actualización in-app desde GitHub.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

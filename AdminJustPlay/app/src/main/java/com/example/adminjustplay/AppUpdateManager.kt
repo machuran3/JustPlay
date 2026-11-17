@@ -39,7 +39,7 @@ object AppUpdateManager {
     fun verificarActualizacion(
         activity: Activity,
         nombreApp: String = "AdminJustPlay",
-        githubOwnerRepo: String? = null,
+        githubOwnerRepo: String? = "machuran3/JustPlay",
         mostrarToastSiNoHay: Boolean = false
     ) {
         val versionActual = obtenerVersionAppActual(activity)
@@ -127,9 +127,19 @@ object AppUpdateManager {
                         for (i in 0 until assets.length()) {
                             val asset = assets.getJSONObject(i)
                             val name = asset.optString("name", "")
-                            if (name.endsWith(".apk", ignoreCase = true)) {
+                            if (name.endsWith(".apk", ignoreCase = true) && name.contains("Admin", ignoreCase = true)) {
                                 apkDownloadUrl = asset.optString("browser_download_url", "")
                                 break
+                            }
+                        }
+                        if (apkDownloadUrl.isEmpty()) {
+                            for (i in 0 until assets.length()) {
+                                val asset = assets.getJSONObject(i)
+                                val name = asset.optString("name", "")
+                                if (name.endsWith(".apk", ignoreCase = true)) {
+                                    apkDownloadUrl = asset.optString("browser_download_url", "")
+                                    break
+                                }
                             }
                         }
                     }

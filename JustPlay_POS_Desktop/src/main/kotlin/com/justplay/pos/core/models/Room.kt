@@ -17,7 +17,8 @@ data class RoomOrder(
     val cantidad: Int = 1,
     val nombre: String = "",
     val precioUnidad: Double = 0.0,
-    val estaEntregado: Boolean = true
+    val estaEntregado: Boolean = true,
+    val barcode: String = ""
 ) {
     val subtotal: Double get() = cantidad * precioUnidad
 }

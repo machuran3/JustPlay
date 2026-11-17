@@ -74,10 +74,18 @@ class SqliteLocalStorage(
                             client_phone TEXT,
                             operator_name TEXT,
                             is_synced INTEGER DEFAULT 0,
-                            is_deleted INTEGER DEFAULT 0
+                            is_deleted INTEGER DEFAULT 0,
+                            destination_type TEXT DEFAULT 'MOSTRADOR',
+                            target_room_id INTEGER,
+                            target_room_name TEXT,
+                            receipt_image_url TEXT
                         )
                         """.trimIndent()
                     )
+                    try { stmt.execute("ALTER TABLE local_sales ADD COLUMN destination_type TEXT DEFAULT 'MOSTRADOR'") } catch (_: Exception) {}
+                    try { stmt.execute("ALTER TABLE local_sales ADD COLUMN target_room_id INTEGER") } catch (_: Exception) {}
+                    try { stmt.execute("ALTER TABLE local_sales ADD COLUMN target_room_name TEXT") } catch (_: Exception) {}
+                    try { stmt.execute("ALTER TABLE local_sales ADD COLUMN receipt_image_url TEXT") } catch (_: Exception) {}
 
                     // Tabla de Cola Offline de Catálogo de Productos
                     stmt.execute(
@@ -109,8 +117,9 @@ class SqliteLocalStorage(
                 INSERT OR REPLACE INTO local_sales (
                     id, date_time, items_json, total_amount, payment_method,
                     cash_received, qr_amount, change_returned, client_name, client_phone,
-                    operator_name, is_synced, is_deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    operator_name, is_synced, is_deleted,
+                    destination_type, target_room_id, target_room_name, receipt_image_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent()
 
             conn.prepareStatement(sql).use { pstmt ->
@@ -127,6 +136,10 @@ class SqliteLocalStorage(
                 pstmt.setString(11, sale.operatorName)
                 pstmt.setInt(12, if (sale.isSynced) 1 else 0)
                 pstmt.setInt(13, if (sale.isDeleted) 1 else 0)
+                pstmt.setString(14, sale.destinationType)
+                if (sale.targetRoomId != null) pstmt.setInt(15, sale.targetRoomId) else pstmt.setNull(15, java.sql.Types.INTEGER)
+                pstmt.setString(16, sale.targetRoomName)
+                pstmt.setString(17, sale.receiptImageUrl)
                 pstmt.executeUpdate()
             }
         }
@@ -246,6 +259,11 @@ class SqliteLocalStorage(
             PaymentMethod.EFECTIVO
         }
 
+        val destType = try { rs.getString("destination_type") ?: "MOSTRADOR" } catch (_: Exception) { "MOSTRADOR" }
+        val roomId = try { val v = rs.getInt("target_room_id"); if (rs.wasNull()) null else v } catch (_: Exception) { null }
+        val roomName = try { rs.getString("target_room_name") } catch (_: Exception) { null }
+        val receiptUrl = try { rs.getString("receipt_image_url") } catch (_: Exception) { null }
+
         return SaleTransaction(
             id = rs.getString("id"),
             dateTime = rs.getString("date_time"),
@@ -258,6 +276,10 @@ class SqliteLocalStorage(
             clientName = rs.getString("client_name") ?: "Venta Mostrador",
             clientPhone = rs.getString("client_phone"),
             operatorName = rs.getString("operator_name") ?: "Lector POS PC",
+            destinationType = destType,
+            targetRoomId = roomId,
+            targetRoomName = roomName,
+            receiptImageUrl = receiptUrl,
             isSynced = rs.getInt("is_synced") == 1,
             isDeleted = rs.getInt("is_deleted") == 1
         )

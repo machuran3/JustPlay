@@ -81,8 +81,8 @@ class RoomManagementService(
         return roomRepository.clearRoom(roomId)
     }
 
-    suspend fun addOrderToRoom(roomId: Int, order: RoomOrder): Boolean {
-        return roomRepository.addOrderToRoom(roomId, order)
+    suspend fun addOrderToRoom(roomId: Int, order: RoomOrder, shouldRegisterInVentas: Boolean = true): Boolean {
+        return roomRepository.addOrderToRoom(roomId, order, shouldRegisterInVentas)
     }
 
     suspend fun removeOrderFromRoom(roomId: Int, orderIndex: Int): Boolean {

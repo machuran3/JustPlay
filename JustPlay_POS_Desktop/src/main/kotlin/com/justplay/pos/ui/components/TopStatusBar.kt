@@ -1,6 +1,7 @@
 package com.justplay.pos.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +29,8 @@ fun TopStatusBar(
     onHistoryClick: () -> Unit,
     onNewProductClick: () -> Unit,
     onExportMasterClick: () -> Unit = {},
-    onDismissExportNotification: () -> Unit = {}
+    onDismissExportNotification: () -> Unit = {},
+    onCheckUpdatesClick: () -> Unit = {}
 ) {
     Surface(
         color = CardDark,
@@ -68,15 +70,45 @@ fun TopStatusBar(
                         Surface(
                             color = SurfaceDark,
                             shape = RoundedCornerShape(4.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
+                            modifier = Modifier.clickable { onCheckUpdatesClick() }
                         ) {
-                            Text(
-                                text = "v${state.currentAppVersion}",
-                                color = TextMuted,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "v${state.currentAppVersion}",
+                                    color = TextMuted,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "🔄",
+                                    fontSize = 9.sp
+                                )
+                            }
+                        }
+
+                        if (state.availableUpdate != null) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Button(
+                                onClick = onCheckUpdatesClick,
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(24.dp)
+                            ) {
+                                Text(
+                                    text = "🚀 Actualizar (${state.availableUpdate.tagName})",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else if (state.isCheckingForUpdate) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            CircularProgressIndicator(color = AccentLime, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                         }
                     }
                     Text(

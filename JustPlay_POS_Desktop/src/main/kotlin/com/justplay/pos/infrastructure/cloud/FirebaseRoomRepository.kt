@@ -597,7 +597,7 @@ class FirebaseRoomRepository(
         }
     }
 
-    override suspend fun addOrderToRoom(roomId: Int, order: RoomOrder): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun addOrderToRoom(roomId: Int, order: RoomOrder, shouldRegisterInVentas: Boolean): Boolean = withContext(Dispatchers.IO) {
         try {
             val currentRooms = fetchRooms()
             val existing = currentRooms.find { it.id == roomId } ?: return@withContext false
@@ -608,34 +608,36 @@ class FirebaseRoomRepository(
             val updatedRoom = existing.copy(pedidos = updatedOrders)
             val ok = updateRoom(updatedRoom)
             if (ok) {
-                // Registrar el consumo/producto agregado APARTE en /registros
-                val fechaHora = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
-                val regId = if (order.idFirebase.isNotBlank()) order.idFirebase else "ORD_${System.currentTimeMillis()}"
-                val regPayload = mapOf(
-                    "idFirebase" to regId,
-                    "tipo" to "Consumo",
-                    "nombreElemento" to "Consumo ${existing.nombre}",
-                    "cliente" to (existing.cliente ?: "Cliente"),
-                    "celular" to existing.celular,
-                    "fechaHora" to fechaHora,
-                    "pedidos" to "${order.cantidad}x ${order.nombre} (${order.subtotal} Bs)",
-                    "totalCobrado" to order.subtotal,
-                    "metodoPago" to existing.metodoPago,
-                    "creadoPor" to "POS Desktop (PC)",
-                    "eliminado" to false
-                )
-                val jsonReg = gson.toJson(regPayload).toRequestBody(jsonMediaType)
-                val regRequest = Request.Builder()
-                    .url("$baseUrl/registros/$regId.json")
-                    .put(jsonReg)
-                    .build()
-                client.newCall(regRequest).execute().close()
+                if (shouldRegisterInVentas) {
+                    // Registrar el consumo/producto agregado APARTE en /registros (solo si no viene de una venta ya cobrada)
+                    val fechaHora = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(Date())
+                    val regId = if (order.idFirebase.isNotBlank()) order.idFirebase else "ORD_${System.currentTimeMillis()}"
+                    val regPayload = mapOf(
+                        "idFirebase" to regId,
+                        "tipo" to "Consumo",
+                        "nombreElemento" to "Consumo ${existing.nombre}",
+                        "cliente" to (existing.cliente ?: "Cliente"),
+                        "celular" to existing.celular,
+                        "fechaHora" to fechaHora,
+                        "pedidos" to "${order.cantidad}x ${order.nombre} (${order.subtotal} Bs)",
+                        "totalCobrado" to order.subtotal,
+                        "metodoPago" to existing.metodoPago,
+                        "creadoPor" to "POS Desktop (PC)",
+                        "eliminado" to false
+                    )
+                    val jsonReg = gson.toJson(regPayload).toRequestBody(jsonMediaType)
+                    val regRequest = Request.Builder()
+                        .url("$baseUrl/registros/$regId.json")
+                        .put(jsonReg)
+                        .build()
+                    client.newCall(regRequest).execute().close()
 
-                val regAuditRequest = Request.Builder()
-                    .url("$baseUrl/auditoria_registros/$regId.json")
-                    .put(jsonReg)
-                    .build()
-                client.newCall(regAuditRequest).execute().close()
+                    val regAuditRequest = Request.Builder()
+                        .url("$baseUrl/auditoria_registros/$regId.json")
+                        .put(jsonReg)
+                        .build()
+                    client.newCall(regAuditRequest).execute().close()
+                }
 
                 fetchRooms()
             }

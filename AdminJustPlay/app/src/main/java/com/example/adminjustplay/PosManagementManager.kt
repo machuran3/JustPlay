@@ -950,16 +950,27 @@ class PosManagementManager(
                             return@addOnSuccessListener
                         }
 
-                        // 2. Validar nombre duplicado (en creación o edición)
-                        val duplicateNameSnap = snap.children.find { child ->
+                        // 2. Validar nombre y gramaje duplicado (en creación o edición)
+                        fun normalizeG(g: String) = g.trim().replace("\\s+".toRegex(), "").lowercase()
+                        val currentGramaje = gramaje.trim()
+
+                        val duplicateNameAndGramajeSnap = snap.children.find { child ->
                             val childCode = child.key ?: ""
                             val childName = child.child("nombre").getValue(String::class.java)?.trim() ?: ""
-                            childCode != (codigoExistente ?: code) && childName.equals(name, ignoreCase = true)
+                            val childGramaje = child.child("gramaje").getValue(String::class.java)?.trim() ?: ""
+                            childCode != (codigoExistente ?: code) &&
+                                childName.equals(name, ignoreCase = true) &&
+                                normalizeG(childGramaje) == normalizeG(currentGramaje)
                         }
 
-                        if (duplicateNameSnap != null) {
-                            val existingCode = duplicateNameSnap.key
-                            Toast.makeText(context, "❌ Error: Ya existe otro producto con el nombre '$name' (Código: $existingCode)", Toast.LENGTH_LONG).show()
+                        if (duplicateNameAndGramajeSnap != null) {
+                            val existingCode = duplicateNameAndGramajeSnap.key
+                            val msg = if (currentGramaje.isNotEmpty()) {
+                                "❌ Ya existe otro producto con el mismo nombre y gramaje '$name $currentGramaje' (Código: $existingCode)"
+                            } else {
+                                "❌ Ya existe otro producto con el nombre '$name'. Ingresa el gramaje/volumen para diferenciar esta presentación."
+                            }
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                             return@addOnSuccessListener
                         }
 

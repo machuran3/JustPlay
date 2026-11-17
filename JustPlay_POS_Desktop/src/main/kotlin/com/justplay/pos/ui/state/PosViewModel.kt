@@ -41,7 +41,7 @@ class PosViewModel(
     private val _uiState = MutableStateFlow(
         PosUiState(
             deviceId = securityService?.identity?.deviceId ?: "POS-PC-01",
-            currentAppVersion = "1.0.0"
+            currentAppVersion = AutoUpdaterService.CURRENT_APP_VERSION
         )
     )
     val uiState: StateFlow<PosUiState> = _uiState.asStateFlow()

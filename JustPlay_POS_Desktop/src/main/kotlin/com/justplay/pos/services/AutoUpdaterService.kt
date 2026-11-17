@@ -27,6 +27,10 @@ class AutoUpdaterService(
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 ) {
+    companion object {
+        const val CURRENT_APP_VERSION = "1.0.2"
+    }
+
     /**
      * Compara dos cadenas de versión semántica (ej. "1.0.1" vs "1.0.0").
      * Retorna positivo si candidate > current.
@@ -51,7 +55,7 @@ class AutoUpdaterService(
     /**
      * Consulta la API pública de GitHub para obtener la última versión disponible.
      */
-    suspend fun checkForUpdates(currentVersion: String = "1.0.0"): Result<ReleaseInfo?> = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(currentVersion: String = CURRENT_APP_VERSION): Result<ReleaseInfo?> = withContext(Dispatchers.IO) {
         try {
             val url = "https://api.github.com/repos/$githubRepo/releases/latest"
             val request = Request.Builder()

@@ -1,6 +1,7 @@
 package com.justplay.pos.ui.state
 
 import com.justplay.pos.core.models.*
+import com.justplay.pos.services.AutoUpdaterService
 
 data class PosUiState(
     val cartItems: List<CartItem> = emptyList(),
@@ -69,7 +70,7 @@ data class PosUiState(
 
     // Seguridad, Bloqueo de Dispositivo y Force Update
     val deviceId: String = "",
-    val currentAppVersion: String = "1.0.0",
+    val currentAppVersion: String = AutoUpdaterService.CURRENT_APP_VERSION,
     val minRequiredVersion: String = "1.0.0",
     val isDeviceRevoked: Boolean = false,
     val isVersionObsolete: Boolean = false,

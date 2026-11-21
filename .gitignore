@@ -9,6 +9,8 @@ build/
 
 # Archivos locales de compilación y salida
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear

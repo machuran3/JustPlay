@@ -2202,6 +2202,32 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun identificarSeccionBase(id: String, nombre: String, prefijo: String = ""): String? {
+        val idL = id.trim().lowercase()
+        val nomL = nombre.trim().lowercase()
+        val prefL = prefijo.trim().lowercase()
+        if (idL in listOf("minicine", "cine", "cines", "salas", "sala") ||
+            nomL.contains("cine") ||
+            (nomL.startsWith("sala") && !nomL.contains("auto") && !nomL.contains("dance")) ||
+            prefL == "sala"
+        ) {
+            return "minicine"
+        }
+        if (idL in listOf("autitos", "volantes", "simuladores", "car", "cars", "autito", "volante", "simulador") ||
+            nomL.contains("auto") || nomL.contains("car") || nomL.contains("volante") || nomL.contains("simulador") ||
+            prefL in listOf("car", "auto", "volante")
+        ) {
+            return "autitos"
+        }
+        if (idL in listOf("just_dance", "dance", "justdance") ||
+            nomL.contains("dance") ||
+            prefL.contains("dance")
+        ) {
+            return "just_dance"
+        }
+        return null
+    }
+
     private fun mostrarDialogoAdministrarSalas() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_administrar_salas, null)
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
@@ -2444,11 +2470,11 @@ class MainActivity : AppCompatActivity() {
             opcionesSecciones.clear()
             val mapa = LinkedHashMap<String, SeccionSala>()
 
-            val baseCine = listaSecciones.find { it.id.equals("minicine", ignoreCase = true) || it.id.equals("cine", ignoreCase = true) }
+            val baseCine = listaSecciones.find { identificarSeccionBase(it.id, it.nombre, it.prefijoSala) == "minicine" }
                 ?: SeccionSala(id = "minicine", nombre = "Minicine", icono = "🎬", prefijoSala = "Sala", baseIdRango = 0)
-            val baseAutitos = listaSecciones.find { it.id.equals("autitos", ignoreCase = true) || it.id.equals("volantes", ignoreCase = true) }
+            val baseAutitos = listaSecciones.find { identificarSeccionBase(it.id, it.nombre, it.prefijoSala) == "autitos" }
                 ?: SeccionSala(id = "autitos", nombre = "Autitos (Simuladores)", icono = "🏎️", prefijoSala = "Car", baseIdRango = 100)
-            val baseDance = listaSecciones.find { it.id.equals("just_dance", ignoreCase = true) || it.id.equals("dance", ignoreCase = true) }
+            val baseDance = listaSecciones.find { identificarSeccionBase(it.id, it.nombre, it.prefijoSala) == "just_dance" }
                 ?: SeccionSala(id = "just_dance", nombre = "Just Dance", icono = "💃", prefijoSala = "Just Dance", baseIdRango = 200)
 
             mapa["minicine"] = baseCine
@@ -2457,15 +2483,9 @@ class MainActivity : AppCompatActivity() {
 
             for (sec in listaSecciones) {
                 if (!sec.activa) continue
-                val idLower = sec.id.trim().lowercase()
-                val nomLower = sec.nombre.trim().lowercase()
-
-                if (idLower in listOf("minicine", "cine", "cines", "salas") || nomLower in listOf("minicine", "cine", "cines", "salas")) {
-                    mapa["minicine"] = sec
-                } else if (idLower in listOf("autitos", "volantes", "simuladores") || nomLower in listOf("autitos", "volantes", "simuladores", "autitos (simuladores)")) {
-                    mapa["autitos"] = sec
-                } else if (idLower in listOf("just_dance", "dance") || nomLower in listOf("just dance", "just_dance")) {
-                    mapa["just_dance"] = sec
+                val base = identificarSeccionBase(sec.id, sec.nombre, sec.prefijoSala)
+                if (base != null) {
+                    mapa[base] = sec
                 } else {
                     mapa[sec.id] = sec
                 }
@@ -2652,11 +2672,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val customSections = listaSecciones.filter { sec ->
-                val idLower = sec.id.trim().lowercase()
-                val nomLower = sec.nombre.trim().lowercase()
-                sec.activa &&
-                idLower !in listOf("minicine", "cine", "cines", "salas", "autitos", "volantes", "simuladores", "just_dance", "dance") &&
-                nomLower !in listOf("minicine", "cine", "cines", "salas", "autitos", "volantes", "simuladores", "autitos (simuladores)", "just dance", "just_dance")
+                sec.activa && identificarSeccionBase(sec.id, sec.nombre, sec.prefijoSala) == null
             }
             if (customSections.isEmpty()) {
                 val tvEmpty = TextView(this).apply {
@@ -2723,8 +2739,21 @@ class MainActivity : AppCompatActivity() {
                                     if (seccionEnEdicion?.id == sec.id) {
                                         resetearFormulario()
                                     }
+                                    database.child("secciones_salas").addListenerForSingleValueEvent(object : ValueEventListener {
+                                        override fun onDataChange(snap: DataSnapshot) {
+                                            for (c in snap.children) {
+                                                val s = c.getValue(SeccionSala::class.java)
+                                                if (c.key == sec.id || s?.id == sec.id || s?.nombre.equals(sec.nombre, ignoreCase = true)) {
+                                                    c.ref.removeValue()
+                                                }
+                                            }
+                                        }
+                                        override fun onCancelled(error: DatabaseError) {}
+                                    })
                                     database.child("secciones_salas").child(sec.id).removeValue()
                                     database.child("config_precios").child("precio_${sec.id}").removeValue()
+                                    BasePriceConfig.preciosDinamicos.remove(sec.id)
+                                    BasePriceConfig.preciosDinamicos.remove(sec.nombre)
                                     listaSecciones.removeAll { it.id == sec.id || it.nombre.equals(sec.nombre, ignoreCase = true) }
                                     redibujarListaSecciones()
                                     onSeccionesModificadas?.invoke()
@@ -2907,13 +2936,12 @@ class MainActivity : AppCompatActivity() {
 
         val seccionesParaMostrar = mutableSetOf<String>()
         for (sec in listaSecciones) {
-            if (sec.id.lowercase() !in listOf("minicine", "autitos", "just_dance") &&
-                sec.nombre.lowercase() !in listOf("minicine", "autitos", "volantes", "just dance")) {
+            if (sec.activa && identificarSeccionBase(sec.id, sec.nombre, sec.prefijoSala) == null) {
                 seccionesParaMostrar.add(sec.nombre)
             }
         }
         for (key in reservasDinamicasMap.keys) {
-            if (key.isNotBlank()) seccionesParaMostrar.add(key)
+            if (key.isNotBlank() && identificarSeccionBase(key, key) == null) seccionesParaMostrar.add(key)
         }
 
         if (seccionesParaMostrar.isEmpty()) return
@@ -3090,11 +3118,7 @@ class MainActivity : AppCompatActivity() {
         contenedor.removeAllViews()
 
         val seccionesCustom = listaSecciones.filter { sec ->
-            val idLower = sec.id.trim().lowercase()
-            val nomLower = sec.nombre.trim().lowercase()
-            sec.activa &&
-            idLower !in listOf("minicine", "autitos", "just_dance", "cine", "cines", "volantes", "salas") &&
-            nomLower !in listOf("minicine", "autitos", "just dance", "just_dance", "cine", "cines", "volantes", "salas", "autitos (simuladores)")
+            sec.activa && identificarSeccionBase(sec.id, sec.nombre, sec.prefijoSala) == null
         }
         for (sec in seccionesCustom) {
             val isChecked = filtrosSeccionesDinamicasEstado.getOrPut(sec.id) { true }

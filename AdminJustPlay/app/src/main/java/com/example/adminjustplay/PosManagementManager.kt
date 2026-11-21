@@ -150,6 +150,8 @@ class PosManagementManager(
                     val nombre = snap.child("nombre").getValue(String::class.java) ?: "Producto $barcode"
                     val gramaje = snap.child("gramaje").getValue(String::class.java) ?: ""
                     val precio = snap.child("precio_unitario").getValue(Double::class.java) ?: 0.0
+                    val costo = snap.child("costo_compra").getValue(Double::class.java)
+                        ?: snap.child("costPrice").getValue(Double::class.java) ?: (precio * 0.6)
                     val stock = snap.child("stock_actual").getValue(Int::class.java) ?: 0
                     val categoria = snap.child("categoria").getValue(String::class.java) ?: "General"
 
@@ -162,7 +164,7 @@ class PosManagementManager(
                         lp.setMargins(0, 0, 0, 8)
                         layoutParams = lp
                         setOnClickListener {
-                            mostrarDialogoCrearEditarProducto(barcode, nombre, precio, stock, categoria, gramaje)
+                            mostrarDialogoCrearEditarProducto(barcode, nombre, precio, costo, stock, categoria, gramaje)
                         }
                     }
 
@@ -475,6 +477,7 @@ class PosManagementManager(
         codigoExistente: String? = null,
         nombreExistente: String = "",
         precioExistente: Double = 10.0,
+        costoExistente: Double = 5.0,
         stockExistente: Int = 50,
         categoriaExistente: String = "Snacks",
         gramajeExistente: String = ""
@@ -510,6 +513,14 @@ class PosManagementManager(
         val etPrecio = EditText(context).apply {
             hint = "Precio Venta en Bs"
             setText(precioExistente.toString())
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.parseColor("#888888"))
+        }
+
+        val etCosto = EditText(context).apply {
+            hint = "Costo Compra en Bs (debe ser menor al precio)"
+            setText(costoExistente.toString())
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
@@ -576,6 +587,7 @@ class PosManagementManager(
         container.addView(etNombre)
         container.addView(etGramaje)
         container.addView(etPrecio)
+        container.addView(etCosto)
         container.addView(etStock)
         container.addView(llStockButtons)
         container.addView(tvCatLabel)
@@ -589,6 +601,7 @@ class PosManagementManager(
                 val name = etNombre.text.toString().trim()
                 val gramaje = etGramaje.text.toString().trim()
                 val price = etPrecio.text.toString().toDoubleOrNull() ?: 10.0
+                val cost = etCosto.text.toString().toDoubleOrNull() ?: 5.0
                 val rawStock = etStock.text.toString().trim()
                 val stock = if (rawStock.startsWith("+")) {
                     val inc = rawStock.removePrefix("+").trim().toIntOrNull() ?: 0
@@ -598,6 +611,12 @@ class PosManagementManager(
                 }
                 val cat = spinnerCategoria.selectedItem?.toString() ?: "Snack"
                 val now = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
+
+                // Validación estricta de regla de negocio: Precio Venta > Costo Compra
+                if (price <= cost) {
+                    Toast.makeText(context, "❌ El precio de venta ($price Bs) debe ser mayor al costo de compra ($cost Bs).", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
 
                 if (code.isNotEmpty() && name.isNotEmpty()) {
                     // Validar duplicados de código y nombre en Firebase
@@ -645,6 +664,7 @@ class PosManagementManager(
                             "nombre" to name,
                             "gramaje" to gramaje,
                             "precio_unitario" to price,
+                            "costo_compra" to cost,
                             "stock_actual" to stock,
                             "categoria" to cat,
                             "activo" to true,

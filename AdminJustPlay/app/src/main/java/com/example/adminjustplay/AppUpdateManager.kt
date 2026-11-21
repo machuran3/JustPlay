@@ -47,6 +47,20 @@ object AppUpdateManager {
     ) {
         val versionActual = obtenerVersionAppActual(activity)
 
+        // Si se fuerza actualización obligatoria (por versión mínima obsoleta), consultar directamente GitHub Releases
+        if (forzarObligatoria && !githubOwnerRepo.isNullOrEmpty()) {
+            consultarGitHubReleases(
+                activity = activity,
+                githubOwnerRepo = githubOwnerRepo,
+                versionActual = versionActual,
+                mostrarToastSiNoHay = mostrarToastSiNoHay,
+                forzarObligatoria = true,
+                versionMinimaRequerida = "Actualización Requerida",
+                esObligatoriaDb = true
+            )
+            return
+        }
+
         // 1. Consultar primero la configuración de versión mínima global (Desktop y Celular)
         val configPosRef = FirebaseDatabase.getInstance().getReference("config_pos")
         configPosRef.addListenerForSingleValueEvent(object : ValueEventListener {
@@ -444,9 +458,9 @@ object AppUpdateManager {
     fun obtenerVersionAppActual(context: Context): String {
         return try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.6"
+            pInfo.versionName ?: "1.0.7"
         } catch (e: Exception) {
-            "1.0.6"
+            "1.0.7"
         }
     }
 

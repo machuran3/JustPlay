@@ -18,7 +18,7 @@ import java.awt.event.KeyEvent
  */
 class KeyboardBarcodeScanner(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
-    private val maxCharIntervalMs: Long = 75L
+    private val maxCharIntervalMs: Long = 120L
 ) : IBarcodeScanner, KeyEventDispatcher {
 
     private val _barcodeScannedFlow = MutableSharedFlow<String>(extraBufferCapacity = 64)
@@ -58,9 +58,9 @@ class KeyboardBarcodeScanner(
 
         if (isEnter) {
             val hadBuffer = buffer.length >= 3
-            val isRecentBurst = (currentTime - lastKeyTimestamp <= 75L)
+            val isRecentBurst = (currentTime - lastKeyTimestamp <= 130L)
 
-            if (currentTime - lastEnterTimestamp < 80L) {
+            if (currentTime - lastEnterTimestamp < 100L) {
                 return hadBuffer && isRecentBurst
             }
             lastEnterTimestamp = currentTime
@@ -94,15 +94,15 @@ class KeyboardBarcodeScanner(
                 }
                 buffer.append(char)
 
-                // Si la tecla llegó a velocidad de lector de código de barras (< 75ms) o ya tenemos acumulación rápida,
+                // Si la tecla llegó a velocidad de lector de código de barras (< 120ms) o ya tenemos acumulación rápida,
                 // CONSUMIMOS el evento para que NO se escriba en ningún TextField activo
-                if (timeSinceLastKey <= 75L || (buffer.length >= 2 && timeSinceLastKey <= 120L)) {
+                if (timeSinceLastKey <= 120L || (buffer.length >= 2 && timeSinceLastKey <= 150L)) {
                     return true
                 }
             }
         } else if (e.id == KeyEvent.KEY_PRESSED) {
             val timeSinceLastKey = if (lastKeyTimestamp == 0L) Long.MAX_VALUE else (currentTime - lastKeyTimestamp)
-            if (timeSinceLastKey <= 75L && buffer.isNotEmpty()) {
+            if (timeSinceLastKey <= 120L && buffer.isNotEmpty()) {
                 return true
             }
             if (lastKeyTimestamp != 0L && currentTime - lastKeyTimestamp > maxCharIntervalMs * 2) {
@@ -111,7 +111,7 @@ class KeyboardBarcodeScanner(
             }
         } else if (e.id == KeyEvent.KEY_RELEASED) {
             val timeSinceLastKey = if (lastKeyTimestamp == 0L) Long.MAX_VALUE else (currentTime - lastKeyTimestamp)
-            if (timeSinceLastKey <= 75L && buffer.isNotEmpty()) {
+            if (timeSinceLastKey <= 120L && buffer.isNotEmpty()) {
                 return true
             }
         }

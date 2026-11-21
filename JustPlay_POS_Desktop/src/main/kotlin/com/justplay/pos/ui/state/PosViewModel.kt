@@ -258,8 +258,19 @@ class PosViewModel(
                 }
                 return s
             }
+
+            fun cleanSearchIfBarcode(query: String, scanned: String): String {
+                val q = query.trim()
+                val b = scanned.trim()
+                if (q.isEmpty() || b.isEmpty()) return q
+                if (q == b || q.endsWith(b) || q.startsWith(b) || b.contains(q) || q.contains(b)) {
+                    return ""
+                }
+                return q
+            }
             val cleanClientName = cleanInput(currentState.clientNameInput)
             val cleanSearchQuery = cleanInput(currentState.searchQuery)
+            val effectiveSearchQuery = cleanSearchIfBarcode(cleanSearchQuery, barcode)
 
             if (product != null && product.active) {
                 if (product.currentStock <= 0) {
@@ -269,7 +280,7 @@ class PosViewModel(
                             lastScannedProduct = product,
                             scanErrorMessage = "⚠️ PRODUCTO AGOTADO: '${product.name}' (Stock: 0). No se puede vender sin stock (evita venta fantasma).",
                             manualBarcodeText = "",
-                            searchQuery = if (cleanSearchQuery == barcode || cleanSearchQuery.endsWith(barcode)) "" else cleanSearchQuery
+                            searchQuery = effectiveSearchQuery
                         )
                     }
                     return@launch
@@ -285,7 +296,7 @@ class PosViewModel(
                             lastScannedProduct = product,
                             scanErrorMessage = "⚠️ Stock máximo alcanzado para '${product.name}' (${product.currentStock} disponibles en inventario).",
                             manualBarcodeText = "",
-                            searchQuery = if (cleanSearchQuery == barcode || cleanSearchQuery.endsWith(barcode)) "" else cleanSearchQuery
+                            searchQuery = effectiveSearchQuery
                         )
                     }
                     return@launch
@@ -309,7 +320,7 @@ class PosViewModel(
                             scanErrorMessage = null,
                             manualBarcodeText = "",
                             clientNameInput = if (cleanClientName.isBlank()) "Venta Mostrador" else cleanClientName,
-                            searchQuery = if (cleanSearchQuery == barcode || cleanSearchQuery.endsWith(barcode)) "" else cleanSearchQuery
+                            searchQuery = effectiveSearchQuery
                         )
                     }
                 }
@@ -321,7 +332,7 @@ class PosViewModel(
                         scanErrorMessage = "Código no encontrado: '$barcode'. Pulsa '➕ Crear Producto' para registrarlo.",
                         manualBarcodeText = barcode,
                         clientNameInput = if (cleanClientName.isBlank()) "Venta Mostrador" else cleanClientName,
-                        searchQuery = cleanSearchQuery
+                        searchQuery = effectiveSearchQuery
                     )
                 }
             }

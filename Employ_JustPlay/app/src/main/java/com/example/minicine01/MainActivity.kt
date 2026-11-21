@@ -83,6 +83,8 @@ class MainActivity : AppCompatActivity() {
 
     private var estaConectadoInternet: Boolean = true
     private var sesionIniciada: Boolean = false
+    private var versionObsoletaBloqueada: Boolean = false
+    private var minVersionRequeridaPos: String = "1.0.0"
 
     private lateinit var tvMinicineOcupadas: TextView
     private lateinit var tvAutitosOcupados: TextView
@@ -491,6 +493,14 @@ class MainActivity : AppCompatActivity() {
             refrescarInfoLogin()
 
             btnLoginIngresar.setOnClickListener {
+                if (versionObsoletaBloqueada) {
+                    tvLoginMensajeError.visibility = View.VISIBLE
+                    tvLoginMensajeError.text = "⚠️ Tu versión de aplicación ha quedado obsoleta. Debes actualizar a v$minVersionRequeridaPos para poder acceder."
+                    Toast.makeText(this, "⚠️ Aplicación obsoleta. Actualización requerida: v$minVersionRequeridaPos", Toast.LENGTH_LONG).show()
+                    AppUpdateManager.verificarActualizacion(this@MainActivity, "Employ_JustPlay", forzarObligatoria = true)
+                    return@setOnClickListener
+                }
+
                 val pinIngresado = etLoginPin.text.toString().trim()
                 val user = PresenciaManager.obtenerUsuarioActualModel()
                 val pinConfigurado = user.pin.trim().ifEmpty { "0001" }
@@ -655,12 +665,17 @@ class MainActivity : AppCompatActivity() {
                                 ?: "1.0.0"
                             val versionActual = AppUpdateManager.obtenerVersionAppActual(this@MainActivity)
                             if (AppUpdateManager.esVersionSuperior(minVer, versionActual)) {
+                                versionObsoletaBloqueada = true
+                                minVersionRequeridaPos = minVer
                                 try {
-                                    FirebaseDatabase.getInstance().goOffline()
                                     sesionIniciada = false
                                     findViewById<View>(R.id.layoutLoginPin)?.visibility = View.VISIBLE
+                                    findViewById<View>(R.id.layoutBloqueoDispositivo)?.visibility = View.VISIBLE
+                                    findViewById<TextView>(R.id.tvTituloBloqueo)?.text = "🚫 Versión de App Obsoleta"
+                                    findViewById<TextView>(R.id.tvMotivoBloqueo)?.text = "Tu versión (v$versionActual) ya no tiene acceso. Se requiere mínimo v$minVer. Por favor actualiza la aplicación."
                                     findViewById<View>(R.id.fabMain)?.visibility = View.GONE
                                     drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                                    FirebaseDatabase.getInstance().goOffline()
                                 } catch (_: Exception) {}
                                 AppUpdateManager.verificarActualizacion(this@MainActivity, "Employ_JustPlay", forzarObligatoria = true)
                             }

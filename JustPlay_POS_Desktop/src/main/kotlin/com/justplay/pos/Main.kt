@@ -34,6 +34,39 @@ import kotlinx.coroutines.Dispatchers
 
 fun main() = application {
     // -------------------------------------------------------------
+    // PROTECCIÓN CONTRA ANOMALÍAS DE ENFOQUE INTERNO EN COMPOSE DESKTOP
+    // (Ej. "ActiveParent with no focused child" en ráfagas de escáner/recomposición)
+    // -------------------------------------------------------------
+    val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+    Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+        if (throwable.message?.contains("ActiveParent", ignoreCase = true) == true ||
+            throwable.cause?.message?.contains("ActiveParent", ignoreCase = true) == true) {
+            System.err.println("⚠️ Interceptada anomalía interna de foco en Compose Desktop: ${throwable.message}")
+        } else {
+            defaultHandler?.uncaughtException(thread, throwable) ?: throwable.printStackTrace()
+        }
+    }
+
+    try {
+        java.awt.Toolkit.getDefaultToolkit().systemEventQueue.push(object : java.awt.EventQueue() {
+            override fun dispatchEvent(event: java.awt.AWTEvent?) {
+                try {
+                    super.dispatchEvent(event)
+                } catch (e: Throwable) {
+                    if (e.message?.contains("ActiveParent", ignoreCase = true) == true ||
+                        e.cause?.message?.contains("ActiveParent", ignoreCase = true) == true) {
+                        System.err.println("⚠️ EventQueue capturó y previno diálogo de error de foco: ${e.message}")
+                    } else {
+                        throw e
+                    }
+                }
+            }
+        })
+    } catch (e: Exception) {
+        System.err.println("Nota: No se pudo registrar filtro de EventQueue: ${e.message}")
+    }
+
+    // -------------------------------------------------------------
     // INVERSIÓN DE DEPENDENCIAS / INYECCIÓN MANUAL (SOLID: DIP)
     // -------------------------------------------------------------
     val appScope = remember { CoroutineScope(Dispatchers.Default) }
@@ -95,6 +128,7 @@ fun main() = application {
             false
         }
     ) {
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
         JustPlayTheme {
             Scaffold(
                 topBar = {
@@ -102,8 +136,8 @@ fun main() = application {
                         TopStatusBar(
                             state = state,
                             onSyncClick = { viewModel.triggerCloudSync() },
-                            onHistoryClick = { viewModel.openHistoryDialog() },
-                            onNewProductClick = { viewModel.openProductManager(null) },
+                            onHistoryClick = { focusManager.clearFocus(); viewModel.openHistoryDialog() },
+                            onNewProductClick = { focusManager.clearFocus(); viewModel.openProductManager(null) },
                             onExportMasterClick = { viewModel.exportMasterReport() },
                             onDismissExportNotification = { viewModel.dismissMasterExportNotification() },
                             onCheckUpdatesClick = { viewModel.checkForUpdates(silent = false) }
@@ -121,7 +155,7 @@ fun main() = application {
                                 val isSalas = state.currentTab == "SALAS"
                                 val countSalas = state.rooms.count { it.categoria == "Minicine" }
                                 Button(
-                                    onClick = { viewModel.switchTab("SALAS") },
+                                    onClick = { focusManager.clearFocus(); viewModel.switchTab("SALAS") },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isSalas) AccentGreen else BgDark,
                                         contentColor = if (isSalas) Color.Black else Color.White
@@ -135,7 +169,7 @@ fun main() = application {
                                 val isVolantes = state.currentTab == "VOLANTES"
                                 val countVolantes = state.rooms.count { it.categoria == "Autitos" }
                                 Button(
-                                    onClick = { viewModel.switchTab("VOLANTES") },
+                                    onClick = { focusManager.clearFocus(); viewModel.switchTab("VOLANTES") },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isVolantes) AccentGreen else BgDark,
                                         contentColor = if (isVolantes) Color.Black else Color.White
@@ -149,7 +183,7 @@ fun main() = application {
                                 val isDance = state.currentTab == "JUST_DANCE"
                                 val countDance = state.rooms.count { it.categoria == "Just Dance" }
                                 Button(
-                                    onClick = { viewModel.switchTab("JUST_DANCE") },
+                                    onClick = { focusManager.clearFocus(); viewModel.switchTab("JUST_DANCE") },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isDance) AccentGreen else BgDark,
                                         contentColor = if (isDance) Color.Black else Color.White
@@ -169,7 +203,7 @@ fun main() = application {
                                     val isCustom = state.currentTab == "SEC_$customCat"
                                     val countCat = state.rooms.count { it.categoria.equals(customCat, ignoreCase = true) || it.seccionNombre.equals(customCat, ignoreCase = true) }
                                     Button(
-                                        onClick = { viewModel.switchTab("SEC_$customCat") },
+                                        onClick = { focusManager.clearFocus(); viewModel.switchTab("SEC_$customCat") },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = if (isCustom) AccentGreen else BgDark,
                                             contentColor = if (isCustom) Color.Black else Color.White
@@ -183,7 +217,7 @@ fun main() = application {
 
                                 val isSchedule = state.currentTab == "SCHEDULE"
                                 Button(
-                                    onClick = { viewModel.switchTab("SCHEDULE") },
+                                    onClick = { focusManager.clearFocus(); viewModel.switchTab("SCHEDULE") },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isSchedule) AccentGreen else BgDark,
                                         contentColor = if (isSchedule) Color.Black else Color.White
@@ -196,7 +230,7 @@ fun main() = application {
 
                                 val isPos = state.currentTab == "POS"
                                 Button(
-                                    onClick = { viewModel.switchTab("POS") },
+                                    onClick = { focusManager.clearFocus(); viewModel.switchTab("POS") },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (isPos) AccentGreen else BgDark,
                                         contentColor = if (isPos) Color.Black else Color.White
@@ -244,7 +278,7 @@ fun main() = application {
                                         onSearchChange = { viewModel.onSearchQueryChanged(it) },
                                         onCategorySelect = { viewModel.onCategorySelected(it) },
                                         onProductClick = { viewModel.onProductCardClicked(it) },
-                                        onProductEditClick = { viewModel.openProductManager(it) }
+                                        onProductEditClick = { focusManager.clearFocus(); viewModel.openProductManager(it) }
                                     )
                                 }
 
@@ -259,7 +293,7 @@ fun main() = application {
                                         onQuantityChange = { barcode, q -> viewModel.onUpdateCartQuantity(barcode, q) },
                                         onRemoveItem = { barcode -> viewModel.onRemoveCartItem(barcode) },
                                         onClearCart = { viewModel.onClearCart() },
-                                        onCheckoutClick = { viewModel.openPaymentDialog() }
+                                        onCheckoutClick = { focusManager.clearFocus(); viewModel.openPaymentDialog() }
                                     )
                                 }
                             }

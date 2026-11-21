@@ -21,6 +21,7 @@ enum class TipoAuditoriaEvento {
 data class AuditoriaEvento(
     val id: String = "",
     val tipo: TipoAuditoriaEvento = TipoAuditoriaEvento.VENTA,
+    val categoria: String = "",
     val tituloBadge: String = "🛒 VENTA",
     val usuarioNombre: String = "Personal",
     val usuarioRol: String = "Empleado",

@@ -71,9 +71,12 @@ class ProductCatalogService(
     }
 
     fun saveOrUpdateProduct(product: Product, oldBarcode: String? = null) {
-        // Validación: Precios no negativos
+        // Validación: Precios no negativos y precio de venta estrictamente mayor al costo de compra
         require(product.unitPrice >= 0.0 && product.costPrice >= 0.0) {
             "El precio de venta (${product.unitPrice}) y el costo de compra (${product.costPrice}) deben ser mayores o iguales a cero."
+        }
+        require(product.unitPrice > product.costPrice) {
+            "El precio de venta (${product.unitPrice} Bs) debe ser mayor al costo de compra (${product.costPrice} Bs)."
         }
 
         val now = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())

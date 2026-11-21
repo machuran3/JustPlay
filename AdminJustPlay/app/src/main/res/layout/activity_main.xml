@@ -587,6 +587,66 @@
                             android:layout_marginStart="6dp"/>
                     </LinearLayout>
 
+                    <!-- FILTRO POR CATEGORIAS / SECCIONES (AUDITORIA) -->
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:scrollbars="none"
+                        android:layout_marginBottom="8dp">
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <CheckBox
+                                android:id="@+id/cbAuditFiltroCine"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🎬 Cines"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"/>
+
+                            <CheckBox
+                                android:id="@+id/cbAuditFiltroAutitos"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🏎️ Volantes"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"
+                                android:layout_marginStart="8dp"/>
+
+                            <CheckBox
+                                android:id="@+id/cbAuditFiltroDance"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="💃 Just Dance"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"
+                                android:layout_marginStart="8dp"/>
+
+                            <CheckBox
+                                android:id="@+id/cbAuditFiltroMostrador"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🛒 Mostrador"
+                                android:textColor="#FFFFFF"
+                                android:textSize="12sp"
+                                android:checked="true"
+                                android:layout_marginStart="8dp"/>
+
+                            <LinearLayout
+                                android:id="@+id/llAuditFiltrosSeccionesDinamicas"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"/>
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
                     <!-- CHIPS / BOTONES DE TIPO DE ACCIÓN -->
                     <HorizontalScrollView
                         android:layout_width="match_parent"

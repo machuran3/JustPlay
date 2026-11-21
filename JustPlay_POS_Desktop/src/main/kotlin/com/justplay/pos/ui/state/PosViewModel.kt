@@ -269,7 +269,7 @@ class PosViewModel(
                             lastScannedProduct = product,
                             scanErrorMessage = "⚠️ PRODUCTO AGOTADO: '${product.name}' (Stock: 0). No se puede vender sin stock (evita venta fantasma).",
                             manualBarcodeText = "",
-                            searchQuery = cleanSearchQuery
+                            searchQuery = if (cleanSearchQuery == barcode || cleanSearchQuery.endsWith(barcode)) "" else cleanSearchQuery
                         )
                     }
                     return@launch
@@ -285,7 +285,7 @@ class PosViewModel(
                             lastScannedProduct = product,
                             scanErrorMessage = "⚠️ Stock máximo alcanzado para '${product.name}' (${product.currentStock} disponibles en inventario).",
                             manualBarcodeText = "",
-                            searchQuery = cleanSearchQuery
+                            searchQuery = if (cleanSearchQuery == barcode || cleanSearchQuery.endsWith(barcode)) "" else cleanSearchQuery
                         )
                     }
                     return@launch
@@ -309,7 +309,7 @@ class PosViewModel(
                             scanErrorMessage = null,
                             manualBarcodeText = "",
                             clientNameInput = if (cleanClientName.isBlank()) "Venta Mostrador" else cleanClientName,
-                            searchQuery = cleanSearchQuery
+                            searchQuery = if (cleanSearchQuery == barcode || cleanSearchQuery.endsWith(barcode)) "" else cleanSearchQuery
                         )
                     }
                 }

@@ -655,6 +655,13 @@ class MainActivity : AppCompatActivity() {
                                 ?: "1.0.0"
                             val versionActual = AppUpdateManager.obtenerVersionAppActual(this@MainActivity)
                             if (AppUpdateManager.esVersionSuperior(minVer, versionActual)) {
+                                try {
+                                    FirebaseDatabase.getInstance().goOffline()
+                                    sesionIniciada = false
+                                    findViewById<View>(R.id.layoutLoginPin)?.visibility = View.VISIBLE
+                                    findViewById<View>(R.id.fabMain)?.visibility = View.GONE
+                                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                                } catch (_: Exception) {}
                                 AppUpdateManager.verificarActualizacion(this@MainActivity, "Employ_JustPlay", forzarObligatoria = true)
                             }
                         } catch (e: Exception) {

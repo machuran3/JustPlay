@@ -95,19 +95,8 @@ class KeyboardBarcodeScanner(
                 buffer.append(char)
 
                 // Si la tecla llegó a velocidad de lector de código de barras (< 75ms) o ya tenemos acumulación rápida,
-                // CONSUMIMOS el evento para que NO se escriba en ningún TextField activo (como el nombre de cliente en sala)
+                // CONSUMIMOS el evento para que NO se escriba en ningún TextField activo
                 if (timeSinceLastKey <= 75L || (buffer.length >= 2 && timeSinceLastKey <= 120L)) {
-                    if (buffer.length == 2 && timeSinceLastKey <= 75L) {
-                        try {
-                            val focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
-                            if (focusOwner != null) {
-                                val now = System.currentTimeMillis()
-                                focusOwner.dispatchEvent(KeyEvent(focusOwner, KeyEvent.KEY_PRESSED, now, 0, KeyEvent.VK_BACK_SPACE, KeyEvent.CHAR_UNDEFINED))
-                                focusOwner.dispatchEvent(KeyEvent(focusOwner, KeyEvent.KEY_TYPED, now, 0, KeyEvent.VK_UNDEFINED, '\b'))
-                                focusOwner.dispatchEvent(KeyEvent(focusOwner, KeyEvent.KEY_RELEASED, now, 0, KeyEvent.VK_BACK_SPACE, KeyEvent.CHAR_UNDEFINED))
-                            }
-                        } catch (_: Exception) {}
-                    }
                     return true
                 }
             }

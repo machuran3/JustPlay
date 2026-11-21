@@ -215,7 +215,7 @@ class PosManagementManager(
 
     fun mostrarDialogoCambiarVersionMinima() {
         val etVersion = EditText(context).apply {
-            hint = "Ej: 1.0.4"
+            hint = "Ej: 1.0.5"
             setTextColor(Color.WHITE)
             setHintTextColor(Color.parseColor("#888888"))
         }

@@ -129,6 +129,7 @@ class MainActivity : AppCompatActivity() {
     private var auditFiltroTipo: String = "TODAS"
     private var auditFiltroFecha: String? = null
     private var auditQueryTexto: String = ""
+    private val filtrosAuditSeccionesDinamicasEstado = mutableMapOf<String, Boolean>()
 
     // RESERVAS
     private val listaReservasGlobales = mutableListOf<Reserva>()
@@ -565,6 +566,11 @@ class MainActivity : AppCompatActivity() {
                 actualizarEstilosBotonesTipoAuditoria()
                 aplicarFiltrosAuditoria()
             }
+
+            findViewById<CheckBox>(R.id.cbAuditFiltroCine)?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosAuditoria() }
+            findViewById<CheckBox>(R.id.cbAuditFiltroAutitos)?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosAuditoria() }
+            findViewById<CheckBox>(R.id.cbAuditFiltroDance)?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosAuditoria() }
+            findViewById<CheckBox>(R.id.cbAuditFiltroMostrador)?.setOnCheckedChangeListener { _, _ -> aplicarFiltrosAuditoria() }
 
             findViewById<Button>(R.id.btnFiltroFecha).setOnClickListener {
                 val cal = Calendar.getInstance()
@@ -1322,10 +1328,22 @@ class MainActivity : AppCompatActivity() {
                                     else -> "🛡️ ACCIÓN SALA"
                                 }
 
+                                val catLower = categoria.trim().lowercase()
+                                val salaLower = salaNombre.trim().lowercase()
+                                val catAsignada = when {
+                                    catLower.contains("cine") || salaLower.contains("cine") || salaLower.startsWith("sala") -> "cine"
+                                    catLower.contains("auto") || catLower.contains("car") || catLower.contains("volante") || catLower.contains("simulador") ||
+                                    salaLower.contains("car") || salaLower.contains("auto") || salaLower.contains("volante") -> "autitos"
+                                    catLower.contains("dance") || salaLower.contains("dance") -> "dance"
+                                    categoria.isNotBlank() -> categoria
+                                    else -> "cine"
+                                }
+
                                 tempSalasAudit.add(
                                     AuditoriaEvento(
                                         id = snap.key ?: "",
                                         tipo = tipoEv,
+                                        categoria = catAsignada,
                                         tituloBadge = badgeTitulo,
                                         usuarioNombre = usuarioNombre,
                                         usuarioRol = usuarioRol,
@@ -2420,22 +2438,55 @@ class MainActivity : AppCompatActivity() {
         val etNumeroNuevaSalaDinamica = dialogView.findViewById<EditText>(R.id.etNumeroNuevaSalaDinamica)
         val btnAgregarSalaDinamica = dialogView.findViewById<Button>(R.id.btnAgregarSalaDinamica)
 
-        btnAbrirGestionSecciones?.setOnClickListener {
-            mostrarDialogoGestionarSecciones()
+        val opcionesSecciones = mutableListOf<SeccionSala>()
+
+        fun refrescarSpinnerSecciones() {
+            opcionesSecciones.clear()
+            val mapa = LinkedHashMap<String, SeccionSala>()
+
+            val baseCine = listaSecciones.find { it.id.equals("minicine", ignoreCase = true) || it.id.equals("cine", ignoreCase = true) }
+                ?: SeccionSala(id = "minicine", nombre = "Minicine", icono = "🎬", prefijoSala = "Sala", baseIdRango = 0)
+            val baseAutitos = listaSecciones.find { it.id.equals("autitos", ignoreCase = true) || it.id.equals("volantes", ignoreCase = true) }
+                ?: SeccionSala(id = "autitos", nombre = "Autitos (Simuladores)", icono = "🏎️", prefijoSala = "Car", baseIdRango = 100)
+            val baseDance = listaSecciones.find { it.id.equals("just_dance", ignoreCase = true) || it.id.equals("dance", ignoreCase = true) }
+                ?: SeccionSala(id = "just_dance", nombre = "Just Dance", icono = "💃", prefijoSala = "Just Dance", baseIdRango = 200)
+
+            mapa["minicine"] = baseCine
+            mapa["autitos"] = baseAutitos
+            mapa["just_dance"] = baseDance
+
+            for (sec in listaSecciones) {
+                if (!sec.activa) continue
+                val idLower = sec.id.trim().lowercase()
+                val nomLower = sec.nombre.trim().lowercase()
+
+                if (idLower in listOf("minicine", "cine", "cines", "salas") || nomLower in listOf("minicine", "cine", "cines", "salas")) {
+                    mapa["minicine"] = sec
+                } else if (idLower in listOf("autitos", "volantes", "simuladores") || nomLower in listOf("autitos", "volantes", "simuladores", "autitos (simuladores)")) {
+                    mapa["autitos"] = sec
+                } else if (idLower in listOf("just_dance", "dance") || nomLower in listOf("just dance", "just_dance")) {
+                    mapa["just_dance"] = sec
+                } else {
+                    mapa[sec.id] = sec
+                }
+            }
+
+            opcionesSecciones.addAll(mapa.values)
+            val spinnerAdapter = ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                opcionesSecciones.map { "${it.icono} ${it.nombre} (${it.prefijoSala})" }
+            )
+            spSeccionParaNuevaSala?.adapter = spinnerAdapter
         }
 
-        val opcionesSecciones = mutableListOf<SeccionSala>()
-        opcionesSecciones.add(SeccionSala(id = "minicine", nombre = "Minicine", icono = "🎬", prefijoSala = "Sala", baseIdRango = 0))
-        opcionesSecciones.add(SeccionSala(id = "autitos", nombre = "Autitos (Simuladores)", icono = "🏎️", prefijoSala = "Car", baseIdRango = 100))
-        opcionesSecciones.add(SeccionSala(id = "just_dance", nombre = "Just Dance", icono = "💃", prefijoSala = "Just Dance", baseIdRango = 200))
-        opcionesSecciones.addAll(listaSecciones)
+        refrescarSpinnerSecciones()
 
-        val spinnerAdapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            opcionesSecciones.map { "${it.icono} ${it.nombre} (${it.prefijoSala})" }
-        )
-        spSeccionParaNuevaSala?.adapter = spinnerAdapter
+        btnAbrirGestionSecciones?.setOnClickListener {
+            mostrarDialogoGestionarSecciones {
+                refrescarSpinnerSecciones()
+            }
+        }
 
         btnAgregarSalaDinamica?.setOnClickListener {
             val numStr = etNumeroNuevaSalaDinamica?.text.toString().trim()
@@ -2470,10 +2521,11 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun mostrarDialogoGestionarSecciones() {
+    private fun mostrarDialogoGestionarSecciones(onSeccionesModificadas: (() -> Unit)? = null) {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_gestionar_secciones, null)
         val dialog = AlertDialog.Builder(this).setView(dialogView).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.setOnDismissListener { onSeccionesModificadas?.invoke() }
 
         val btnCerrar = dialogView.findViewById<TextView>(R.id.btnCerrarGestionSecciones)
         val tvTituloForm = dialogView.findViewById<TextView>(R.id.tvTituloFormSeccion)
@@ -2599,7 +2651,13 @@ class MainActivity : AppCompatActivity() {
                 llContenedor.addView(row)
             }
 
-            val customSections = listaSecciones.filter { it.id.lowercase() !in listOf("minicine", "autitos", "just_dance") }
+            val customSections = listaSecciones.filter { sec ->
+                val idLower = sec.id.trim().lowercase()
+                val nomLower = sec.nombre.trim().lowercase()
+                sec.activa &&
+                idLower !in listOf("minicine", "cine", "cines", "salas", "autitos", "volantes", "simuladores", "just_dance", "dance") &&
+                nomLower !in listOf("minicine", "cine", "cines", "salas", "autitos", "volantes", "simuladores", "autitos (simuladores)", "just dance", "just_dance")
+            }
             if (customSections.isEmpty()) {
                 val tvEmpty = TextView(this).apply {
                     text = "No has creado secciones adicionales aún."
@@ -2667,6 +2725,10 @@ class MainActivity : AppCompatActivity() {
                                     }
                                     database.child("secciones_salas").child(sec.id).removeValue()
                                     database.child("config_precios").child("precio_${sec.id}").removeValue()
+                                    listaSecciones.removeAll { it.id == sec.id || it.nombre.equals(sec.nombre, ignoreCase = true) }
+                                    redibujarListaSecciones()
+                                    onSeccionesModificadas?.invoke()
+
                                     // Cascada: Eliminar todas las salas asociadas a esta sección
                                     database.child("salas").get().addOnSuccessListener { snapshot ->
                                         for (child in snapshot.children) {
@@ -2682,7 +2744,9 @@ class MainActivity : AppCompatActivity() {
                                             }
                                         }
                                         Toast.makeText(this@MainActivity, "Sección '${sec.nombre}' y sus salas eliminadas", Toast.LENGTH_SHORT).show()
+                                        listaSecciones.removeAll { it.id == sec.id || it.nombre.equals(sec.nombre, ignoreCase = true) }
                                         redibujarListaSecciones()
+                                        onSeccionesModificadas?.invoke()
                                     }
                                 }
                                 .setNegativeButton("Cancelar", null)
@@ -2751,9 +2815,17 @@ class MainActivity : AppCompatActivity() {
                         database.child("config_precios").child("precio_$secId").setValue(precio)
                         BasePriceConfig.preciosDinamicos[secId] = precio
                         BasePriceConfig.preciosDinamicos[nombre] = precio
+                        val idx = listaSecciones.indexOfFirst { it.id == secId }
+                        if (idx != -1) {
+                            listaSecciones[idx] = seccionActualizada
+                        } else {
+                            listaSecciones.add(seccionActualizada)
+                        }
+
                         Toast.makeText(this, "✅ Sección '$nombre' actualizada con éxito", Toast.LENGTH_SHORT).show()
                         resetearFormulario()
                         redibujarListaSecciones()
+                        onSeccionesModificadas?.invoke()
                     }
                     .addOnFailureListener {
                         Toast.makeText(this, "Error al actualizar la sección: ${it.message}", Toast.LENGTH_SHORT).show()
@@ -2781,9 +2853,13 @@ class MainActivity : AppCompatActivity() {
                         database.child("config_precios").child("precio_$secId").setValue(precio)
                         BasePriceConfig.preciosDinamicos[secId] = precio
                         BasePriceConfig.preciosDinamicos[nombre] = precio
+
+                        listaSecciones.add(nuevaSeccion)
+
                         Toast.makeText(this, "✅ Sección '$nombre' creada y sincronizada con éxito", Toast.LENGTH_SHORT).show()
                         resetearFormulario()
                         redibujarListaSecciones()
+                        onSeccionesModificadas?.invoke()
                     }
                     .addOnFailureListener {
                         Toast.makeText(this, "Error al guardar la sección", Toast.LENGTH_SHORT).show()
@@ -3038,6 +3114,27 @@ class MainActivity : AppCompatActivity() {
             contenedor.addView(cb)
         }
         aplicarFiltrosRegistro()
+
+        val contenedorAudit = findViewById<LinearLayout>(R.id.llAuditFiltrosSeccionesDinamicas)
+        contenedorAudit?.removeAllViews()
+        for (sec in seccionesCustom) {
+            val isCheckedAudit = filtrosAuditSeccionesDinamicasEstado.getOrPut(sec.id) { true }
+            val cbAudit = CheckBox(this).apply {
+                text = "${sec.icono} ${sec.nombre}"
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                this.isChecked = isCheckedAudit
+                val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.setMargins((8 * resources.displayMetrics.density).toInt(), 0, 0, 0)
+                layoutParams = lp
+                setOnCheckedChangeListener { _, checked ->
+                    filtrosAuditSeccionesDinamicasEstado[sec.id] = checked
+                    aplicarFiltrosAuditoria()
+                }
+            }
+            contenedorAudit?.addView(cbAudit)
+        }
+        aplicarFiltrosAuditoria()
     }
 
     private fun aplicarFiltrosRegistro() {
@@ -3314,6 +3411,20 @@ class MainActivity : AppCompatActivity() {
             val tipoFiltro = auditFiltroTipo
             val fechaFiltro = auditFiltroFecha
 
+            val cbCine = findViewById<CheckBox>(R.id.cbAuditFiltroCine)?.isChecked ?: true
+            val cbAutitos = findViewById<CheckBox>(R.id.cbAuditFiltroAutitos)?.isChecked ?: true
+            val cbDance = findViewById<CheckBox>(R.id.cbAuditFiltroDance)?.isChecked ?: true
+            val cbMostrador = findViewById<CheckBox>(R.id.cbAuditFiltroMostrador)?.isChecked ?: true
+            val mapaAuditDinamicos = HashMap(filtrosAuditSeccionesDinamicasEstado)
+            val seccionesSnapshot = synchronized(listaSecciones) { ArrayList(listaSecciones) }
+            val seccionesValidas = seccionesSnapshot.filter { sec ->
+                val idLower = sec.id.trim().lowercase()
+                val nomLower = sec.nombre.trim().lowercase()
+                sec.activa &&
+                idLower !in listOf("minicine", "autitos", "just_dance", "cine", "cines", "volantes", "salas") &&
+                nomLower !in listOf("minicine", "autitos", "just dance", "just_dance", "cine", "cines", "volantes", "salas", "autitos (simuladores)")
+            }
+
             val eventosSalasSnapshot = synchronized(eventosSalasAudit) { ArrayList(eventosSalasAudit) }
             val historialSnapshot = synchronized(historialCompleto) { ArrayList(historialCompleto) }
 
@@ -3326,6 +3437,66 @@ class MainActivity : AppCompatActivity() {
                     reg.tipo.equals("Egreso", ignoreCase = true) || reg.nombreElemento.startsWith("Egreso", ignoreCase = true) -> TipoAuditoriaEvento.EGRESO
                     reg.tipo.equals("Consumo", ignoreCase = true) || reg.tipo.equals("Venta Directa", ignoreCase = true) || reg.nombreElemento.contains("Mostrador", ignoreCase = true) -> TipoAuditoriaEvento.VENTA
                     else -> TipoAuditoriaEvento.SALA_INICIO
+                }
+
+                val tipoLower = reg.tipo.trim().lowercase()
+                val nombreLower = reg.nombreElemento.trim().lowercase()
+                val pedidosLower = reg.pedidos.trim().lowercase()
+
+                val esEgreso = tipoLower.contains("egreso") || tipoLower.contains("gasto") ||
+                               nombreLower.contains("egreso") || nombreLower.contains("gasto") ||
+                               pedidosLower.contains("egreso")
+
+                val esMostrador = !esEgreso && (
+                    tipoLower.contains("consumo") || tipoLower.contains("mostrador") ||
+                    tipoLower.contains("venta directa") || tipoLower.contains("producto") ||
+                    tipoLower.contains("snack") || tipoLower.contains("bebida") ||
+                    tipoLower.contains("golosina") ||
+                    nombreLower.startsWith("consumo") || nombreLower.startsWith("venta")
+                )
+
+                val esCine = !esEgreso && !esMostrador && (
+                    tipoLower == "minicine" || tipoLower == "cine" || tipoLower.contains("cine") ||
+                    tipoLower == "salas" || tipoLower == "sala" || tipoLower == "alquiler de sala" ||
+                    nombreLower.contains("cine") ||
+                    (REGEX_SALA_TITULO.matches(nombreLower) &&
+                     !nombreLower.contains("auto") && !nombreLower.contains("volante") &&
+                     !nombreLower.contains("car") && !nombreLower.contains("dance"))
+                )
+
+                val esAutitos = !esEgreso && !esMostrador && !esCine && (
+                    tipoLower.contains("auto") || tipoLower.contains("car") ||
+                    tipoLower.contains("volante") || tipoLower.contains("simulador") ||
+                    nombreLower.contains("auto") || nombreLower.contains("car") ||
+                    nombreLower.contains("volante")
+                )
+
+                val esDance = !esEgreso && !esMostrador && !esCine && !esAutitos && (
+                    tipoLower.contains("dance") || tipoLower.contains("justplay") ||
+                    tipoLower == "just dance" || tipoLower == "just_dance" ||
+                    nombreLower.contains("dance")
+                )
+
+                val seccionCoincidente = if (!esEgreso && !esMostrador && !esCine && !esAutitos && !esDance) {
+                    seccionesValidas.find { sec ->
+                        val secNom = sec.nombre.trim().lowercase()
+                        val secId = sec.id.trim().lowercase()
+                        val secPref = sec.prefijoSala.trim().lowercase()
+
+                        tipoLower == secNom || tipoLower == secId ||
+                        (secNom.isNotBlank() && tipoLower.contains(secNom)) ||
+                        (secPref.isNotBlank() && secPref.length >= 2 && nombreLower.startsWith(secPref)) ||
+                        (secNom.isNotBlank() && nombreLower.startsWith(secNom))
+                    }
+                } else null
+
+                val catEv = when {
+                    esCine -> "cine"
+                    esAutitos -> "autitos"
+                    esDance -> "dance"
+                    esMostrador || esEgreso -> "mostrador"
+                    seccionCoincidente != null -> seccionCoincidente.id
+                    else -> "mostrador"
                 }
 
                 val badge = when (tipoEv) {
@@ -3355,6 +3526,7 @@ class MainActivity : AppCompatActivity() {
                     AuditoriaEvento(
                         id = reg.idFirebase,
                         tipo = tipoEv,
+                        categoria = catEv,
                         tituloBadge = badge,
                         usuarioNombre = userResponsable,
                         usuarioRol = if (reg.eliminado) "Eliminación" else "Registro",
@@ -3382,6 +3554,29 @@ class MainActivity : AppCompatActivity() {
             var countBorrados = 0
 
             for (ev in eventos) {
+                // 0. Filtro Categoria / Seccion
+                val catLower = ev.categoria.trim().lowercase()
+                val pasaCat = when {
+                    catLower == "cine" || catLower == "minicine" -> cbCine
+                    catLower == "autitos" || catLower == "volantes" || catLower == "car" -> cbAutitos
+                    catLower == "dance" || catLower == "just_dance" -> cbDance
+                    catLower == "mostrador" || catLower == "egreso" || catLower == "venta" -> cbMostrador
+                    mapaAuditDinamicos.containsKey(ev.categoria) -> mapaAuditDinamicos[ev.categoria] ?: true
+                    else -> {
+                        val secCoinc = seccionesValidas.find { sec ->
+                            sec.id.equals(ev.categoria, ignoreCase = true) ||
+                            sec.nombre.equals(ev.categoria, ignoreCase = true) ||
+                            (sec.prefijoSala.isNotBlank() && ev.elemento.startsWith(sec.prefijoSala, ignoreCase = true))
+                        }
+                        if (secCoinc != null) {
+                            mapaAuditDinamicos[secCoinc.id] ?: true
+                        } else {
+                            true
+                        }
+                    }
+                }
+                if (!pasaCat) continue
+
                 // 1. Filtro Tipo
                 val coincideTipo = when (tipoFiltro) {
                     "VENTAS" -> ev.tipo == TipoAuditoriaEvento.VENTA || ev.tipo == TipoAuditoriaEvento.EGRESO

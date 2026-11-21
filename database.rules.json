@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "config_pos": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "config_actualizaciones": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "config_precios": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "secciones_salas": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "usuarios": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "salas": {
+      ".read": true,
+      ".write": true
+    },
+    "historial": {
+      ".read": true,
+      ".write": true
+    },
+    "auditoria_salas": {
+      ".read": true,
+      ".write": true
+    },
+    "reservas": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

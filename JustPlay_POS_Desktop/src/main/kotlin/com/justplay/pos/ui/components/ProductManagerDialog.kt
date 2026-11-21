@@ -76,8 +76,8 @@ fun ProductManagerDialog(
 
     val parsedPrice = price.toDoubleOrNull() ?: 0.0
     val parsedCost = costPrice.toDoubleOrNull() ?: 0.0
-    // Validación: El costo de compra no puede ser mayor al precio de venta
-    val isCostInvalid = price.isNotBlank() && costPrice.isNotBlank() && (parsedCost > parsedPrice)
+    // Validación: El precio de venta debe ser estrictamente mayor al costo de compra
+    val isCostInvalid = price.isNotBlank() && costPrice.isNotBlank() && (parsedCost >= parsedPrice)
 
     val baseStock = initialProduct?.currentStock ?: 0
     val calculatedStock = remember(stockInput, baseStock) {
@@ -112,10 +112,10 @@ fun ProductManagerDialog(
                 it.name.trim().equals(cleanName, ignoreCase = true)
     }
 
-    val canSave = cleanBarcode.isNotBlank() && cleanName.isNotBlank() && !isDuplicateBarcode && !isDuplicateNameAndGramaje && !isCostInvalid && parsedPrice > 0.0
+    val canSave = cleanBarcode.isNotBlank() && cleanName.isNotBlank() && !isDuplicateBarcode && !isDuplicateNameAndGramaje && !isCostInvalid && parsedPrice > 0.0 && (parsedPrice > parsedCost)
 
     val performSave: () -> Unit = {
-        if (canSave && !isSaving) {
+        if (canSave && !isSaving && parsedPrice > parsedCost) {
             isSaving = true
             onSaveProduct(
                 Product(
@@ -403,7 +403,7 @@ fun ProductManagerDialog(
                 }
                 if (isCostInvalid) {
                     Text(
-                        text = "❌ El costo de compra ($parsedCost Bs) no puede ser mayor al precio de venta ($parsedPrice Bs).",
+                        text = "❌ El precio de venta ($parsedPrice Bs) debe ser mayor al costo de compra ($parsedCost Bs).",
                         color = AlertRed,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,

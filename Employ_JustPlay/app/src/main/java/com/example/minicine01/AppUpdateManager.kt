@@ -96,7 +96,7 @@ object AppUpdateManager {
                                     versionNueva = versionNueva,
                                     novedades = novedades,
                                     urlDescargaApk = urlApk,
-                                    esObligatoria = esObsoletaFinal || esObligatoriaDb
+                                    esObligatoria = true // En app de empleados las actualizaciones son obligatorias
                                 )
                                 activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                                 return
@@ -232,7 +232,7 @@ object AppUpdateManager {
                             versionNueva = tagName,
                             novedades = body,
                             urlDescargaApk = apkDownloadUrl,
-                            esObligatoria = esObsoleta || esObligatoriaDb
+                            esObligatoria = true // En app de empleados las actualizaciones son obligatorias
                         )
                         activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                         return@Thread

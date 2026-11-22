@@ -554,7 +554,7 @@ fun main() = application {
                     )
                 }
 
-                // Diálogo de Actualización Remota (GitHub Releases)
+                // Diálogo de Actualización Remota (GitHub Releases) - OBLIGATORIA
                 if (state.availableUpdate != null) {
                     UpdateDialog(
                         release = state.availableUpdate!!,
@@ -563,6 +563,7 @@ fun main() = application {
                         downloadProgress = state.updateDownloadProgress,
                         isDownloaded = state.isUpdateDownloaded,
                         statusMessage = state.updateStatusMessage,
+                        isMandatory = true, // Actualización obligatoria en Desktop
                         onStartDownload = { viewModel.startUpdateDownload() },
                         onApplyUpdate = { viewModel.applyDownloadedUpdate() },
                         onDismiss = { viewModel.dismissUpdateDialog() }
@@ -580,7 +581,12 @@ fun main() = application {
                 if (state.isVersionObsolete) {
                     ForceUpdateDialog(
                         currentVersion = state.currentAppVersion,
-                        minRequiredVersion = state.minRequiredVersion
+                        minRequiredVersion = state.minRequiredVersion,
+                        isDownloading = state.isDownloadingUpdate,
+                        downloadProgress = state.updateDownloadProgress,
+                        statusMessage = state.updateStatusMessage,
+                        onStartUpdate = { viewModel.startUpdateDownload() },
+                        onCloseApp = { kotlin.system.exitProcess(0) }
                     )
                 }
             }

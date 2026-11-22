@@ -86,24 +86,38 @@ class AutoUpdaterService(
                     return@withContext Result.success(null) // Ya está actualizado
                 }
 
-                // Buscar asset prioritario: .exe, .jar o .zip
+                // Buscar asset prioritario: JustPlayPOS.jar
                 var downloadUrl = ""
                 var assetName = ""
                 var assetSize = 0L
 
                 val assets = json.getAsJsonArray("assets")
                 if (assets != null && assets.size() > 0) {
+                    // 1. Priorizar JustPlayPOS.jar
                     for (assetElement in assets) {
                         val assetObj = assetElement.asJsonObject
                         val name = assetObj.get("name")?.asString ?: ""
-                        if (name.endsWith(".exe", ignoreCase = true) ||
-                            name.endsWith(".jar", ignoreCase = true) ||
-                            name.endsWith(".zip", ignoreCase = true)
-                        ) {
+                        if (name.contains("JustPlayPOS", ignoreCase = true) && name.endsWith(".jar", ignoreCase = true)) {
                             downloadUrl = assetObj.get("browser_download_url")?.asString ?: ""
                             assetName = name
                             assetSize = assetObj.get("size")?.asLong ?: 0L
                             break
+                        }
+                    }
+                    // 2. Si no encontró por nombre JustPlayPOS, cualquier .jar o .exe
+                    if (downloadUrl.isBlank()) {
+                        for (assetElement in assets) {
+                            val assetObj = assetElement.asJsonObject
+                            val name = assetObj.get("name")?.asString ?: ""
+                            if (name.endsWith(".jar", ignoreCase = true) ||
+                                name.endsWith(".exe", ignoreCase = true) ||
+                                name.endsWith(".zip", ignoreCase = true)
+                            ) {
+                                downloadUrl = assetObj.get("browser_download_url")?.asString ?: ""
+                                assetName = name
+                                assetSize = assetObj.get("size")?.asLong ?: 0L
+                                break
+                            }
                         }
                     }
                     // Si no encontró por extensión, usar el primer asset
@@ -187,26 +201,90 @@ class AutoUpdaterService(
     }
 
     /**
-     * Ejecuta el instalador descargado o abre la carpeta con la nueva versión.
+     * Aplica la actualización y reinicia la aplicación automáticamente en 1-Clic.
      */
-    fun openOrInstallUpdate(file: File) {
+    fun applyUpdateAndRestart(downloadedFile: File): Result<Boolean> {
         try {
             val os = System.getProperty("os.name").lowercase()
-            when {
-                os.contains("win") && file.name.endsWith(".exe", ignoreCase = true) -> {
-                    ProcessBuilder(file.absolutePath).start()
+
+            // 1. Determinar la ubicación del JAR en ejecución
+            val runningJar = try {
+                val codeSource = AutoUpdaterService::class.java.protectionDomain.codeSource
+                val location = codeSource?.location?.toURI()?.path
+                if (location != null && location.endsWith(".jar", ignoreCase = true)) {
+                    File(location)
+                } else {
+                    null
                 }
-                os.contains("win") && file.name.endsWith(".jar", ignoreCase = true) -> {
-                    ProcessBuilder("java", "-jar", file.absolutePath).start()
-                }
-                else -> {
-                    if (java.awt.Desktop.isDesktopSupported()) {
-                        java.awt.Desktop.getDesktop().open(file.parentFile ?: file)
-                    }
-                }
+            } catch (_: Exception) {
+                null
             }
+
+            // Ubicaciones estándar donde puede estar instalado JustPlayPOS
+            val userHome = System.getProperty("user.home")
+            val standardLinuxInstall = File(userHome, ".local/share/justplay/JustPlayPOS.jar")
+            val repoReleaseAsset = File("build/release_assets/JustPlayPOS.jar")
+
+            val targetJar = when {
+                runningJar != null && runningJar.isFile -> runningJar
+                standardLinuxInstall.exists() -> standardLinuxInstall
+                repoReleaseAsset.exists() -> repoReleaseAsset.absoluteFile
+                else -> standardLinuxInstall
+            }
+
+            targetJar.parentFile?.mkdirs()
+
+            if (os.contains("win")) {
+                // Windows: script .bat para esperar que termine el proceso, reemplazar y reabrir
+                val updaterScript = File.createTempFile("justplay_update_", ".bat")
+                updaterScript.writeText(
+                    """
+                    @echo off
+                    timeout /t 2 /nobreak > nul
+                    copy /y "${downloadedFile.absolutePath}" "${targetJar.absolutePath}"
+                    del "${downloadedFile.absolutePath}"
+                    start "" javaw -Xmx2048m -jar "${targetJar.absolutePath}"
+                    del "%~f0"
+                    """.trimIndent()
+                )
+                ProcessBuilder("cmd.exe", "/c", updaterScript.absolutePath).start()
+                kotlin.system.exitProcess(0)
+            } else {
+                // Linux / macOS: script bash para reemplazar en segundo plano y reiniciar
+                val updaterScript = File.createTempFile("justplay_update_", ".sh")
+                val scriptContent = """
+                    #!/bin/bash
+                    sleep 1
+                    cp -f "${downloadedFile.absolutePath}" "${targetJar.absolutePath}"
+                    chmod +x "${targetJar.absolutePath}"
+                    
+                    # Si existe la instalación estándar de GNOME, actualizarla también
+                    STD_PATH="$userHome/.local/share/justplay/JustPlayPOS.jar"
+                    if [ -d "$userHome/.local/share/justplay" ] && [ "${targetJar.absolutePath}" != "${'$'}STD_PATH" ]; then
+                        cp -f "${downloadedFile.absolutePath}" "${'$'}STD_PATH"
+                        chmod +x "${'$'}STD_PATH"
+                    fi
+                    
+                    nohup java -Xmx2048m -jar "${targetJar.absolutePath}" >/dev/null 2>&1 &
+                    rm -f "$0"
+                """.trimIndent()
+
+                updaterScript.writeText(scriptContent)
+                updaterScript.setExecutable(true)
+                ProcessBuilder("bash", updaterScript.absolutePath).start()
+                kotlin.system.exitProcess(0)
+            }
+            return Result.success(true)
         } catch (e: Exception) {
             e.printStackTrace()
+            return Result.failure(e)
         }
+    }
+
+    /**
+     * Ejecuta el instalador descargado o abre la carpeta con la nueva versión (fallback).
+     */
+    fun openOrInstallUpdate(file: File) {
+        applyUpdateAndRestart(file)
     }
 }

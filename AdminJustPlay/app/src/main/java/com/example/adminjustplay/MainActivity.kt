@@ -1529,7 +1529,7 @@ class MainActivity : AppCompatActivity() {
 
                     val versionActual = AppUpdateManager.obtenerVersionAppActual(this@MainActivity)
                     if (AppUpdateManager.esVersionSuperior(minVer, versionActual)) {
-                        AppUpdateManager.verificarActualizacion(this@MainActivity, "AdminJustPlay", forzarObligatoria = true)
+                        AppUpdateManager.verificarActualizacion(this@MainActivity, "AdminJustPlay", forzarObligatoria = false)
                     }
 
                     val permitirTodas = snapshot.child("permitir_todas_las_pc").getValue(Boolean::class.java)

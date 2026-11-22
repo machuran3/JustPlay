@@ -26,12 +26,13 @@ fun UpdateDialog(
     downloadProgress: Float,
     isDownloaded: Boolean,
     statusMessage: String?,
+    isMandatory: Boolean = true,
     onStartDownload: () -> Unit,
     onApplyUpdate: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(
-        onDismissRequest = { if (!isDownloading) onDismiss() },
+        onDismissRequest = { if (!isMandatory && !isDownloading) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
@@ -191,14 +192,14 @@ fun UpdateDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (!isDownloading && !isDownloaded) {
+                    if (!isMandatory && !isDownloading && !isDownloaded) {
                         OutlinedButton(
                             onClick = onDismiss,
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = TextMuted),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.height(42.dp)
                         ) {
-                            Text("Más Tarde", fontSize = 12.sp)
+                            Text("Recordar más tarde", fontSize = 12.sp)
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                     }
@@ -210,7 +211,9 @@ fun UpdateDialog(
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.height(42.dp)
                         ) {
-                            Text("🔄 Instalar y Abrir", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("🔄 Reiniciando...", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     } else if (isDownloading) {
                         Button(
@@ -222,7 +225,7 @@ fun UpdateDialog(
                         ) {
                             CircularProgressIndicator(color = AccentLime, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Descargando...", fontSize = 12.sp, color = TextMuted)
+                            Text("Descargando e Instalando...", fontSize = 12.sp, color = TextMuted)
                         }
                     } else {
                         Button(
@@ -231,7 +234,7 @@ fun UpdateDialog(
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.height(42.dp)
                         ) {
-                            Text("⬇️ Descargar Actualización", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("⚡ Actualizar Ahora (1-Clic)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }

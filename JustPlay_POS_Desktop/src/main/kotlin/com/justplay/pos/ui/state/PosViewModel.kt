@@ -1344,20 +1344,62 @@ class PosViewModel(
     }
 
     fun startUpdateDownload() {
-        val release = _uiState.value.availableUpdate ?: return
+        val release = _uiState.value.availableUpdate
         if (_uiState.value.isDownloadingUpdate) return
 
+        if (release == null) {
+            // Si aún no tenemos los datos del release (ej: forzado por versión obsoleta), buscamos y descargamos
+            scope.launch {
+                _uiState.update {
+                    it.copy(
+                        isDownloadingUpdate = true,
+                        updateDownloadProgress = 0.05f,
+                        updateStatusMessage = "Conectando con el servidor de actualizaciones..."
+                    )
+                }
+                val checkResult = autoUpdaterService.checkForUpdates("0.0.0")
+                checkResult.fold(
+                    onSuccess = { foundRelease ->
+                        if (foundRelease != null) {
+                            _uiState.update { it.copy(availableUpdate = foundRelease) }
+                            ejecutarDescargaEInstalacion(foundRelease)
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    isDownloadingUpdate = false,
+                                    updateStatusMessage = "No se encontró paquete de actualización en GitHub."
+                                )
+                            }
+                        }
+                    },
+                    onFailure = { err ->
+                        _uiState.update {
+                            it.copy(
+                                isDownloadingUpdate = false,
+                                updateStatusMessage = "Error al conectar: ${err.message}"
+                            )
+                        }
+                    }
+                )
+            }
+            return
+        }
+
+        ejecutarDescargaEInstalacion(release)
+    }
+
+    private fun ejecutarDescargaEInstalacion(release: com.justplay.pos.services.ReleaseInfo) {
         _uiState.update {
             it.copy(
                 isDownloadingUpdate = true,
-                updateDownloadProgress = 0f,
+                updateDownloadProgress = 0.1f,
                 updateStatusMessage = "Descargando versión ${release.tagName}..."
             )
         }
 
         scope.launch {
             val appDir = java.io.File(System.getProperty("user.home"), ".justplay_pos/updates")
-            val targetFile = java.io.File(appDir, release.assetName.ifBlank { "JustPlayPOS_update.jar" })
+            val targetFile = java.io.File(appDir, "JustPlayPOS.jar")
 
             val result = autoUpdaterService.downloadAsset(release.downloadUrl, targetFile) { progress ->
                 _uiState.update { it.copy(updateDownloadProgress = progress) }
@@ -1370,9 +1412,12 @@ class PosViewModel(
                             isDownloadingUpdate = false,
                             isUpdateDownloaded = true,
                             downloadedUpdateFile = file,
-                            updateStatusMessage = "Descarga completada: ${file.name}"
+                            updateStatusMessage = "✅ Descarga completada. Aplicando actualización y reiniciando JustPlay POS..."
                         )
                     }
+                    // Auto-actualización 1-Clic: aplica el reemplazo y reinicia de forma autónoma
+                    kotlinx.coroutines.delay(1000)
+                    autoUpdaterService.applyUpdateAndRestart(file)
                 },
                 onFailure = { err ->
                     _uiState.update {
@@ -1388,7 +1433,7 @@ class PosViewModel(
 
     fun applyDownloadedUpdate() {
         val file = _uiState.value.downloadedUpdateFile ?: return
-        autoUpdaterService.openOrInstallUpdate(file)
+        autoUpdaterService.applyUpdateAndRestart(file)
     }
 }
 

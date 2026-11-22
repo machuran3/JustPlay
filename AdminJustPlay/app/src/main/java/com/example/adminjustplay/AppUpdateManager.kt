@@ -92,18 +92,18 @@ object AppUpdateManager {
                                     versionNueva = versionNueva,
                                     novedades = novedades,
                                     urlDescargaApk = urlApk,
-                                    esObligatoria = esObsoletaFinal || esObligatoriaDb
+                                    esObligatoria = false // En Admin nunca es obligatoria
                                 )
                                 activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                                 return
                             }
 
                             if (!repoGitHub.isNullOrEmpty()) {
-                                consultarGitHubReleases(activity, repoGitHub, versionActual, mostrarToastSiNoHay, esObsoletaFinal, minVerPos, esObligatoriaDb)
+                                consultarGitHubReleases(activity, repoGitHub, versionActual, mostrarToastSiNoHay, false, minVerPos, false)
                                 return
                             }
                         } else if (!githubOwnerRepo.isNullOrEmpty()) {
-                            consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay, esVersionObsoleta, minVerPos, false)
+                            consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay, false, minVerPos, false)
                             return
                         }
 
@@ -112,9 +112,9 @@ object AppUpdateManager {
                                 hayNuevaVersion = true,
                                 versionActual = versionActual,
                                 versionNueva = minVerPos,
-                                novedades = "⚠️ Tu versión actual (v$versionActual) ha quedado obsoleta.\nLa versión mínima requerida es v$minVerPos. Debes actualizar la aplicación para continuar.",
+                                novedades = "⚠️ Tu versión actual (v$versionActual) ha quedado obsoleta.\nLa versión recomendada es v$minVerPos. Puedes actualizar ahora o posponerlo.",
                                 urlDescargaApk = if (!githubOwnerRepo.isNullOrEmpty()) "https://github.com/$githubOwnerRepo/releases" else "",
-                                esObligatoria = true
+                                esObligatoria = false // En Admin nunca es obligatoria
                             )
                             activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                             return
@@ -129,15 +129,15 @@ object AppUpdateManager {
 
                     override fun onCancelled(error: DatabaseError) {
                         if (!githubOwnerRepo.isNullOrEmpty()) {
-                            consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay, esVersionObsoleta, minVerPos, false)
+                            consultarGitHubReleases(activity, githubOwnerRepo, versionActual, mostrarToastSiNoHay, false, minVerPos, false)
                         } else if (esVersionObsoleta) {
                             val info = ActualizacionInfo(
                                 hayNuevaVersion = true,
                                 versionActual = versionActual,
                                 versionNueva = minVerPos,
-                                novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión mínima requerida (v$minVerPos).",
+                                novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión recomendada (v$minVerPos).",
                                 urlDescargaApk = if (!githubOwnerRepo.isNullOrEmpty()) "https://github.com/$githubOwnerRepo/releases" else "",
-                                esObligatoria = true
+                                esObligatoria = false
                             )
                             activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                         } else if (mostrarToastSiNoHay) {
@@ -224,7 +224,7 @@ object AppUpdateManager {
                             versionNueva = tagName,
                             novedades = body,
                             urlDescargaApk = apkDownloadUrl,
-                            esObligatoria = esObsoleta || esObligatoriaDb
+                            esObligatoria = false // En Admin nunca es obligatoria
                         )
                         activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                         return@Thread
@@ -235,9 +235,9 @@ object AppUpdateManager {
                             hayNuevaVersion = true,
                             versionActual = versionActual,
                             versionNueva = if (tagName.isNotEmpty() && esVersionSuperior(tagName, versionMinimaRequerida)) tagName else versionMinimaRequerida,
-                            novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión mínima requerida (v$versionMinimaRequerida).\nDebes actualizar la aplicación para continuar.",
+                            novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión recomendada (v$versionMinimaRequerida).\nPuedes actualizar o posponerlo.",
                             urlDescargaApk = apkDownloadUrl.ifEmpty { htmlUrl.ifEmpty { "https://github.com/$cleanRepo/releases" } },
-                            esObligatoria = true
+                            esObligatoria = false
                         )
                         activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                         return@Thread
@@ -247,9 +247,9 @@ object AppUpdateManager {
                         hayNuevaVersion = true,
                         versionActual = versionActual,
                         versionNueva = versionMinimaRequerida,
-                        novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión mínima requerida (v$versionMinimaRequerida).\nDebes actualizar la aplicación para continuar.",
+                        novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión recomendada (v$versionMinimaRequerida).\nPuedes actualizar o posponerlo.",
                         urlDescargaApk = "https://github.com/$cleanRepo/releases",
-                        esObligatoria = true
+                        esObligatoria = false
                     )
                     activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                     return@Thread
@@ -267,9 +267,9 @@ object AppUpdateManager {
                         hayNuevaVersion = true,
                         versionActual = versionActual,
                         versionNueva = versionMinimaRequerida,
-                        novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión mínima requerida (v$versionMinimaRequerida).\nDebes actualizar la aplicación para continuar.",
+                        novedades = "⚠️ Tu versión actual (v$versionActual) es inferior a la versión recomendada (v$versionMinimaRequerida).\nPuedes actualizar o posponerlo.",
                         urlDescargaApk = "https://github.com/$cleanRepo/releases",
-                        esObligatoria = true
+                        esObligatoria = false
                     )
                     activity.runOnUiThread { mostrarDialogoActualizacion(activity, info) }
                     return@Thread
@@ -292,18 +292,14 @@ object AppUpdateManager {
             }
         } catch (_: Exception) {}
 
+        // En AdminJustPlay las actualizaciones NO son obligatorias (siempre permitir recordar más tarde)
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_actualizacion_app, null)
         val dialog = AlertDialog.Builder(activity)
             .setView(dialogView)
-            .setCancelable(!info.esObligatoria)
+            .setCancelable(true)
             .create()
 
-        if (info.esObligatoria) {
-            dialog.setCanceledOnTouchOutside(false)
-            dialog.setOnKeyListener { _, keyCode, _ ->
-                keyCode == android.view.KeyEvent.KEYCODE_BACK
-            }
-        }
+        dialog.setCanceledOnTouchOutside(true)
 
         dialogoActual = dialog
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
@@ -319,11 +315,10 @@ object AppUpdateManager {
         tvVersiones.text = "v${info.versionActual}  ➔  v${info.versionNueva}"
         tvNovedades.text = if (info.novedades.isNotBlank()) info.novedades else "• Corrección de errores y optimizaciones generales."
 
-        if (info.esObligatoria) {
-            btnMasTarde.visibility = View.GONE
-        } else {
-            btnMasTarde.setOnClickListener { dialog.dismiss() }
-        }
+        // Botón "Recordar más tarde" siempre disponible para el Administrador
+        btnMasTarde.visibility = View.VISIBLE
+        btnMasTarde.text = "Recordar más tarde"
+        btnMasTarde.setOnClickListener { dialog.dismiss() }
 
         btnNavegador.setOnClickListener {
             try {

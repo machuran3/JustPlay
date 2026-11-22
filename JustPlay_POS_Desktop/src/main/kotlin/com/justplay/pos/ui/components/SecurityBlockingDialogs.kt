@@ -162,7 +162,12 @@ fun DeviceRevokedDialog(
 @Composable
 fun ForceUpdateDialog(
     currentVersion: String,
-    minRequiredVersion: String
+    minRequiredVersion: String,
+    isDownloading: Boolean = false,
+    downloadProgress: Float = 0f,
+    statusMessage: String? = null,
+    onStartUpdate: () -> Unit = {},
+    onCloseApp: () -> Unit = { exitProcess(0) }
 ) {
     Dialog(
         onDismissRequest = { /* Modal estricto: no se permite cerrar */ },
@@ -269,27 +274,85 @@ fun ForceUpdateDialog(
                     }
                 }
 
-                Text(
-                    text = "Por favor, descarga e instala la última compilación de JustPlayPOS.jar para continuar operando.",
-                    color = TextMuted,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center
-                )
+                if (isDownloading) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = statusMessage ?: "Descargando e instalando...",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = "${(downloadProgress * 100).toInt()}%",
+                                color = AccentLime,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { downloadProgress },
+                            modifier = Modifier.fillMaxWidth().height(8.dp),
+                            color = AccentLime,
+                            trackColor = SurfaceDark
+                        )
+                    }
+                } else if (statusMessage != null) {
+                    Text(
+                        text = statusMessage,
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Text(
+                        text = "Puedes actualizar automáticamente con un solo clic o cerrar la aplicación.",
+                        color = TextMuted,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                Button(
-                    onClick = { exitProcess(0) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = WarningYellow,
-                        contentColor = Color.Black
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Cerrar Aplicación para Actualizar", fontWeight = FontWeight.Bold)
+                    OutlinedButton(
+                        onClick = onCloseApp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextMuted)
+                    ) {
+                        Text("Cerrar App", fontSize = 13.sp)
+                    }
+
+                    Button(
+                        onClick = onStartUpdate,
+                        enabled = !isDownloading,
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = AccentLime,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        if (isDownloading) {
+                            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Actualizando...", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        } else {
+                            Text("⚡ Actualizar Ahora", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 }
             }
         }

@@ -190,16 +190,19 @@ fun ScheduleDashboardPanel(
             border = androidx.compose.foundation.BorderStroke(1.dp, BorderDark),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Título y Selector de Fechas
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Fila 1: Título a la izquierda, Acciones (Vistas, Excel, Refrescar) a la derecha
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.CalendarToday, contentDescription = null, tint = AccentLime, modifier = Modifier.size(20.dp))
                         Text(
                             text = "TABLERO DE HORARIOS Y RESERVAS",
@@ -209,6 +212,70 @@ fun ScheduleDashboardPanel(
                         )
                     }
 
+                    // Selector de Vista, Botón Excel y Botón Refrescar
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(
+                                onClick = { onViewModeChange("GRID") },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = if (viewMode == "GRID") AccentGreen else CardDark,
+                                    contentColor = if (viewMode == "GRID") Color.Black else TextPrimary
+                                ),
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(Icons.Default.GridView, contentDescription = "Cuadrícula Excel", modifier = Modifier.size(18.dp))
+                            }
+
+                            IconButton(
+                                onClick = { onViewModeChange("TABLE") },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = if (viewMode == "TABLE") AccentGreen else CardDark,
+                                    contentColor = if (viewMode == "TABLE") Color.Black else TextPrimary
+                                ),
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(Icons.Default.TableRows, contentDescription = "Tabla Resumen", modifier = Modifier.size(18.dp))
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                try {
+                                    val (xlsxRec, _) = com.justplay.pos.services.ExcelReportExporter.exportSessions(records)
+                                    val (xlsxRes, _) = com.justplay.pos.services.ExcelReportExporter.exportReservations(reservations)
+                                    exportNotification = "✅ Reportes exportados a:\n${xlsxRec.name} y ${xlsxRes.name}\nCarpeta: ${xlsxRec.parentFile?.absolutePath}"
+                                } catch (e: Exception) {
+                                    exportNotification = "❌ Error al exportar: ${e.message}"
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("📊 Excel", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        IconButton(
+                            onClick = onRefresh,
+                            colors = IconButtonDefaults.iconButtonColors(containerColor = CardDark, contentColor = AccentLime),
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Actualizar", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = BorderDark, thickness = 0.5.dp)
+
+                // Fila 2: Filtros de Fecha y Filtros de Categoría con Scroll Horizontal
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     // Chips de Fecha Rápida (Ayer, Hoy, Mañana, Todas)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         val isAyer = !isAllDates && currentDateStr == yesterdayStr
@@ -262,12 +329,11 @@ fun ScheduleDashboardPanel(
                             )
                         )
                     }
-                }
 
-                // Filtro de Categoría, Selector de Vista, Botón Excel y Botón Refrescar
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VerticalDivider(modifier = Modifier.height(24.dp), color = BorderDark)
+
                     // Selector de Categoría
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(
                             "TODOS" to "🎮 Todos (${rooms.size})",
                             "MINICINE" to "🎬 Cines ($countCines)",
@@ -290,60 +356,6 @@ fun ScheduleDashboardPanel(
                                 )
                             }
                         }
-                    }
-
-                    VerticalDivider(modifier = Modifier.height(24.dp), color = BorderDark)
-
-                    // Selector de Vista (Cuadrícula Excel vs Tabla)
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        IconButton(
-                            onClick = { onViewModeChange("GRID") },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (viewMode == "GRID") AccentGreen else CardDark,
-                                contentColor = if (viewMode == "GRID") Color.Black else TextPrimary
-                            ),
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Icon(Icons.Default.GridView, contentDescription = "Cuadrícula Excel", modifier = Modifier.size(18.dp))
-                        }
-
-                        IconButton(
-                            onClick = { onViewModeChange("TABLE") },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (viewMode == "TABLE") AccentGreen else CardDark,
-                                contentColor = if (viewMode == "TABLE") Color.Black else TextPrimary
-                            ),
-                            modifier = Modifier.size(34.dp)
-                        ) {
-                            Icon(Icons.Default.TableRows, contentDescription = "Tabla Resumen", modifier = Modifier.size(18.dp))
-                        }
-                    }
-
-                    // Botón Exportar Reporte a Excel
-                    Button(
-                        onClick = {
-                            try {
-                                val (xlsxRec, _) = com.justplay.pos.services.ExcelReportExporter.exportSessions(records)
-                                val (xlsxRes, _) = com.justplay.pos.services.ExcelReportExporter.exportReservations(reservations)
-                                exportNotification = "✅ Reportes exportados a:\n${xlsxRec.name} y ${xlsxRes.name}\nCarpeta: ${xlsxRec.parentFile?.absolutePath}"
-                            } catch (e: Exception) {
-                                exportNotification = "❌ Error al exportar: ${e.message}"
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.Black),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Text("📊 Excel", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    IconButton(
-                        onClick = onRefresh,
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = CardDark, contentColor = AccentLime),
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Actualizar", modifier = Modifier.size(18.dp))
                     }
                 }
             }

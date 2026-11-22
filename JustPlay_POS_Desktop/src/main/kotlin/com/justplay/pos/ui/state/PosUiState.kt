@@ -52,7 +52,7 @@ data class PosUiState(
     val viewReceiptForReservation: String? = null,
 
     // Tablero de Horarios / Cronograma Tipo Excel
-    val scheduleSelectedDate: String = "TODAS",
+    val scheduleSelectedDate: String = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date()),
     val scheduleCategoryFilter: String = "TODOS", // "TODOS", "MINICINE", "VOLANTES", "JUST_DANCE"
     val scheduleViewMode: String = "GRID", // "GRID" (Cuadrícula Excel) o "TABLE" (Tabla Resumen)
 

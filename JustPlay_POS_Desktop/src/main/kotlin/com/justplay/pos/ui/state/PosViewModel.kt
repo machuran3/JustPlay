@@ -127,8 +127,9 @@ class PosViewModel(
             }
         }
 
-        // Inicializar fecha para el cronograma (Por defecto: "TODAS" para ver todas las reservas)
-        _uiState.update { it.copy(scheduleSelectedDate = "TODAS") }
+        // Inicializar fecha para el cronograma (Por defecto: Hoy para ver las reservas de la jornada actual)
+        val todayInit = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date())
+        _uiState.update { it.copy(scheduleSelectedDate = todayInit) }
 
         // Cargar precios base configurados en Firebase
         scope.launch {

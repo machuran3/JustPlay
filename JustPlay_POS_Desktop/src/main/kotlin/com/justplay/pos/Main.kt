@@ -1,6 +1,8 @@
 package com.justplay.pos
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -149,7 +151,10 @@ fun main() = application {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 val isSalas = state.currentTab == "SALAS"

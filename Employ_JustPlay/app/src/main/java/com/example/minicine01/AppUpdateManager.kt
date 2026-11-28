@@ -547,9 +547,9 @@ object AppUpdateManager {
     fun obtenerVersionAppActual(context: Context): String {
         return try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            pInfo.versionName ?: "1.0.9"
+            pInfo.versionName ?: "1.1.0"
         } catch (e: Exception) {
-            "1.0.9"
+            "1.1.0"
         }
     }
 

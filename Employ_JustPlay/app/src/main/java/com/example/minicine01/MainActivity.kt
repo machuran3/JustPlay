@@ -454,11 +454,30 @@ class MainActivity : AppCompatActivity() {
                 tvDispositivoInfoBloqueo.text = "Dispositivo: ${user.nombre} (${user.id})"
             }
 
-            // Estado inicial de sesión
+            // Estado inicial de sesión y validación de versión requerida
+            val prefsConfig = getSharedPreferences("justplay_config", Context.MODE_PRIVATE)
+            val cachedMinVer = prefsConfig.getString("min_version_required", null)
+            val versionActualApp = AppUpdateManager.obtenerVersionAppActual(this)
+            if (!cachedMinVer.isNullOrEmpty() && AppUpdateManager.esVersionSuperior(cachedMinVer, versionActualApp)) {
+                versionObsoletaBloqueada = true
+                minVersionRequeridaPos = cachedMinVer
+            }
+
             val userInicial = PresenciaManager.obtenerUsuarioActualModel()
             val estabaAutenticado = PresenciaManager.estaSesionAutenticada(this)
 
-            if (estabaAutenticado && !userInicial.bloqueado && !userInicial.estaExpirado()) {
+            if (versionObsoletaBloqueada) {
+                sesionIniciada = false
+                layoutLoginPin.visibility = View.VISIBLE
+                layoutBloqueo.visibility = View.VISIBLE
+                tvTituloBloqueo.text = "🚫 Versión de App Obsoleta"
+                tvMotivoBloqueo.text = "Tu versión (v$versionActualApp) ha quedado desactualizada. Se requiere mínimo v$minVersionRequeridaPos para sincronizar y operar. Por favor actualiza la app."
+                fabMain.visibility = View.GONE
+                drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                try {
+                    FirebaseDatabase.getInstance().goOffline()
+                } catch (_: Exception) {}
+            } else if (estabaAutenticado && !userInicial.bloqueado && !userInicial.estaExpirado()) {
                 sesionIniciada = true
                 layoutLoginPin.visibility = View.GONE
                 layoutBloqueo.visibility = View.GONE
@@ -664,6 +683,9 @@ class MainActivity : AppCompatActivity() {
                                 ?: snapshot.child("min_app_version_desktop").getValue(String::class.java)
                                 ?: "1.0.0"
                             val versionActual = AppUpdateManager.obtenerVersionAppActual(this@MainActivity)
+                            val prefs = getSharedPreferences("justplay_config", Context.MODE_PRIVATE)
+                            prefs.edit().putString("min_version_required", minVer).apply()
+
                             if (AppUpdateManager.esVersionSuperior(minVer, versionActual)) {
                                 versionObsoletaBloqueada = true
                                 minVersionRequeridaPos = minVer
@@ -678,6 +700,16 @@ class MainActivity : AppCompatActivity() {
                                     FirebaseDatabase.getInstance().goOffline()
                                 } catch (_: Exception) {}
                                 AppUpdateManager.verificarActualizacion(this@MainActivity, "Employ_JustPlay", forzarObligatoria = true)
+                            } else {
+                                if (versionObsoletaBloqueada) {
+                                    versionObsoletaBloqueada = false
+                                    try {
+                                        FirebaseDatabase.getInstance().goOnline()
+                                    } catch (_: Exception) {}
+                                    iniciarListenerCatalogoProductos()
+                                    qrValidationHelper.iniciarEscucha()
+                                    sincronizarConFirebase()
+                                }
                             }
                         } catch (e: Exception) {
                             e.printStackTrace()
@@ -728,9 +760,11 @@ class MainActivity : AppCompatActivity() {
                 e.printStackTrace()
             }
 
-            iniciarListenerCatalogoProductos()
-            qrValidationHelper.iniciarEscucha()
-            sincronizarConFirebase()
+            if (!versionObsoletaBloqueada) {
+                iniciarListenerCatalogoProductos()
+                qrValidationHelper.iniciarEscucha()
+                sincronizarConFirebase()
+            }
 
         } catch (t: Throwable) {
             Log.e("Employ_JustPlay", "CRITICAL ERROR in onCreate", t)
@@ -843,6 +877,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sincronizarConFirebase() {
+        if (versionObsoletaBloqueada) {
+            try {
+                FirebaseDatabase.getInstance().goOffline()
+            } catch (_: Exception) {}
+            return
+        }
+
         // Habilitar sincronización local offline en disco
         try {
             database.child("salas").keepSynced(true)

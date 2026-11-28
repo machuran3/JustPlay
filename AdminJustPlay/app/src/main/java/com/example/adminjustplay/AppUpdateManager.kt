@@ -363,15 +363,49 @@ object AppUpdateManager {
     ) {
         Thread {
             try {
-                val url = URL(apkUrl)
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 15000
-                conn.readTimeout = 20000
-                conn.connect()
+                var currentUrl = apkUrl
+                var conn: HttpURLConnection? = null
+                var redirects = 0
+                val maxRedirects = 8
 
-                if (conn.responseCode != HttpURLConnection.HTTP_OK) {
+                while (redirects < maxRedirects) {
+                    val u = URL(currentUrl)
+                    val c = u.openConnection() as HttpURLConnection
+                    c.instanceFollowRedirects = true
+                    c.connectTimeout = 20000
+                    c.readTimeout = 30000
+                    c.setRequestProperty("User-Agent", "JustPlay-InAppUpdater")
+                    c.connect()
+
+                    val status = c.responseCode
+                    if (status == HttpURLConnection.HTTP_MOVED_TEMP ||
+                        status == HttpURLConnection.HTTP_MOVED_PERM ||
+                        status == HttpURLConnection.HTTP_SEE_OTHER ||
+                        status == 307 || status == 308
+                    ) {
+                        val newLocation = c.getHeaderField("Location")
+                        c.disconnect()
+                        if (!newLocation.isNullOrEmpty()) {
+                            currentUrl = if (newLocation.startsWith("http://") || newLocation.startsWith("https://")) {
+                                newLocation
+                            } else {
+                                URL(u, newLocation).toString()
+                            }
+                            redirects++
+                            continue
+                        }
+                    }
+
+                    conn = c
+                    break
+                }
+
+                if (conn == null || conn.responseCode != HttpURLConnection.HTTP_OK) {
+                    val code = conn?.responseCode ?: -1
+                    conn?.disconnect()
                     activity.runOnUiThread {
-                        Toast.makeText(activity, "Error al conectar con el servidor de descarga (${conn.responseCode})", Toast.LENGTH_LONG).show()
+                        Toast.makeText(activity, "Error al conectar con el servidor de descarga (HTTP $code)", Toast.LENGTH_LONG).show()
+                        tvEstado.text = "❌ Error HTTP $code al descargar. Usa el botón de navegador."
                         onResultado(false)
                     }
                     return@Thread
@@ -383,27 +417,43 @@ object AppUpdateManager {
                 if (apkFile.exists()) apkFile.delete()
 
                 val input = conn.inputStream
-                val output = FileOutputStream(apkFile)
+                val fos = FileOutputStream(apkFile)
 
-                val data = ByteArray(4096)
+                val data = ByteArray(8192)
                 var total: Long = 0
                 var count: Int
 
                 while (input.read(data).also { count = it } != -1) {
                     total += count.toLong()
                     if (fileLength > 0) {
-                        val progress = (total * 100 / fileLength).toInt()
+                        val progress = ((total * 100) / fileLength).toInt().coerceIn(0, 100)
                         activity.runOnUiThread {
                             progressBar.progress = progress
                             tvEstado.text = "Descargando: $progress% (${total / (1024 * 1024)}MB / ${fileLength / (1024 * 1024)}MB)"
                         }
                     }
-                    output.write(data, 0, count)
+                    fos.write(data, 0, count)
                 }
 
-                output.flush()
-                output.close()
+                fos.flush()
+                try {
+                    fos.fd.sync()
+                } catch (_: Exception) {}
+                fos.close()
                 input.close()
+                conn.disconnect()
+
+                // Validar que el archivo descargado no esté corrupto ni vacío (mínimo 500 KB para un APK)
+                if (!apkFile.exists() || apkFile.length() < 500_000L) {
+                    activity.runOnUiThread {
+                        tvEstado.text = "❌ Paquete de actualización incompleto o dañado."
+                        Toast.makeText(activity, "El archivo descargado está incompleto. Usa el botón navegador.", Toast.LENGTH_LONG).show()
+                        onResultado(false)
+                    }
+                    return@Thread
+                }
+
+                apkFile.setReadable(true, false)
 
                 activity.runOnUiThread {
                     tvEstado.text = "✅ Descarga completa. Abriendo instalador..."
@@ -413,7 +463,7 @@ object AppUpdateManager {
             } catch (e: Exception) {
                 e.printStackTrace()
                 activity.runOnUiThread {
-                    tvEstado.text = "❌ Error en la descarga. Usa el botón de navegador."
+                    tvEstado.text = "❌ Error en la descarga: ${e.localizedMessage}"
                     Toast.makeText(activity, "Error de descarga: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                     onResultado(false)
                 }
@@ -441,8 +491,17 @@ object AppUpdateManager {
 
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
-                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
+
+            val resInfoList = activity.packageManager.queryIntentActivities(installIntent, 0)
+            for (resolveInfo in resInfoList) {
+                val pkg = resolveInfo.activityInfo.packageName
+                activity.grantUriPermission(pkg, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
             activity.startActivity(installIntent)
         } catch (e: Exception) {
             e.printStackTrace()

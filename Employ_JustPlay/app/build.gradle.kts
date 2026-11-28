@@ -18,14 +18,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            val ksInProject = file("${rootDir}/keystore/justplay.keystore")
+            val ksInParent = file("${rootDir}/../keystore/justplay.keystore")
+            storeFile = if (ksInProject.exists()) ksInProject else ksInParent
+            storePassword = "justplay2026"
+            keyAlias = "justplay"
+            keyPassword = "justplay2026"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
